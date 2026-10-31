@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: 检出源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 释放磁盘空间
         # 基础镜像包含 Go 工具链、Node.js 与 Debian 构建依赖，两平台构建缓存
@@ -130,7 +130,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: 检出源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 构建 golang 镜像（不推送）
         run: |

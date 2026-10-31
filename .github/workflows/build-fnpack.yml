@@ -67,7 +67,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: 检出源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # workflow_run 时用触发那次 build-golang 的 commit，保证两边同源
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
@@ -130,7 +130,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: 检出源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 构建 golang 基础镜像（不推送）
         run: |
