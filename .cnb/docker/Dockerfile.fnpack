@@ -1,0 +1,54 @@
+# ===================================================================
+# Golang 构建环境镜像 + fnpack
+#
+# 在 Dockerfile.golang 产出的镜像之上只加一个 fnpack 二进制，
+# 保证「有 fnpack」与「无 fnpack」两个镜像的工具链完全一致。
+#
+# 两个平台各留一份：本文件（CNB 侧）与
+# .github/docker/Dockerfile.fnpack（GitHub 侧），有意复制、不互相引用。
+#
+# 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
+#   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
+# 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
+#
+# fnpack 下载地址：
+#   https://developer.fnnas.com/docs/cli/fnpack/
+#   https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
+# ===================================================================
+
+ARG GOLANG_IMAGE=golang:1.27.3-trixie
+FROM ${GOLANG_IMAGE}
+
+ARG GOLANG_IMAGE
+ARG FNPACK_VERSION=1.2.3
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+ARG BASE_DIGEST=unknown
+ARG IMAGE_SOURCE
+
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + fnpack：在 golang 镜像基础上增加 fnpack" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+RUN set -eux; \
+    ARCH="$(uname -m)"; \
+    case "$ARCH" in \
+    x86_64) FNPACK_ARCH="amd64" ;; \
+    aarch64) FNPACK_ARCH="arm64" ;; \
+    *) echo "不支持的架构: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    FNPACK_URL="https://static2.fnnas.com/fnpack/fnpack-${FNPACK_VERSION}-linux-${FNPACK_ARCH}"; \
+    curl -fsSL -o /usr/local/bin/fnpack "${FNPACK_URL}"; \
+    chmod +x /usr/local/bin/fnpack; \
+    test -x /usr/local/bin/fnpack; \
+    echo "--- fnpack 安装的 ---"; \
+    fnpack --help >/dev/null 2>&1 || true
+
+CMD ["bash"]

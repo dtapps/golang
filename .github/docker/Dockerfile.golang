@@ -1,0 +1,196 @@
+# ===================================================================
+# Golang 构建环境镜像（不含 fnpack）
+#
+# 两个平台各留一份：.cnb/docker/Dockerfile.golang 与
+# .github/docker/Dockerfile.golang，有意复制、不互相引用。
+# 改镜像内容（换源、装包、升级工具版本）时两处都要改。
+#
+# 镜像内容：
+#   Go 工具链 + UPX + nfpm + Node.js/pnpm
+#   + sqlc / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt
+#   + gojq / sql-formatter / markdownfmt
+#
+# 下载源（GitHub Release）：
+#   GITHUB_MIRROR 为空（默认）        → 直接访问 github.com（GitHub Actions 用）
+#   GITHUB_MIRROR=https://files.m.daocloud.io
+#                                     → 走 DaoCloud 镜像（CNB 用）
+# NODE_MIRROR 同理，用于 nodejs.org。
+# ===================================================================
+
+ARG GO_VERSION=1.27.3
+ARG DEBIAN_VERSION=trixie
+FROM golang:${GO_VERSION}-${DEBIAN_VERSION}
+
+# FROM 之前声明的 ARG 在构建阶段不可见，必须在此重新声明才能用于 LABEL
+ARG GO_VERSION
+ARG DEBIAN_VERSION
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+# 默认值取固定纪元时间而非当前时间：不传参时同一份源码构建出同样的镜像 config
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+# 基础镜像的 manifest digest（CI 解析后传入）
+ARG BASE_DIGEST=unknown
+# 本镜像所在的代码仓库（OCI source/url），由构建脚本传入
+ARG IMAGE_SOURCE
+# 为空 = 直连 github.com；CI 的 CNB 侧传 https://files.m.daocloud.io
+ARG GITHUB_MIRROR=""
+# 为空 = 直连 nodejs.org；CI 的 CNB 侧传 https://files.m.daocloud.io
+ARG NODE_MIRROR=""
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + Node.js/pnpm + 常用 Go 工具" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="golang:${GO_VERSION}-${DEBIAN_VERSION}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+# ==========================================
+# 定义版本变量
+# https://github.com/upx/upx/releases
+# https://github.com/goreleaser/nfpm/releases
+# https://github.com/nodejs/node/releases
+# https://github.com/pnpm/pnpm/releases
+# https://github.com/sqlc-dev/sqlc/releases
+# https://github.com/golangci/golangci-lint/releases
+# https://go.googlesource.com/vuln
+# https://github.com/mvdan/sh/releases
+# https://github.com/reteps/dockerfmt/releases
+# https://github.com/google/yamlfmt/releases
+# https://github.com/itchyny/gojq/releases
+# https://github.com/wasilibs/go-sql-formatter/releases
+# https://github.com/Kunde21/markdownfmt/releases
+# ==========================================
+ARG UPX_VERSION=5.2.1
+ARG NFPM_VERSION=2.48.0
+ARG NODE_VERSION=26.12.1
+ARG PNPM_VERSION=12.16.0
+ARG SQLC_VERSION=v1.31.1
+ARG GOLANGCI_LINT_VERSION=v2.15.0
+ARG GOVULNCHECK_VERSION=v1.9.0
+ARG SHFMT_VERSION=v3.14.1
+ARG DOCKERFMT_VERSION=v0.5.4
+ARG YAMLFMT_VERSION=v0.21.0
+ARG GOJQ_VERSION=v0.12.19
+ARG GOSQLFORMATTER_VERSION=v15.8.2
+ARG MARKDOWNFMT_VERSION=v3.1.0
+
+# 1. 设置 Go 环境变量
+ENV GO111MODULE=on \
+    GOPROXY=https://mirrors.cloud.tencent.com/go/,direct \
+    GOINSECURE=go.dtapp.net \
+    GOPATH=/go \
+    PATH="$GOPATH/bin:$PATH"
+
+# 2. 替换 Debian APT 加速源
+RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null \
+    || sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list
+
+# 3. 安装基础构建工具
+RUN export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    xz-utils \
+    ca-certificates \
+    curl \
+    gnupg \
+    git \
+    make \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# 4. 安装 UPX 工具
+RUN set -eux; \
+    ARCH="$(uname -m)"; \
+    case "$ARCH" in \
+    x86_64) UPX_ARCH="amd64" ;; \
+    aarch64) UPX_ARCH="arm64" ;; \
+    *) echo "不支持的架构: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    if [ -n "${GITHUB_MIRROR}" ]; then GH="${GITHUB_MIRROR%/}/github.com"; else GH="https://github.com"; fi; \
+    UPX_DIR="upx-${UPX_VERSION}-${UPX_ARCH}_linux"; \
+    UPX_URL="${GH}/upx/upx/releases/download/v${UPX_VERSION}/${UPX_DIR}.tar.xz"; \
+    wget -q -O /tmp/upx.tar.xz "${UPX_URL}"; \
+    tar -xJf /tmp/upx.tar.xz -C /tmp; \
+    mv "/tmp/${UPX_DIR}/upx" /usr/local/bin/upx; \
+    chmod +x /usr/local/bin/upx; \
+    rm -rf /tmp/upx.tar.xz "/tmp/${UPX_DIR}"; \
+    echo "--- UPX 安装的 ---"; \
+    upx --version
+
+# 5. 安装 nfpm 工具
+RUN set -eux; \
+    ARCH="$(uname -m)"; \
+    case "$ARCH" in \
+    x86_64) NFPM_ARCH="x86_64" ;; \
+    aarch64) NFPM_ARCH="arm64" ;; \
+    *) echo "不支持的架构: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    if [ -n "${GITHUB_MIRROR}" ]; then GH="${GITHUB_MIRROR%/}/github.com"; else GH="https://github.com"; fi; \
+    NFPM_URL="${GH}/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_${NFPM_ARCH}.tar.gz"; \
+    wget -q -O /tmp/nfpm.tar.gz "${NFPM_URL}"; \
+    tar -xzf /tmp/nfpm.tar.gz -C /tmp nfpm; \
+    mv /tmp/nfpm /usr/local/bin/nfpm; \
+    chmod +x /usr/local/bin/nfpm; \
+    rm -rf /tmp/nfpm.tar.gz; \
+    echo "--- nfpm 安装的 ---"; \
+    nfpm --version
+
+# 6. 安装 Node.js 工具
+RUN set -eux; \
+    ARCH="$(uname -m)"; \
+    case "$ARCH" in \
+    x86_64) NODE_ARCH="x64" ;; \
+    aarch64) NODE_ARCH="arm64" ;; \
+    *) echo "不支持的架构: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; else NODE_BASE="https://nodejs.org/dist"; fi; \
+    NODE_DIR="node-v${NODE_VERSION}-linux-${NODE_ARCH}"; \
+    NODE_URL="${NODE_BASE}/v${NODE_VERSION}/${NODE_DIR}.tar.xz"; \
+    wget -q -O /tmp/node.tar.xz "${NODE_URL}"; \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1; \
+    npm config set registry https://mirrors.cloud.tencent.com/npm/; \
+    npm install -g pnpm@${PNPM_VERSION}; \
+    pnpm config set registry https://mirrors.cloud.tencent.com/npm/; \
+    pnpm config set ignore-scripts false; \
+    rm -rf /tmp/node.tar.xz /root/.npm /root/.cache/node; \
+    echo "--- Node.js 安装的 ---"; \
+    node -v && npm -v && pnpm -v
+
+# 7. 预安装 Go 工具链
+# 同一层内 go install + 清缓存，避免 go-build 和 mod 缓存留在独立层里
+RUN echo "==> 预安装 Go 工具链..." \
+    && go install github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION} \
+    && echo "==> sqlc 安装完成 (${SQLC_VERSION})" \
+    && go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION} \
+    && echo "==> golangci-lint 安装完成 (${GOLANGCI_LINT_VERSION})" \
+    && go install golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} \
+    && echo "==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})" \
+    && go install mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
+    && echo "==> shfmt 安装完成 (${SHFMT_VERSION})" \
+    && go install github.com/reteps/dockerfmt@${DOCKERFMT_VERSION} \
+    && echo "==> dockerfmt 安装完成 (${DOCKERFMT_VERSION})" \
+    && go install github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION} \
+    && echo "==> yamlfmt 安装完成 (${YAMLFMT_VERSION})" \
+    && go install github.com/itchyny/gojq/cmd/gojq@${GOJQ_VERSION} \
+    && echo "==> gojq 安装完成 (${GOJQ_VERSION})" \
+    && go install github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
+    && echo "==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})" \
+    && go install github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
+    && echo "==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})" \
+    && echo "--- Go 工具链安装完成 ---" \
+    && ls -l $GOPATH/bin \
+    && rm -rf /root/.cache/go-build /go/pkg/mod
+
+# 8. 卸载不需要的工具，并清空所有 apt 缓存
+RUN apt-get purge -y wget xz-utils \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /root/.npm
+
+CMD ["bash"]
