@@ -1,0 +1,34 @@
+'**':
+  # 自定义按钮可触发的事件：web_trigger_build_fnpack
+  # 用 docker buildx 一次构建 amd64 + arm64，推送 <registry>/<repo>/fnpack。
+  # 基础镜像 <registry>/<repo>:<go 版本> 由 build-golang.yml 产出，这里只追加
+  # fnpack 二进制；定时任务给基础镜像留了三小时（00:05 → 03:05）。
+  #
+  # fnpack 从 https://static2.fnnas.com 下载，不经过 GitHub Release，
+  # 因此这里不需要 DaoCloud 镜像参数。
+  web_trigger_build_fnpack:
+    - name: build-fnpack
+      runner:
+        tags: cnb:arch:amd64 # 指定 Runner 必须有这个标签
+      # CNB 的 docker 服务默认已支持多架构 buildx，无需 options.rootlessBuildkitd
+      services:
+        - docker # 启用 Docker 服务（用于 docker buildx/push）
+      # 远程 import 是可变引用：main 一改 CI 行为就变，PR 里看不到，也无法审计。
+      # TODO 收敛：把 docker.yml vendor 进 .cnb/envs/ 纳入评审，或至少钉到具体
+      # commit（https://cnb.cool/dtapp/envs/-/blob/<40 位 sha>/docker.yml）。
+      imports:
+        - https://cnb.cool/dtapp/envs/-/blob/main/docker.yml # 引入环境变量/配置
+        # 不要把 .cnb/scripts/build-fnpack.sh 放进 imports：imports 会对被引入的
+        # 文件做变量处理，脚本里的 ${...} 会被改写成带引号的字面量。脚本在仓库里，
+        # 由下面的 `source` 直接执行即可。
+      stages:
+        - name: 构建并推送多架构镜像
+          script: |
+            source .cnb/scripts/build-fnpack.sh
+        # 把本次产物的 digest / 体积 / 构建时间写成 commit 元数据。
+        - name: 写入镜像元数据
+          image: cnbcool/annotations:latest
+          settings:
+            type: ADD
+            fromJsonFile: .cnb/annotation-fnpack.json
+

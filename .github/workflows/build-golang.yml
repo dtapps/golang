@@ -1,0 +1,107 @@
+# ===================================================================
+# GitHub Actions：构建并推送 golang 基础镜像到 GHCR
+#
+#   产物：ghcr.io/<owner>/<repo>  → golang（不含 fnpack）
+#
+#   fnpack 镜像是另一个地址（ghcr.io/<owner>/<repo>/fnpack），由
+#   build-fnpack.yml 单独构建：它 FROM 本工作流推好的 <go 版本> 标签。
+#
+#   实现：GitHub 侧独立维护一份（与 CNB 各自维护，不共用）
+#         · Dockerfile  .github/docker/Dockerfile.golang
+#         · 构建脚本    .github/scripts/build-golang.sh
+#         · 对照实现    .cnb/docker/Dockerfile.golang + .cnb/scripts/build-golang.sh
+#
+#   触发：schedule（每天跟上游）/ workflow_dispatch
+#
+#   镜像源：直连 github.com / nodejs.org；CNB 侧才走 https://files.m.daocloud.io。
+#
+#   标签契约与 CNB 完全一致（<go 版本> / <major.minor> / latest /
+#   <版本>-linux-{amd64,arm64}），详见 docs/github.md 与
+#   docs/golang/images-and-tags.md。
+# ===================================================================
+name: build-golang
+
+on:
+  schedule:
+    # 每天 00:35（Asia/Shanghai）= 16:35 UTC。GitHub 的 cron 只按 UTC 解析。
+    - cron: '35 16 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        # 与 CNB 按钮的 version 输入等价，白名单校验在脚本里
+        description: '选填：Go 版本。留空 = 跟随 Dockerfile 的 GO_VERSION（golang:1-trixie，最新稳定 Go）；也可填 1.27 / 1.27.3'
+        required: false
+        default: ''
+        type: string
+
+# GITHUB_TOKEN 默认只读，推送 GHCR 必须显式要 packages: write
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-golang-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 释放磁盘空间
+        # 基础镜像包含 Go 工具链、Node.js 与 Debian 构建依赖，两平台构建缓存
+        # 会吃掉 hosted runner 的临时盘。预装 SDK 与本构建无关。
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: 安装 QEMU（跨架构构建 arm64）
+        # arm64 那层 go install / npm install 在 amd64 runner 上靠 binfmt/QEMU 执行；
+        # 没有这一步 buildx 会在 arm64 阶段报 exec format error。
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: 初始化 buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 构建并推送多架构镜像
+        id: build
+        # 镜像名、revision、source 等由脚本从 Actions 内置变量派生：
+        #   IMAGE         ← ghcr.io + GITHUB_REPOSITORY（小写）
+        #   REGISTRY_USER ← GITHUB_ACTOR
+        #   REVISION      ← GITHUB_SHA
+        #   IMAGE_SOURCE  ← https://github.com/<GITHUB_REPOSITORY>
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version: ${{ inputs.version }}
+        # 必须 source：脚本里的 export、trap 与退出码都留在当前 shell
+        run: |
+          source .github/scripts/build-golang.sh
+
+      - name: 写入运行摘要
+        if: always()
+        run: |
+          {
+            echo '### Golang 镜像（GHCR）'
+            echo ''
+            if [ -f .github/annotation.json ]; then
+              echo '| 键 | 值 |'
+              echo '| --- | --- |'
+              jq -r 'to_entries[] | "| \(.key) | \(.value) |"' .github/annotation.json
+            else
+              echo '本次没有产出 .github/annotation.json（构建在元数据步骤之前就失败）。'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 上传构建元数据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golang-annotation
+          path: .github/annotation.json
+          if-no-files-found: warn
+          retention-days: 30

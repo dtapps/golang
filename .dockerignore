@@ -1,0 +1,20 @@
+# 构建上下文只需要两个平台各自的 Dockerfile*（由 -f 指定），其余是传输噪声。
+# 当前仓库 3.0 MB，其中 .git 占 1.8 MB：不忽略的话每次构建都要上传一遍。
+
+.git
+.gitignore
+
+# 文档与仓库元数据
+*.md
+docs
+备份
+LICENSE
+Makefile
+
+# 工具配置与 CI 生成物
+.yamlfmt
+.scanignore
+.cnb/annotation.json
+.cnb/annotation-fnpack.json
+.github/annotation.json
+.github/annotation-fnpack.json
