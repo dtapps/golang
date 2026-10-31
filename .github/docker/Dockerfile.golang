@@ -31,23 +31,17 @@ ARG BASE_DIGEST=unknown
 # 本镜像所在的代码仓库（OCI source/url），由构建脚本传入
 ARG IMAGE_SOURCE
 
-# -------------------------------------------------------------------
-# OCI 元数据标签
-# -------------------------------------------------------------------
-LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
-    org.opencontainers.image.url="${IMAGE_SOURCE}" \
-    org.opencontainers.image.revision="${VCS_REF}" \
-    org.opencontainers.image.created="${BUILD_DATE}" \
-    org.opencontainers.image.version="${IMAGE_VERSION}" \
-    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt" \
-    org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.base.name="golang:${GO_VERSION}-${DEBIAN_VERSION}" \
-    org.opencontainers.image.base.digest="${BASE_DIGEST}"
-
 # ==========================================
-# 工具版本：默认 latest，构建时自动解析最新版。
-# cron / 手动触发不传参 = 永远最新；出问题时可钉回具体版本：
-#   --build-arg SQLC_VERSION=v1.31.1（或直接改这里的默认值）
+# 工具版本：默认 latest，CI 会先解析成具体版本号再传进来。
+#
+# 为什么 CI 要先解析：层缓存是按 build-arg 的「值」算缓存键的。每天都传字符串
+# latest，缓存键永远不变，层会一直命中第一次构建的产物，工具再也不会升级。
+# 所以 .github/scripts/build-golang.sh 先在构建之前把 latest 解析成 v1.31.1 这种
+# 具体版本，再以 --build-arg 传入——没发新版就全命中，发新版才重建那一层。
+# 这里的 latest 默认值只是「不经过 CI 的裸 docker build」的兜底，此时由下面
+# 各步骤在构建时自行解析，行为和改造前一致（慢，但正确）。
+#
+# 出问题时可钉回具体版本：--build-arg SQLC_VERSION=v1.31.1（或改这里的默认值）
 #
 # latest 的解析渠道（jq 在第 2 步安装）：
 #   UPX        releases.atom 第一个稳定 tag（不走 api.github.com：免认证、
@@ -165,42 +159,76 @@ RUN set -eux; \
     echo "--- Node.js 安装的 (v${NODE_VER}) ---"; \
     node -v && npm -v && pnpm -v
 
-# 5. 预安装 Go 工具链（含 nfpm，走 GOPROXY @latest）
-# 同一层内 go install + 清缓存，避免 go-build 和 mod 缓存留在独立层里
-RUN echo "==> 预安装 Go 工具链..." \
-    && go install github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION} \
+# 5. 预安装 Go 工具链（含 nfpm，走 GOPROXY）
+# 按工具分组拆层 + BuildKit 缓存挂载：
+#   · 拆层：某个工具发版时只重建它所在的那一层，不用 13 个全部重装；
+#   · --mount=type=cache：模块缓存与编译缓存留在构建节点、不进入镜像层，
+#     所以不再需要「同一层内 rm -rf /go/pkg/mod /root/.cache/go-build」。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION} \
     && echo "==> nfpm 安装完成 (${NFPM_VERSION})" \
     && go install github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION} \
-    && echo "==> sqlc 安装完成 (${SQLC_VERSION})" \
-    && go install entgo.io/ent/cmd/ent@${ENT_VERSION} \
+    && echo "==> sqlc 安装完成 (${SQLC_VERSION})"
+
+# 5.1 ent / entc
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install entgo.io/ent/cmd/ent@${ENT_VERSION} \
     && go install entgo.io/ent/cmd/entc@${ENT_VERSION} \
-    && echo "==> ent / entc 安装完成 (${ENT_VERSION})" \
-    && go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION} \
+    && echo "==> ent / entc 安装完成 (${ENT_VERSION})"
+
+# 5.2 golangci-lint / govulncheck
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION} \
     && echo "==> golangci-lint 安装完成 (${GOLANGCI_LINT_VERSION})" \
     && go install golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} \
-    && echo "==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})" \
-    && go install mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
+    && echo "==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})"
+
+# 5.3 shfmt / dockerfmt / yamlfmt / gojq
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
     && echo "==> shfmt 安装完成 (${SHFMT_VERSION})" \
     && go install github.com/reteps/dockerfmt@${DOCKERFMT_VERSION} \
     && echo "==> dockerfmt 安装完成 (${DOCKERFMT_VERSION})" \
     && go install github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION} \
     && echo "==> yamlfmt 安装完成 (${YAMLFMT_VERSION})" \
     && go install github.com/itchyny/gojq/cmd/gojq@${GOJQ_VERSION} \
-    && echo "==> gojq 安装完成 (${GOJQ_VERSION})" \
-    && go install github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
+    && echo "==> gojq 安装完成 (${GOJQ_VERSION})"
+
+# 5.4 sql-formatter / gotestsum / markdownfmt
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
     && echo "==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})" \
     && go install gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
     && echo "==> gotestsum 安装完成 (${GOTESTSUM_VERSION})" \
     && go install github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
     && echo "==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})" \
     && echo "--- Go 工具链安装完成 ---" \
-    && ls -l $GOPATH/bin \
-    && rm -rf /root/.cache/go-build /go/pkg/mod
+    && ls -l "$GOPATH/bin"
 
 # 6. 卸载不需要的工具，并清空所有 apt 缓存
 RUN apt-get purge -y wget xz-utils \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /root/.npm
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# apt、Node、go install 这些层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="golang:${GO_VERSION}-${DEBIAN_VERSION}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
 
 CMD ["bash"]

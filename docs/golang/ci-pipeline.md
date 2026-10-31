@@ -18,7 +18,7 @@ fnpack 镜像 `FROM` 同版本的 golang 基础镜像，所以顺序是「先基
 | `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang 基础镜像；不传 version          |
 | `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack 镜像；使用 00:05 产出的基础镜像 |
 | `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                        |
-| `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version`                        |
+| `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version`     |
 | `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                                   |
 | `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验                        |
 | `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                              |
@@ -27,12 +27,12 @@ fnpack 镜像 `FROM` 同版本的 golang 基础镜像，所以顺序是「先基
 
 ### GitHub Actions
 
-| 工作流         | 事件                                            | 行为                                    |
-|----------------|-------------------------------------------------|-----------------------------------------|
-| `build-golang` | `schedule` 每天 `35 16 * * *` UTC（北京 00:35） | 构建并推送 golang 基础镜像              |
-| `build-golang` | `workflow_dispatch`                             | 手动构建，可传 `version`                |
-| `build-fnpack` | `schedule` 每天 `35 19 * * *` UTC（北京 03:35） | 构建并推送 fnpack（要求基础镜像已存在） |
-| `build-fnpack` | `workflow_dispatch`                             | 手动构建（要求基础镜像已存在）          |
+| 工作流         | 事件                                            | 行为                                                              |
+|----------------|-------------------------------------------------|-------------------------------------------------------------------|
+| `build-golang` | `schedule` 每天 `35 16 * * *` UTC（北京 00:35） | 构建并推送 golang 基础镜像                                        |
+| `build-golang` | `workflow_dispatch`                             | 手动构建，可传 `version`                                          |
+| `build-fnpack` | `schedule` 每天 `35 19 * * *` UTC（北京 03:35） | 构建并推送 fnpack（要求基础镜像已存在）                           |
+| `build-fnpack` | `workflow_dispatch`                             | 手动构建，可传 `version` / `fnpack_version`（要求基础镜像已存在） |
 
 GitHub 也按错开的定时任务跑：16:35 UTC 的 golang、19:35 UTC 的 fnpack，中间留 3 小时给基础镜像构建；`build-fnpack` 还会等基础镜像标签出现最多 5 分钟。
 
@@ -40,13 +40,13 @@ GitHub 也按错开的定时任务跑：16:35 UTC 的 golang、19:35 UTC 的 fnp
 
 `.cnb/web_trigger.yml` 定义手动入口：
 
-| 按钮                                | event                      | 权限                       | 输入                            |
-|-------------------------------------|----------------------------|----------------------------|---------------------------------|
-| 打包 Golang 镜像（多架构）          | `web_trigger_build_golang` | owner / master / developer | `version`：留空 / 1.27 / 1.27.3 |
-| 打包 Golang + fnpack 镜像（多架构） | `web_trigger_build_fnpack` | owner / master / developer | `version`：同上                 |
-| 生成 Code Wiki                      | `web_trigger_codewiki`     | owner / master / developer | 无                              |
+| 按钮                                | event                      | 权限                       | 输入                                            |
+|-------------------------------------|----------------------------|----------------------------|-------------------------------------------------|
+| 打包 Golang 镜像（多架构）          | `web_trigger_build_golang` | owner / master / developer | `version`：留空 / 1.27 / 1.27.3                 |
+| 打包 Golang + fnpack 镜像（多架构） | `web_trigger_build_fnpack` | owner / master / developer | `version`：同上；`fnpack_version`：留空 / 1.2.3 |
+| 生成 Code Wiki                      | `web_trigger_codewiki`     | owner / master / developer | 无                                              |
 
-`event` 必须与 workflow 文件里的事件键逐字一致，否则按钮点下去不会产生流水线。
+`event` 必须与 workflow 文件里的事件键逐字一致，否则按钮点下去不会产生流水线。`fnpack_version` 留空表示使用 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）。
 
 ## imports 的坑
 

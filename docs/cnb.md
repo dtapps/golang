@@ -41,15 +41,15 @@ FNPACK_IMAGE="${IMAGE}/fnpack"                                     # golang/fnpa
 
 ## 触发矩阵
 
-| 事件                                | 定义位置                                                            | 产物                                          |
-|-------------------------------------|---------------------------------------------------------------------|-----------------------------------------------|
-| `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang；不传 version          |
-| `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack（用 00:05 的基础镜像） |
-| `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`               |
-| `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version`               |
-| `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                          |
-| `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验               |
-| `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                     |
+| 事件                                | 定义位置                                                            | 产物                                               |
+|-------------------------------------|---------------------------------------------------------------------|----------------------------------------------------|
+| `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang；不传 version               |
+| `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack（用 00:05 的基础镜像）      |
+| `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                    |
+| `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version` |
+| `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                               |
+| `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验                    |
+| `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                          |
 
 定时任务只在 `main` 顶层键下声明，所以只对默认分支生效；时间按 `Asia/Shanghai` 解释。
 
@@ -57,13 +57,13 @@ FNPACK_IMAGE="${IMAGE}/fnpack"                                     # golang/fnpa
 
 `.cnb/web_trigger.yml` 定义手动入口，`event` 必须与 workflow 文件里的事件键逐字一致：
 
-| 按钮                                | event                      | 权限                       | 输入                            |
-|-------------------------------------|----------------------------|----------------------------|---------------------------------|
-| 打包 Golang 镜像（多架构）          | `web_trigger_build_golang` | owner / master / developer | `version`：留空 / 1.27 / 1.27.3 |
-| 打包 Golang + fnpack 镜像（多架构） | `web_trigger_build_fnpack` | owner / master / developer | `version`：同上                 |
-| 生成 Code Wiki                      | `web_trigger_codewiki`     | owner / master / developer | 无                              |
+| 按钮                                | event                      | 权限                       | 输入                                            |
+|-------------------------------------|----------------------------|----------------------------|-------------------------------------------------|
+| 打包 Golang 镜像（多架构）          | `web_trigger_build_golang` | owner / master / developer | `version`：留空 / 1.27 / 1.27.3                 |
+| 打包 Golang + fnpack 镜像（多架构） | `web_trigger_build_fnpack` | owner / master / developer | `version`：同上；`fnpack_version`：留空 / 1.2.3 |
+| 生成 Code Wiki                      | `web_trigger_codewiki`     | owner / master / developer | 无                                              |
 
-`version` 留空表示使用 Dockerfile 的 `GO_VERSION`。fnpack 按钮要求对应版本的基础镜像已经推送。
+`version` 留空表示使用 Dockerfile 的 `GO_VERSION`。fnpack 按钮要求对应版本的基础镜像已经推送；`fnpack_version` 留空表示使用 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）。
 
 ## imports 与脚本执行
 
@@ -87,7 +87,7 @@ stages:
 https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 ```
 
-常用 key：`image_version`、`golang_digest`、`fnpack_digest`、`fnpack_version`、`built_at`。
+常用 key：`image_version`、`golang_digest`、`fnpack_digest`、`fnpack_version`、`tools`、`built_at`。
 
 `cnbcool/annotations` 目前只发 `:latest`，构建网络内也取不到 digest，所以插件引用暂时无法固定版本。发现插件行为变化时先看流水线日志。
 
@@ -104,6 +104,21 @@ docker buildx build \
 ```
 
 CNB 侧 APT / Go module / npm 使用腾讯云镜像；GitHub 侧 APT 与 Go module 用默认源。详见 [golang/mirrors.md](golang/mirrors.md)。
+
+## 缓存
+
+CNB 文档里的**节点文件缓存**（`docker.volumes` + `copy-on-write`）缓存的是流水线容器自己的目录。本仓库的 apt 与 `go install` 都发生在 `services: docker` 的 buildkit 里，挂不进去，所以用的是 **buildx 层缓存**（`--cache-to type=registry`），跨节点共享：
+
+```sh
+--cache-from type=registry,ref=<镜像>:buildcache
+--cache-to   type=registry,ref=<镜像>:buildcache,mode=min
+```
+
+层缓存要生效，前提是 build-arg 的值跟着版本走，所以脚本会先在基础镜像里把 `latest` 解析成具体版本号再传入——否则缓存键永远是 `latest`，层会一直命中旧产物。细节见 [golang/build.md](golang/build.md#缓存)。
+
+- 缓存清单是普通镜像 manifest，仓库页面会多一个 `buildcache` 标签，属正常现象。
+- `CACHE=off` 关闭缓存并强制全量重建。
+- 缓存导出失败（registry 不支持该 manifest）会自动去掉缓存重试一次。
 
 ## 跨平台同步
 

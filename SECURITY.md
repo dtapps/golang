@@ -52,7 +52,7 @@ GitHub 侧直连官方站，APT 与 Go module 用默认源；CNB 侧的 GitHub R
   - `golang`：`.cnb/annotation.json` / `.github/annotation.json`，含 `golang_digest`、`base_image`、`base_digest`、`built_at`。
   - `golang/fnpack`：`.cnb/annotation-fnpack.json` / `.github/annotation-fnpack.json`，含 `fnpack_digest`、`fnpack_base_image`、`fnpack_base_digest`、`built_at`。
 - 标签会随重建前移，不能作为固定点；也不承诺「同样的命令每次都产出相同的字节」。
-- 构建默认不启用层缓存，每日任务会真的重新拉取依赖。
+- 构建启用 buildx 层缓存（`<镜像>:buildcache`），但缓存键跟着「解析出的工具版本 + 基座 digest」走：上游没发新版才命中，发新版或基座 digest 变化都会重建对应层。需要一次干净的全量重建时设 `CACHE=off`。
 
 ## 已知取舍
 

@@ -12,6 +12,7 @@
 # 触发方式（见 build-fnpack.yml）：
 #   schedule         → 每天固定时间跑（比 build-golang 晚 3 小时）
 #   workflow_dispatch → 手动跑，需要基础镜像标签已存在（脚本会等待并给出提示）
+#                      可传 version / fnpack_version 覆盖默认版本
 ## 这是 GitHub 侧独立实现，与 .cnb/scripts/build-fnpack.sh 各自维护、不互相引用。
 # 标签规则、冒烟断言与 CNB 侧保持一致。
 #
@@ -23,6 +24,8 @@
 #   IMAGE_SOURCE   默认 https://github.com/<GITHUB_REPOSITORY>
 #   version        选填，Go 版本：留空 = Dockerfile 的 GO_VERSION；
 #                  也可填 1.27 / 1.27.3
+#   fnpack_version 选填，fnpack 版本：留空 / latest = Dockerfile 的
+#                  FNPACK_VERSION（当前 1.2.3，暂作为最新版本）；也可填 1.2.3
 #
 # 镜像源：fnpack 从 https://static2.fnnas.com 直接下载，不走 GitHub Release 代理。
 #
@@ -42,9 +45,13 @@ ANNOTATION_FILE=".github/annotation-fnpack.json"
 # 基础镜像由另一个工作流产出，等待它出现在 registry（5 分钟）
 BASE_WAIT_ATTEMPTS=20
 BASE_WAIT_SECONDS=15
+# 层缓存写到 <镜像>:buildcache，mode=min 只导出最终镜像里已有的层（单阶段构建够用）
+CACHE_REF_SUFFIX="buildcache"
+CACHE_MODE="min"
 
 # ---------- 输出助手 ----------
 info() { printf '  %s\n' "$*"; }
+warn() { printf '警告: %s\n' "$*" >&2; }
 die() {
   printf '错误: %s\n' "$*" >&2
   exit 1
@@ -131,6 +138,13 @@ read_arg() (
 : "${REGISTRY_TOKEN:?缺少环境变量 REGISTRY_TOKEN（workflow 里传 secrets.GITHUB_TOKEN）}"
 
 version="${version:-}"
+fnpack_version="${fnpack_version:-}"
+# CACHE=off：关闭层缓存并强制全量重建
+CACHE="${CACHE:-on}"
+case "${CACHE}" in
+  on | off) : ;;
+  *) die "CACHE 只接受 on / off，收到：${CACHE}" ;;
+esac
 _slug="$(printf '%s' "${GITHUB_REPOSITORY:-}" | tr '[:upper:]' '[:lower:]')"
 REGISTRY_USER="${REGISTRY_USER:-${GITHUB_ACTOR:-}}"
 REVISION="${REVISION:-${GITHUB_SHA:-unknown}}"
@@ -182,6 +196,15 @@ case "$version" in
       || die "version 只接受 1.27 / 1.27.3，收到：${version}"
     ;;
 esac
+# fnpack_version 留空 / latest：使用 Dockerfile 的默认值（当前 1.2.3），
+# 因为上游 static2.fnnas.com 没有可查询 latest 的接口，暂时把它当作最新版本。
+case "$fnpack_version" in
+  '' | latest) : ;;
+  *)
+    printf '%s' "${fnpack_version}" | grep -Eq '^[0-9]+(\.[0-9]+)+$' \
+      || die "fnpack_version 只接受版本号（如 1.2.3），收到：${fnpack_version}"
+    ;;
+esac
 
 # ---------- 2. 基座引用 ----------
 [ -f "$DOCKERFILE_GOLANG" ] \
@@ -198,8 +221,18 @@ if [ -n "$version" ]; then
 fi
 GO_REF="${GO_VERSION}-${DEBIAN_VERSION}"
 
-FNPACK_VERSION="$(read_arg FNPACK_VERSION "$DOCKERFILE_FNPACK")"
-[ -n "${FNPACK_VERSION}" ] || die "无法从 ${DOCKERFILE_FNPACK} 解析 ARG FNPACK_VERSION"
+FNPACK_VERSION_DEFAULT="$(read_arg FNPACK_VERSION "$DOCKERFILE_FNPACK")"
+[ -n "${FNPACK_VERSION_DEFAULT}" ] || die "无法从 ${DOCKERFILE_FNPACK} 解析 ARG FNPACK_VERSION"
+case "${fnpack_version}" in
+  '' | latest)
+    FNPACK_VERSION="${FNPACK_VERSION_DEFAULT}"
+    info "fnpack_version 留空：使用 Dockerfile 默认 ${FNPACK_VERSION}（暂作为最新版本）"
+    ;;
+  *)
+    FNPACK_VERSION="${fnpack_version}"
+    info "fnpack_version 入参 ${fnpack_version}"
+    ;;
+esac
 
 # ---------- 3. 解析实际 Go 版本 ----------
 info "解析基座 golang:${GO_REF} 的实际版本"
@@ -260,22 +293,52 @@ BASE_INDEX_DIGEST="$(docker buildx imagetools inspect "${IMAGE}:${STAMP}" \
 
 # ---------- 8. 构建并推送 fnpack 镜像 ----------
 # FROM build-golang 推好的 manifest list：每个平台解析到对应架构的 golang 镜像。
+# 基础镜像 digest 没变时（golang 镜像当天全命中），这一层也全命中，构建接近瞬时。
+CACHE_REF="${FNPACK_IMAGE}:${CACHE_REF_SUFFIX}"
+CACHE_FROM_READY=""
+if [ "${CACHE}" = "on" ]; then
+  if docker buildx imagetools inspect "${CACHE_REF}" >/dev/null 2>&1; then
+    CACHE_FROM_READY=yes
+    info "缓存源 ${CACHE_REF} 可读，本次尝试命中"
+  else
+    info "缓存源 ${CACHE_REF} 还不存在，本次只写不读"
+  fi
+fi
+
+build_image() (
+  mode=$1
+  set -- \
+    -t "${FNPACK_IMAGE}:${STAMP}" \
+    --platform "${PLATFORMS}" \
+    --build-arg "GOLANG_IMAGE=${IMAGE}:${STAMP}" \
+    --build-arg "FNPACK_VERSION=${FNPACK_VERSION}" \
+    --build-arg "IMAGE_VERSION=${STAMP}" \
+    --build-arg "IMAGE_SOURCE=${IMAGE_SOURCE}" \
+    --build-arg "VCS_REF=${VCS_REF}" \
+    --build-arg "BUILD_DATE=${BUILD_DATE}" \
+    --build-arg "BASE_DIGEST=${BASE_INDEX_DIGEST}"
+  case "${mode}" in
+    on)
+      if [ -n "${CACHE_FROM_READY}" ]; then
+        set -- "$@" --cache-from "type=registry,ref=${CACHE_REF}"
+      fi
+      set -- "$@" --cache-to "type=registry,ref=${CACHE_REF},mode=${CACHE_MODE}"
+      ;;
+    off) set -- "$@" --no-cache ;;
+    *) : ;;
+  esac
+  set -- "$@" --provenance=mode=min --sbom=false -f "${DOCKERFILE_FNPACK}" --push .
+  docker buildx build "$@"
+)
+
 info "构建 ${FNPACK_IMAGE}:${STAMP}（${PLATFORMS}）"
-docker buildx build \
-  -t "${FNPACK_IMAGE}:${STAMP}" \
-  --platform "${PLATFORMS}" \
-  --build-arg "GOLANG_IMAGE=${IMAGE}:${STAMP}" \
-  --build-arg "FNPACK_VERSION=${FNPACK_VERSION}" \
-  --build-arg "IMAGE_VERSION=${STAMP}" \
-  --build-arg "IMAGE_SOURCE=${IMAGE_SOURCE}" \
-  --build-arg "VCS_REF=${VCS_REF}" \
-  --build-arg "BUILD_DATE=${BUILD_DATE}" \
-  --build-arg "BASE_DIGEST=${BASE_INDEX_DIGEST}" \
-  --provenance=mode=min \
-  --sbom=false \
-  -f "${DOCKERFILE_FNPACK}" \
-  --push . \
-  || die "fnpack 镜像 docker buildx build 失败"
+if [ "${CACHE}" = "off" ]; then
+  build_image off || die "fnpack 镜像 docker buildx build 失败（CACHE=off）"
+elif ! build_image on; then
+  # 有的 registry 不接受 buildx 的缓存清单，缓存导出在镜像推完之后才报错。
+  warn "带缓存的构建失败：可能是 registry 不支持 buildx 缓存清单，去掉缓存重试一次"
+  build_image plain || die "fnpack 镜像 docker buildx build 失败"
+fi
 
 # ---------- 9. 从同一 manifest 派生单平台标签 ----------
 for arch in amd64 arm64; do

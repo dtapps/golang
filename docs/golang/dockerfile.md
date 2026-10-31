@@ -55,8 +55,13 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
 4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；npm / pnpm 使用腾讯云 registry，`pnpm config set ignore-scripts false`。
-5. **Go 工具链（含 nfpm）**：同一层内 `go install` 全部工具（nfpm 用 `github.com/goreleaser/nfpm/v2/cmd/nfpm`），然后删掉 `/root/.cache/go-build` 与 `/go/pkg/mod`。
+5. **Go 工具链（含 nfpm）**：按工具分成 5 层 `go install`（nfpm+sqlc / ent+entc / golangci-lint+govulncheck / shfmt+dockerfmt+yamlfmt+gojq / sql-formatter+gotestsum+markdownfmt），每层都挂 BuildKit 缓存目录：
+   - `--mount=type=cache,target=/go/pkg/mod`：模块缓存
+   - `--mount=type=cache,target=/root/.cache/go-build`：编译缓存
+
+   缓存挂载不进镜像层，所以不再需要「同一层内 `rm -rf /go/pkg/mod`」那种清理；拆层是为了让某个工具发版时只重建它自己那一层。
 6. **清理**：purge wget / xz-utils，清 APT 缓存与 `/tmp`。
+7. **OCI 元数据标签**：放在文件最后。`BUILD_DATE` / `VCS_REF` / `IMAGE_VERSION` 每次都变，放前面会让 apt、Node、`go install` 这些层的缓存键跟着每次提交一起变。
 
 > CNB 侧会在安装基础包之前把 APT 源换成 `mirrors.cloud.tencent.com`；GitHub 侧不换源。
 
@@ -64,7 +69,11 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 
 ### 版本变量
 
-所有工具 ARG 默认 `latest`，构建时自动解析最新版；出现问题时用 `--build-arg`（或改默认值）钉回具体版本：
+所有工具 `ARG` 默认 `latest`，但 **CI 不会把 `latest` 传进来**：两份 `build-golang.sh` 会先在基础镜像里把 `latest` 解析成具体版本号（如 `v1.31.1`），再以 `--build-arg` 传入。
+
+原因是层缓存按 build-arg 的「值」算缓存键：每天都传字符串 `latest`，缓存键永远不变，层会一直命中第一次构建的产物，工具就再也不会升级。解析后传具体版本号，才能做到「没发新版全命中、发新版只重建那一层」。
+
+`latest` 默认值只用于不经过 CI 的裸 `docker build`，此时由 Dockerfile 在构建时自行解析（行为和以前一致，只是没有缓存收益）。出现问题时用 `--build-arg`（或改默认值）钉回具体版本：
 
 | ARG                      | 默认值   | 对应工具                  | latest 的解析渠道                           |
 |--------------------------|----------|---------------------------|---------------------------------------------|
@@ -106,10 +115,10 @@ https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
 
 ## 3. 改哪个文件
 
-| 要改的东西         | 改哪里                                                              |
-|--------------------|---------------------------------------------------------------------|
-| Go 基座版本        | 两份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新） |
-| 某个工具版本       | 两份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）   |
-| fnpack 版本        | 两份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`                        |
-| 下载源             | 构建脚本的 `MIRROR` / 构建参数                                      |
-| 标签规则、冒烟断言 | 两份 `build-golang.sh` + 两份 `build-fnpack.sh`                     |
+| 要改的东西         | 改哪里                                                                                       |
+|--------------------|----------------------------------------------------------------------------------------------|
+| Go 基座版本        | 两份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新）                          |
+| 某个工具版本       | 两份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）                            |
+| fnpack 版本        | 两份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`（默认值，可被手动触发的 `fnpack_version` 覆盖） |
+| 下载源             | 构建脚本的 `MIRROR` / 构建参数                                                               |
+| 标签规则、冒烟断言 | 两份 `build-golang.sh` + 两份 `build-fnpack.sh`                                              |

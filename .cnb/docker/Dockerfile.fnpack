@@ -27,16 +27,6 @@ ARG BUILD_DATE=1970-01-01T00:00:00Z
 ARG BASE_DIGEST=unknown
 ARG IMAGE_SOURCE
 
-LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
-    org.opencontainers.image.url="${IMAGE_SOURCE}" \
-    org.opencontainers.image.revision="${VCS_REF}" \
-    org.opencontainers.image.created="${BUILD_DATE}" \
-    org.opencontainers.image.version="${IMAGE_VERSION}" \
-    org.opencontainers.image.description="Golang 构建环境 + fnpack：在 golang 镜像基础上增加 fnpack" \
-    org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
-    org.opencontainers.image.base.digest="${BASE_DIGEST}"
-
 # fnpack 的 Linux ARM 产物文件名用 arm（不是 arm64）。
 RUN set -eux; \
     ARCH="$(uname -m)"; \
@@ -51,5 +41,20 @@ RUN set -eux; \
     test -x /usr/local/bin/fnpack; \
     echo "--- fnpack 安装的 ---"; \
     fnpack --help >/dev/null 2>&1 || true
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# 下载 fnpack 那一层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + fnpack：在 golang 镜像基础上增加 fnpack" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
 
 CMD ["bash"]

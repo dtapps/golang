@@ -72,12 +72,13 @@ arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-
 1. 解析 Dockerfile 的 `GO_VERSION` / `DEBIAN_VERSION`，可选被 `version` 输入覆盖。
 2. 起一次性容器执行 `go version`，得到实际版本（如 `1.27.3`）。
 3. 读取上游 `golang:<版本>-<代号>` 的 index digest。
-4. 一次多架构构建并推送 `golang:<go 版本>`（工具版本默认 latest，构建时自动解析）。
-5. 派生 `<go 版本>-linux-{amd64,arm64}`。
-6. amd64 冒烟（工具链齐全、版本命令可执行、fnpack 不存在）。
-7. 校验 OCI `version` 标签。
-8. 提升 `<major.minor>` 与 `latest`。
-9. 写 golang 元数据。
+4. 再起一次性容器解析工具版本：Go 工具走 `go list -m`（模块路径见脚本里的 `GO_TOOL_MODULES`），UPX / Node.js / pnpm 走各自的上游索引，得到 `v1.31.1` 这种具体版本号。解析失败会回退 `latest` 并打警告，不阻断构建。
+5. 一次多架构构建并推送 `golang:<go 版本>`，工具版本以 `--build-arg` 传入。
+6. 派生 `<go 版本>-linux-{amd64,arm64}`。
+7. amd64 冒烟（工具链齐全、版本命令可执行、fnpack 不存在）。
+8. 校验 OCI `version` 标签。
+9. 提升 `<major.minor>` 与 `latest`。
+10. 写 golang 元数据（含 `tools`：本次各工具的实际版本）。
 
 fnpack 镜像（`.cnb/scripts/build-fnpack.sh` / `.github/scripts/build-fnpack.sh`）：
 
@@ -108,7 +109,24 @@ fnpack 镜像：
 
 ### 缓存
 
-两侧都**不启用**层缓存。镜像内容以「每次重新拉上游、重新下载依赖」为准，避免每日定时任务一直命中旧缓存。
+两侧都启用 **buildx 层缓存**，写到 `<镜像>:buildcache`（CNB 制品库 / GHCR 各一份），`mode=min`：单阶段构建，每一层都在最终镜像里，min 已覆盖整条链，而且不会产生没人引用的孤儿 blob。
+
+工作方式：
+
+1. 构建前先把 `latest` 解析成具体版本号（见上面第 4 步）。
+2. 版本没变 → 所有层命中：apt、Node、`go install` 整段跳过，只剩拉基座、冒烟、推 manifest。
+3. 某个工具发版 → 只有它所在的那一层重建（Go 工具按 5 组分层）。
+4. 基座 `golang:1-trixie` 的 digest 变了 → apt 之后的层全部重建，和改造前一样。
+
+`CACHE=off` 可关闭缓存并加 `--no-cache` 强制全量重建：
+
+```bash
+CACHE=off source .cnb/scripts/build-golang.sh
+```
+
+如果 registry 不接受 buildx 的缓存清单（未知 media type / 权限），缓存导出会在镜像推完之后报错；脚本会自动去掉缓存重试一次，所以最坏情况只是慢，不会失败。
+
+> 冒烟测试跑在 `docker run` 的新容器里，不受缓存影响：缓存命中不会跳过冒烟，装坏的二进制仍然会被拦下。
 
 ## 手动触发
 

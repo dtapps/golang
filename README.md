@@ -9,7 +9,7 @@
 | 镜像                           | CNB 地址                              | GitHub 地址（GHCR）            | Dockerfile（CNB / GitHub）                                           | 文档                                  |
 |--------------------------------|---------------------------------------|--------------------------------|----------------------------------------------------------------------|---------------------------------------|
 | Golang 构建环境（不含 fnpack） | `docker.cnb.cool/dtapp/golang`        | `ghcr.io/dtapps/golang`        | `.cnb/docker/Dockerfile.golang` / `.github/docker/Dockerfile.golang` | [docs/golang/](docs/golang/README.md) |
-| Golang 构建环境 + fnpack       | `docker.cnb.cool/dtapp/golang/fnpack` | `ghcr.io/dtapps/golang/fnpack` | `.cnb/docker/Dockerfile.fnpack` / `.github/docker/Dockerfile.fnpack` | [docs/golang/](docs/golang/README.md) |
+| Golang 构建环境 + fnpack       | `docker.cnb.cool/dtapp/golang/fnpack` | `ghcr.io/dtapps/golang/fnpack` | `.cnb/docker/Dockerfile.fnpack` / `.github/docker/Dockerfile.fnpack` | [docs/fnpack/](docs/fnpack/README.md) |
 
 构建脚本按镜像拆分：CNB 用 `.cnb/scripts/build-golang.sh` 与 `build-fnpack.sh`，GitHub 用 `.github/scripts/build-golang.sh` 与 `build-fnpack.sh`。fnpack 镜像依赖同版本的 golang 基础镜像：先发布基础镜像，再 `FROM` 它构建 fnpack。两侧的标签名、提升规则、冒烟断言必须保持一致，平台胶水（触发器、镜像源、元数据落地）各自维护。
 
@@ -70,7 +70,9 @@ FROM ghcr.io/dtapps/golang:latest
 ├── annotation-fnpack.json          # fnpack 镜像元数据（CI 生成，.gitignore 已排除）
 └── dependabot.yml                  # GitHub Actions 依赖更新
 docs/
-├── golang/                         # 镜像层文档（README + 分册索引 + 分册）
+├── golang/                         # 镜像层文档（README + 分册索引 + 分册，两个镜像合写）
+├── fnpack/                         # fnpack 专属文档（速查 + 索引 + 打包/Dockerfile/元数据徽章）
+├── cache-implementation.md         # buildx 层缓存的实现与失效边界
 ├── cnb.md                          # CNB 平台层说明
 └── github.md                       # GitHub Actions / GHCR 平台说明
 备份/                               # 改造前的两份参考 Dockerfile
@@ -88,6 +90,7 @@ GitHub 的 Dockerfile 直接写死官方地址；CNB 的 Dockerfile 有 `GITHUB_
 ## 约定
 
 - 提交前跑 `make format`（yamlfmt / markdownfmt / shfmt / dockerfmt）与 `make lint-shell`；范围包含 `.cnb/` 与 `.github/` 两侧的脚本、Dockerfile 与 workflow。
+- CI 启用 buildx 层缓存（`<镜像>:buildcache`）：工具版本在构建前解析成具体版本号，上游没发新版时构建只拉基座、跑冒烟。需要一次干净的全量重建时设 `CACHE=off`，见 [docs/golang/build.md](docs/golang/build.md#缓存)。
 - 标签是对外契约：`<go 版本>` / `<major.minor>` / `latest`，外加 `<go 版本>-linux-{amd64,arm64}`。标签每天可能被同名覆盖，固定产物请用元数据里的 digest。
 - fnpack 镜像永远基于同版本的 golang 基础镜像构建；基础镜像的 `latest` / `<minor>` 没跟上时，fnpack 不会单独提升这两个标签。
 - 两个平台的 Dockerfile 与脚本各自维护（`.cnb/` 与 `.github/`）：改镜像内容、标签规则或冒烟断言时两处都要改；只改平台胶水时各改各的。平台层说明见 [docs/cnb.md](docs/cnb.md) 与 [docs/github.md](docs/github.md)。

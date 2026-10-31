@@ -28,6 +28,11 @@ on:
         required: false
         default: ''
         type: string
+      fnpack_version:
+        description: '选填：fnpack 版本。留空 = 使用 Dockerfile 的 FNPACK_VERSION（当前 1.2.3，暂作为最新版本）；也可填 1.2.3'
+        required: false
+        default: ''
+        type: string
 
 # GITHUB_TOKEN 默认只读，推送 GHCR 必须显式要 packages: write
 permissions:
@@ -67,6 +72,7 @@ jobs:
         env:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ inputs.version }}
+          fnpack_version: ${{ inputs.fnpack_version }}
         # 必须 source：脚本里的 export、trap 与退出码都留在当前 shell
         run: |
           source .github/scripts/build-fnpack.sh

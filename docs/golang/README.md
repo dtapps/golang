@@ -1,5 +1,7 @@
 # Golang 构建环境镜像
 
+[![定时构建](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/status/crontab)](https://cnb.cool/dtapp/golang/-/pipeline) [![流水线配置](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/pipeline-as-code)](https://cnb.cool/dtapp/golang/-/blob/main/.cnb.yml) [![漏洞扫描](https://cnb.cool/dtapp/golang/-/badge/security/vulnerability/full/latest)](https://cnb.cool/dtapp/golang/-/security) ![基础镜像](https://img.shields.io/badge/base-golang-00ADD8?logo=go&logoColor=white) ![架构](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-informational) ![镜像大小](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_size) ![arm64 大小](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_size_arm64) ![镜像摘要](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_digest_short) ![镜像版本](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/image_version)
+
 两个镜像共用一套工具链，区别只有一个二进制：
 
 | 镜像            | 包含 fnpack | 典型用途                                       |
@@ -58,3 +60,5 @@ CI 按平台和镜像拆开，每个镜像一条流水线：
 - [getting-started.md](getting-started.md)：常见用法
 - [maintenance.md](maintenance.md)：版本升级与日常维护
 - [troubleshooting.md](troubleshooting.md)：排错手册
+
+fnpack 镜像的专属分册（`.fpk` 打包用法、`Dockerfile.fnpack` 解析、`fnpack_*` 元数据与徽章）在 [../fnpack/](../fnpack/index.md)。徽章里的 annotation key 与 `unknown` 的含义见 [../fnpack/metadata-and-badges.md](../fnpack/metadata-and-badges.md)（golang 侧的键在 [images-and-tags.md](images-and-tags.md) 的「固定某一份产物」）。

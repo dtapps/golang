@@ -50,7 +50,7 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 
 - 触发：
   - `schedule`：每天 19:35 UTC（北京 03:35），比 `build-golang` 晚 3 小时
-  - `workflow_dispatch`：手动，要求对应版本的基础镜像已存在
+  - `workflow_dispatch`：手动，要求对应版本的基础镜像已存在；可填 `version` / `fnpack_version`
 - `build` 作业：检出 → 释放磁盘 → QEMU → buildx → `source .github/scripts/build-fnpack.sh` → Step Summary → artifact
 - 超时：90 分钟
 
@@ -58,15 +58,16 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 
 ## 变量契约
 
-workflow 只显式传两个变量：
+workflow 只显式传三个变量：
 
 ```yaml
 env:
   REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   version: ${{ inputs.version }}
+  fnpack_version: ${{ inputs.fnpack_version }}
 ```
 
-其余由脚本从 Actions 内置变量派生。`GITHUB_TOKEN` 不会自动进环境变量，所以必须显式从 secrets 传。
+其余由脚本从 Actions 内置变量派生。`GITHUB_TOKEN` 不会自动进环境变量，所以必须显式从 secrets 传。`fnpack_version` 留空时，脚本回退到 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）。
 
 权限：
 
@@ -101,6 +102,21 @@ latest                    latest
 ```
 
 两个镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack 只在基础镜像对应标签也指向本次版本时才提升。
+
+## 缓存
+
+与 CNB 侧同一套做法：buildx 层缓存写到 GHCR 的 `<镜像>:buildcache`，`mode=min`。
+
+- 没有用 `type=gha`：它需要 `ACTIONS_CACHE_URL` / `ACTIONS_RUNTIME_TOKEN`（脚本裸调 `docker buildx build` 时得自己暴露），且有 10GB 上限，这个镜像的缓存很容易顶到；registry 缓存和 CNB 侧对称，脚本结构不用改。
+- `mode=min` 只导出最终镜像里已有的层，缓存清单引用的 blob 与镜像层是同一批 digest，所以存储增量很小。GHCR 不会自动回收无人引用的 blob：工具升级后旧层会留在包里，长期需要偶尔清理。
+- `CACHE=off` 关闭缓存并强制全量重建；缓存导出失败会自动去掉缓存重试一次。
+
+```yaml
+env:
+  CACHE: off   # 可选：需要一次干净的全量构建时加
+```
+
+细节见 [golang/build.md](golang/build.md#缓存)。
 
 ## 固定产物
 

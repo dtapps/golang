@@ -5,7 +5,9 @@
 - CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像。
 - GitHub：每天 16:35 UTC（北京 00:35）构建 golang 基础镜像，19:35 UTC（北京 03:35）构建 fnpack 镜像。
 
-默认不会自动升级 Go 版本，因为 `GO_VERSION` 在 Dockerfile 里是钉死的。定时构建会重新拉取上游同 tag 的基座、重新下载全部依赖，因此上游重新推送同一 tag 时（安全修复）能吃到更新。
+默认不会自动升级 Go 版本，因为 `GO_VERSION` 在 Dockerfile 里是钉死的。定时构建会重新解析上游各工具的最新版本：版本变了才重建对应那一层，没变就全命中缓存（只拉基座、跑冒烟）。上游重新推送同一 tag 的基座（安全修复）时，digest 一变，apt 之后的层会全部重建，同样能吃到更新。
+
+需要一次干净的全量重建时，手动触发并设 `CACHE=off`（或本地 `CACHE=off source .cnb/scripts/build-golang.sh`）。
 
 ## 升级 Go 版本
 
@@ -63,13 +65,16 @@ https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
 
 `<arch>` 为 `amd64` 或 `arm`（ARM 用 `arm`，不是 `arm64`）。升级后两个文件都要先用 `curl -sI` 确认对应产物存在。
 
+想先验证某个版本时，可以手动触发 `build-fnpack` / GitHub 的 `build-fnpack` 工作流并填 `fnpack_version`，确认产物可用后再改两份 Dockerfile 的默认值；不填则使用 Dockerfile 里的默认版本（当前 `1.2.3`，上游暂无 latest 查询接口，暂作为最新版本）。
+
 ## 新增工具
 
 1. 在两份 `Dockerfile.golang` 里加 `ARG` 与安装命令。
 2. 在两份 `build-golang.sh` 的冒烟命令列表里加上二进制名。
-3. 如果工具也应该在 fnpack 镜像里被检查，同步两份 `build-fnpack.sh` 的继承断言。
-4. 更新 [dockerfile.md](dockerfile.md) 的版本表。
-5. 如果工具是 GitHub Release 下载，CNB 侧必须支持 `GITHUB_MIRROR`（走 DaoCloud）；GitHub 侧直接写死官方地址。
+3. 如果是 Go 工具：在两份 `build-golang.sh` 的 `GO_TOOL_MODULES` 里登记「版本变量 → 模块路径」。漏登记时脚本会在构建前直接报错（`go list -m` 要模块路径，Dockerfile 里写的是包路径）。
+4. 如果工具也应该在 fnpack 镜像里被检查，同步两份 `build-fnpack.sh` 的继承断言。
+5. 更新 [dockerfile.md](dockerfile.md) 的版本表。
+6. 如果工具是 GitHub Release 下载，CNB 侧必须支持 `GITHUB_MIRROR`（走 DaoCloud）；GitHub 侧直接写死官方地址。走 `curl` 自己解析版本的，记得同时改两份脚本里的解析逻辑（`resolve_versions`）。
 
 ## 同步检查清单
 
@@ -78,6 +83,7 @@ https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
 - [ ] `.cnb/docker/Dockerfile.golang` 与 `.github/docker/Dockerfile.golang` 一致
 - [ ] `.cnb/docker/Dockerfile.fnpack` 与 `.github/docker/Dockerfile.fnpack` 一致
 - [ ] 两份 `build-golang.sh` 的标签规则、冒烟断言一致
+- [ ] 两份 `build-golang.sh` 的 `GO_TOOL_MODULES` 覆盖 Dockerfile 里所有 `go install` 版本变量（脚本会自检）
 - [ ] 两份 `build-fnpack.sh` 的标签规则、基础镜像检查、冒烟断言一致
 - [ ] `make format` 通过
 - [ ] `make lint-shell` 通过

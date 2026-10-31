@@ -12,6 +12,8 @@
 | [maintenance.md](maintenance.md)         | Go / 工具 / fnpack 版本升级与每日构建的含义     |
 | [troubleshooting.md](troubleshooting.md) | 常见失败与排查步骤                              |
 
+fnpack 镜像的专属分册（`.fpk` 打包、`Dockerfile.fnpack` 解析、`fnpack_*` 元数据与徽章）在 [../fnpack/index.md](../fnpack/index.md)；本目录的分册两个镜像合写，fnpack 专属机制以那边为准。
+
 ## 事实来源
 
 | 事实                     | 来源                                                                                                                          |
