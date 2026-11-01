@@ -67,6 +67,17 @@ https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
 
 想先验证某个版本时，可以手动触发 `build-fnpack` / GitHub 的 `build-fnpack` 工作流并填 `fnpack_version`，确认产物可用后再改两份 Dockerfile 的默认值；不填则使用 Dockerfile 里的默认版本（当前 `1.2.3`，上游暂无 latest 查询接口，暂作为最新版本）。
 
+## 升级 wails3
+
+**通常什么都不用做**：两份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 06:05 / GitHub 22:35 UTC）自动进镜像，版本号会写进元数据 `wails3_version` 与徽章。
+
+需要人工介入的两种情况：
+
+1. **想钉住某个版本**（复现、回滚、或 latest 解析出的版本有问题）：手动触发 `build-wails3` 工作流并填 `wails3_version`（`v3.1.0` / `3.1.0` / `v3.0.0-beta.34` 都接受）。这只影响本次构建，不改默认值。
+2. **想长期钉住**：把两份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 改成具体 tag（如 `v3.1.0`）。脚本遇到「Dockerfile 默认值不是 `latest`」时会尊重它、跳过网络解析——恢复追新时把默认值改回 `latest`。
+
+wails3 版本**不占标签**：`golang/wails3:<go 版本>` 永远是「该 Go 版本下最近一次成功构建」，换了 wails3 版本标签会被同名覆盖。回查某次构建装的是哪个 wails3，看元数据 `wails3_version`；固定产物用 `wails3_digest`。
+
 ## 新增工具
 
 1. 在两份 `Dockerfile.golang` 里加 `ARG` 与安装命令。

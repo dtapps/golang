@@ -172,8 +172,10 @@ MARKDOWNFMT_VERSION=github.com/Kunde21/markdownfmt/v3
 "
 
 # 从 Dockerfile 提取 go install 用到的版本变量（去重、排序）
+# 不假设 go install 后面直接跟包路径：中间可能有 -v 之类的 flag，也可能带引号
 dockerfile_tool_vars() (
-  sed -n 's/.*go install [^@[:space:]]*@\${\([A-Z_][A-Z0-9_]*\)}.*/\1/p' "$1" | sort -u
+  grep -o 'go install[^@;]*@\${[A-Z_][A-Z0-9_]*}' "$1" \
+    | sed -n 's/.*@\${\([A-Z_][A-Z0-9_]*\)}/\1/p' | sort -u
 )
 
 # 取解析结果：resolved_versions 是 KEY=VALUE 的换行列表
@@ -439,10 +441,13 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     fail=""
     got="$(go version | cut -d" " -f3 | sed "s/^go//")"
     [ "$got" = "$EXPECT_GO" ] || fail="$fail go-version($got)"
-    for b in go node npm pnpm git curl make jq upx nfpm sqlc ent entc golangci-lint \
-      govulncheck shfmt dockerfmt yamlfmt gojq sql-formatter gotestsum markdownfmt; do
+    for b in go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm \
+      sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
+      sql-formatter gotestsum markdownfmt; do
       command -v "$b" >/dev/null 2>&1 || fail="$fail bin:$b"
     done
+    # 时区生效：TZ=Asia/Shanghai 下偏移必须是 +0800（tzdata 已装且 zoneinfo 可用）
+    [ "$(date +%z)" = "+0800" ] || fail="$fail tz($(date +%z))"
     # 版本命令实际跑一遍：工具默认 @latest 自动追新后，只查 presence
     # 挡不住装坏的二进制。--version / version / -v 逐个兜底，
     # 输出丢弃，仅以退出码计 fail。

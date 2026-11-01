@@ -1,6 +1,7 @@
 include:
   - .cnb/workflows/build-golang.yml
   - .cnb/workflows/build-fnpack.yml
+  - .cnb/workflows/build-wails3.yml
   - .cnb/workflows/cnb-sechook.yml
   - .cnb/workflows/code-review.yml
   - .cnb/workflows/code-security-config.yml
@@ -64,3 +65,26 @@ main:
           settings:
             type: ADD
             fromJsonFile: .cnb/annotation-fnpack.json
+
+  # 每天 06:05（Asia/Shanghai）构建 wails3 镜像：
+  #   <registry>/<repo>/wails3 → golang + GTK4/WebKitGTK + wails3 CLI
+  # 与上一条流水线再错开三小时，确保基础镜像 <go 版本> 标签已经推好；
+  # 脚本 FROM 那个标签，只追加 GTK4/WebKitGTK 与 wails3 CLI，不重复安装工具链。
+  'crontab: 5 6 * * *':
+    - name: build-wails3
+      runner:
+        tags: cnb:arch:amd64
+      services:
+        - docker
+      imports:
+        - https://cnb.cool/dtapp/envs/-/blob/main/docker.yml
+        # 不要把 .cnb/scripts/build-wails3.sh 放进 imports（${...} 会被改写）
+      stages:
+        - name: 构建并推送多架构镜像
+          script: |
+            source .cnb/scripts/build-wails3.sh
+        - name: 写入镜像元数据
+          image: cnbcool/annotations:latest
+          settings:
+            type: ADD
+            fromJsonFile: .cnb/annotation-wails3.json

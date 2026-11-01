@@ -65,7 +65,7 @@ arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-
 
 ## CI 构建流程
 
-两个镜像由两个脚本分别发布。基础镜像先跑，fnpack 镜像再 `FROM` 它。
+三个镜像由三个脚本分别发布。基础镜像先跑，fnpack / wails3 再各自 `FROM` 它。
 
 基础镜像（`.cnb/scripts/build-golang.sh` / `.github/scripts/build-golang.sh`）：
 
@@ -92,12 +92,25 @@ fnpack 镜像（`.cnb/scripts/build-fnpack.sh` / `.github/scripts/build-fnpack.s
 8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 fnpack 的对应标签。
 9. 写 fnpack 元数据。
 
+wails3 镜像（`.cnb/scripts/build-wails3.sh` / `.github/scripts/build-wails3.sh`）：
+
+1. 解析同一个 `<go 版本>` 标签。
+2. 确定 `WAILS3_VERSION`：输入优先；留空时先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析最新稳定 tag（走基座 Dockerfile 的 `GOPROXY`），解析不到才回退 `latest` 交给 `go install`。
+3. 等 `golang:<go 版本>` 在 registry 出现，并读取它的 index digest。
+4. 构建并推送 `golang/wails3:<go 版本>`（`GOLANG_IMAGE` 指向基础镜像标签，`WAILS3_VERSION` 以 `--build-arg` 传入）。
+5. 派生 wails3 的单平台标签。
+6. amd64 冒烟（见下）。
+7. 校验 OCI `version` 标签。
+8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 wails3 的对应标签。
+9. 写 wails3 元数据（含 `wails3_version`）。
+
 ### 冒烟断言
 
 golang 镜像：
 
 - `go version` 与解析出的版本一致
-- 以下命令都存在：`go node npm pnpm git curl make jq upx nfpm sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq sql-formatter gotestsum markdownfmt`
+- 以下命令都存在：`go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq sql-formatter gotestsum markdownfmt`
+- `date +%z` 为 `+0800`（`TZ=Asia/Shanghai` 生效、`tzdata` 到位）
 - 以下工具的版本命令能实际执行（`--version` / `version` / `-v` 任一成功，防 latest 升级装进坏二进制）：`node npm pnpm upx nfpm sqlc golangci-lint gojq shfmt gotestsum`
 - `fnpack` **不存在**
 
@@ -106,6 +119,14 @@ fnpack 镜像：
 - `go version` 与解析出的版本一致
 - `fnpack` 在 `PATH` 里且可执行
 - `go node pnpm sqlc golangci-lint` 仍然存在（证明继承成功）
+
+wails3 镜像：
+
+- `go version` 与解析出的版本一致
+- `go node pnpm sqlc golangci-lint zip unzip pkg-config` 都存在（证明继承成功，且打包/编译依赖齐全）
+- `pkg-config --exists gtk4` 与 `pkg-config --exists webkitgtk-6.0` 都成立
+- `wails3` 在 `PATH` 里，且 `go version -m` 读到的 `github.com/wailsapp/wails/v3` 模块版本等于本次目标版本（回退 `latest` 时只验证可执行）
+- `fnpack` **不存在**
 
 ### 缓存
 

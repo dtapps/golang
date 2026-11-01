@@ -9,6 +9,7 @@
 | Node.js 官方 tar.xz 与版本索引    | 直连 `nodejs.org`                | `https://files.m.daocloud.io/nodejs.org/...`           |
 | nfpm 与各 Go 工具（`go install`） | Go module（`proxy.golang.org`）  | `mirrors.cloud.tencent.com/go/`                        |
 | fnpack                            | 直连 `static2.fnnas.com`         | 直连 `static2.fnnas.com`                               |
+| wails3（`go install` 与版本解析） | Go module（`proxy.golang.org`）  | `mirrors.cloud.tencent.com/go/`                        |
 | Debian APT                        | 默认 `deb.debian.org`            | `mirrors.cloud.tencent.com`                            |
 | npm / pnpm registry               | `mirrors.cloud.tencent.com/npm/` | `mirrors.cloud.tencent.com/npm/`                       |
 
@@ -36,6 +37,8 @@ NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"  # nodejs.org
 | GitHub | `.github/scripts/build-golang.sh` | 无参数（Dockerfile 直连）        |
 
 fnpack 镜像只从 `https://static2.fnnas.com` 下载二进制，两个平台的 `build-fnpack.sh` 都不传镜像参数。
+
+wails3 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧因为 `Dockerfile.golang` 已设成腾讯云，子镜像自动继承；GitHub 侧用 Go 默认代理。两侧的 `build-wails3.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」走同一个源。
 
 ## 为什么 GitHub 侧不传
 

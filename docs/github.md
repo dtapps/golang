@@ -6,12 +6,12 @@
 
 GitHub 侧不 `source` CNB 的脚本，也不与 CNB 共用 Dockerfile：
 
-| 职责       | CNB 侧                                               | GitHub 侧                                               |
-|------------|------------------------------------------------------|---------------------------------------------------------|
-| Dockerfile | `.cnb/docker/Dockerfile.golang`、`Dockerfile.fnpack` | `.github/docker/Dockerfile.golang`、`Dockerfile.fnpack` |
-| 构建脚本   | `.cnb/scripts/build-golang.sh`、`build-fnpack.sh`    | `.github/scripts/build-golang.sh`、`build-fnpack.sh`    |
-| 流水线     | `.cnb.yml` + `.cnb/workflows/`                       | `.github/workflows/`                                    |
-| 元数据     | `.cnb/annotation{,-fnpack}.json`                     | `.github/annotation{,-fnpack}.json`                     |
+| 职责       | CNB 侧                                                                    | GitHub 侧                                                                    |
+|------------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| Dockerfile | `.cnb/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3` | `.github/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3` |
+| 构建脚本   | `.cnb/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`      | `.github/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`      |
+| 流水线     | `.cnb.yml` + `.cnb/workflows/`                                            | `.github/workflows/`                                                         |
+| 元数据     | `.cnb/annotation{,-fnpack,-wails3}.json`                                  | `.github/annotation{,-fnpack,-wails3}.json`                                  |
 
 各自独立而不是共用的原因：两侧的标签规则、冒烟断言是同构的，但平台胶水完全不同——CNB 读 `CNB_*` 变量、用 `##[set-output]`、写 commit annotation；GitHub 读 Actions 上下文、写 Step Summary/artifact、用 QEMU + buildx。共用意味着任何一侧改平台细节都要考虑另一侧。
 
@@ -23,6 +23,7 @@ GitHub 侧不 `source` CNB 的脚本，也不与 CNB 共用 Dockerfile：
 |--------------------------|--------------------------------|---------------------------------------|
 | Golang 构建环境          | `ghcr.io/dtapps/golang`        | `docker.cnb.cool/dtapp/golang`        |
 | Golang 构建环境 + fnpack | `ghcr.io/dtapps/golang/fnpack` | `docker.cnb.cool/dtapp/golang/fnpack` |
+| Golang 构建环境 + wails3 | `ghcr.io/dtapps/golang/wails3` | `docker.cnb.cool/dtapp/golang/wails3` |
 
 脚本从 Actions 内置变量派生，不写死：
 
@@ -30,6 +31,7 @@ GitHub 侧不 `source` CNB 的脚本，也不与 CNB 共用 Dockerfile：
 |-----------------|-------------------------------------------|-----------------------|
 | `IMAGE`         | `ghcr.io` + `GITHUB_REPOSITORY`（转小写） | golang 镜像全名       |
 | `FNPACK_IMAGE`  | `IMAGE` + `/fnpack`                       | fnpack 镜像全名       |
+| `WAILS3_IMAGE`  | `IMAGE` + `/wails3`                       | wails3 镜像全名       |
 | `REGISTRY_USER` | `GITHUB_ACTOR`                            | `docker login` 用户名 |
 | `REVISION`      | `GITHUB_SHA`                              | OCI `revision`        |
 | `IMAGE_SOURCE`  | `https://github.com/<GITHUB_REPOSITORY>`  | OCI `source` / `url`  |
@@ -54,20 +56,37 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 - `build` 作业：检出 → 释放磁盘 → QEMU → buildx → `source .github/scripts/build-fnpack.sh` → Step Summary → artifact
 - 超时：90 分钟
 
-`build-fnpack` 启动后会最多等 5 分钟，让 `<go 版本>` 标签在 registry 里可读；仍然不存在就报错退出，不会自己重复安装一遍工具链。
+### `build-wails3.yml`
+
+- 触发：
+  - `schedule`：每天 22:35 UTC（北京 06:35），比 `build-fnpack` 再晚 3 小时
+  - `workflow_dispatch`：手动，要求对应版本的基础镜像已存在；可填 `version` / `wails3_version`
+- `build` 作业：检出 → 释放磁盘 → QEMU → buildx → `source .github/scripts/build-wails3.sh` → Step Summary → artifact
+- 超时：120 分钟（`go install` 要按 amd64 + arm64 各编译一遍 wails3 CLI，arm64 那趟走 QEMU）
+
+`wails3_version` 留空时脚本先 `go list -m github.com/wailsapp/wails/v3@latest` 解析最新稳定 tag（如 `v3.1.0`）再传进 `--build-arg`；解析失败回退 `latest`，由 Dockerfile 在构建时解析（层缓存随之失效）。策略细节见 [wails3/README.md](wails3/README.md#wails3-版本策略)。
+
+`build-fnpack` / `build-wails3` 启动后都会最多等 5 分钟，让 `<go 版本>` 标签在 registry 里可读；仍然不存在就报错退出，不会自己重复安装一遍工具链。
 
 ## 变量契约
 
-workflow 只显式传三个变量：
+workflow 只显式传四类变量：
 
 ```yaml
+# build-fnpack.yml
 env:
   REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   version: ${{ inputs.version }}
   fnpack_version: ${{ inputs.fnpack_version }}
+
+# build-wails3.yml
+env:
+  REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  version: ${{ inputs.version }}
+  wails3_version: ${{ inputs.wails3_version }}
 ```
 
-其余由脚本从 Actions 内置变量派生。`GITHUB_TOKEN` 不会自动进环境变量，所以必须显式从 secrets 传。`fnpack_version` 留空时，脚本回退到 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）。
+其余由脚本从 Actions 内置变量派生。`GITHUB_TOKEN` 不会自动进环境变量，所以必须显式从 secrets 传。`fnpack_version` 留空时，脚本回退到 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）；`wails3_version` 留空时脚本解析上游最新稳定 tag，解析不到才回退 Dockerfile 的 `WAILS3_VERSION`（默认 `latest`）。
 
 权限：
 
@@ -79,15 +98,15 @@ permissions:
 
 ## 与 CNB 的差异
 
-| 维度          | CNB                                               | GitHub                                      |
-|---------------|---------------------------------------------------|---------------------------------------------|
-| 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE` | `ghcr.io` + `GITHUB_REPOSITORY`             |
-| 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`               | `GITHUB_ACTOR` / `GITHUB_TOKEN`             |
-| 定时任务      | golang 00:05、fnpack 03:05 Asia/Shanghai          | golang 16:35 UTC、fnpack 19:35 UTC          |
-| 多架构        | docker 服务自带                                   | `setup-qemu-action` + `setup-buildx-action` |
-| GitHub 下载源 | `https://files.m.daocloud.io`                     | 直连 `github.com` / `nodejs.org`            |
-| 元数据        | commit annotation                                 | Step Summary + artifact                     |
-| 磁盘准备      | 无                                                | 删除预装 SDK，释放空间                      |
+| 维度          | CNB                                                    | GitHub                                       |
+|---------------|--------------------------------------------------------|----------------------------------------------|
+| 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE`      | `ghcr.io` + `GITHUB_REPOSITORY`              |
+| 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`                    | `GITHUB_ACTOR` / `GITHUB_TOKEN`              |
+| 定时任务      | golang 00:05、fnpack 03:05、wails3 06:05 Asia/Shanghai | golang 16:35、fnpack 19:35、wails3 22:35 UTC |
+| 多架构        | docker 服务自带                                        | `setup-qemu-action` + `setup-buildx-action`  |
+| GitHub 下载源 | `https://files.m.daocloud.io`                          | 直连 `github.com` / `nodejs.org`             |
+| 元数据        | commit annotation                                      | Step Summary + artifact                      |
+| 磁盘准备      | 无                                                     | 删除预装 SDK，释放空间                       |
 
 ## 标签契约
 
@@ -101,7 +120,7 @@ latest                    latest
 <go 版本>-linux-arm64     1.27.3-linux-arm64
 ```
 
-两个镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack 只在基础镜像对应标签也指向本次版本时才提升。
+三个镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack / wails3 只在基础镜像对应标签也指向本次版本时才提升。
 
 ## 缓存
 
@@ -123,9 +142,10 @@ env:
 ```bash
 docker pull ghcr.io/dtapps/golang@sha256:<golang_digest>
 docker pull ghcr.io/dtapps/golang/fnpack@sha256:<fnpack_digest>
+docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
 ```
 
-golang 的 digest 在 `golang-annotation` artifact / Step Summary 里；fnpack 的 digest 在 `fnpack-annotation` artifact / Step Summary 里。
+golang 的 digest 在 `golang-annotation` artifact / Step Summary 里；fnpack 的在 `fnpack-annotation` 里；wails3 的在 `wails3-annotation` 里。
 
 ## 常见问题
 

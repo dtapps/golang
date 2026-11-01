@@ -6,6 +6,7 @@
 |--------|---------------------------------|------------------------------------|
 | golang | `.cnb/docker/Dockerfile.golang` | `.github/docker/Dockerfile.golang` |
 | fnpack | `.cnb/docker/Dockerfile.fnpack` | `.github/docker/Dockerfile.fnpack` |
+| wails3 | `.cnb/docker/Dockerfile.wails3` | `.github/docker/Dockerfile.wails3` |
 
 ## 1. golang 镜像
 
@@ -51,15 +52,15 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 
 ### 安装顺序
 
-1. **Go 环境变量**：CNB 侧 `GOPROXY` 指向腾讯云，GitHub 侧不设置（用 Go 默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。
-2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）。
+1. **环境变量**：Go 侧 CNB 的 `GOPROXY` 指向腾讯云、GitHub 不设置（用默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。另有 `TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`：容器内统一北京时间与 UTF-8，构建日志、`go build` 产物里的时间戳才对得上。
+2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
 4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；npm / pnpm 使用腾讯云 registry，`pnpm config set ignore-scripts false`。
-5. **Go 工具链（含 nfpm）**：按工具分成 5 层 `go install`（nfpm+sqlc / ent+entc / golangci-lint+govulncheck / shfmt+dockerfmt+yamlfmt+gojq / sql-formatter+gotestsum+markdownfmt），每层都挂 BuildKit 缓存目录：
+5. **Go 工具链（含 nfpm）**：按工具分成 5 层 `go install -v`（nfpm+sqlc / ent+entc / golangci-lint+govulncheck / shfmt+dockerfmt+yamlfmt+gojq / sql-formatter+gotestsum+markdownfmt），`-v` 会打印每个被编译的包，CI 日志里能直接看出卡在哪个工具、哪个包上；每层都挂 BuildKit 缓存目录：
    - `--mount=type=cache,target=/go/pkg/mod`：模块缓存
    - `--mount=type=cache,target=/root/.cache/go-build`：编译缓存
 
-   缓存挂载不进镜像层，所以不再需要「同一层内 `rm -rf /go/pkg/mod`」那种清理；拆层是为了让某个工具发版时只重建它自己那一层。
+   缓存挂载不进镜像层，所以不再需要「同一层内 `rm -rf /go/pkg/mod`」那种清理；拆层是为了让某个工具发版时只重建它自己那一层。`-v` 只是让日志可读，不影响产物；`build-golang.sh` 的 `dockerfile_tool_vars` 用 `grep -o 'go install[^@;]*@${VAR}'` 提取版本变量，所以这里在 `go install` 与包路径之间再加别的 flag 也不会漏检。
 6. **清理**：purge wget / xz-utils，清 APT 缓存与 `/tmp`。
 7. **OCI 元数据标签**：放在文件最后。`BUILD_DATE` / `VCS_REF` / `IMAGE_VERSION` 每次都变，放前面会让 apt、Node、`go install` 这些层的缓存键跟着每次提交一起变。
 
@@ -113,12 +114,32 @@ https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
 - 安装后用 `fnpack --help` 做一次执行探测（部分版本 `--help` 返回非 0，故失败不阻断构建）。
 - OCI `base.name` 记录 `GOLANG_IMAGE`，`base.digest` 记录基础镜像的 index digest。
 
-## 3. 改哪个文件
+## 3. wails3 镜像
+
+```dockerfile
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+```
+
+- 与 fnpack 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，只多两层（apt 装 GTK4/WebKitGTK + `go install` wails3）。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已换成腾讯云源，所以这个文件里没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- 安装的开发包：`zip`、`unzip`、`pkg-config`、`libgtk-4-dev`、`libwebkitgtk-6.0-dev`；装完立刻 `pkg-config --exists gtk4` 与 `webkitgtk-6.0` 断言，避免把问题推迟到使用者手里（这两层**不能**在最后 purge，它们就是镜像的用途）。
+- wails3 版本由 `ARG WAILS3_VERSION` 控制，默认 `latest`（不再钉死某个 tag）；CI 会先解析成 `v3.1.0` 这种具体版本再传进来。安装命令：
+
+```dockerfile
+go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS3_VERSION}"
+```
+
+- `wails3` 落在 `${GOPATH}/bin`（`/go/bin`，已在 `PATH` 中），`test -x` + `wails3 version` 做安装验证。
+- `--mount=type=cache` 挂模块与编译缓存：`go install` 要编译整个 CLI，冷缓存下这一层是耗时大头。
+
+## 4. 改哪个文件
 
 | 要改的东西         | 改哪里                                                                                       |
 |--------------------|----------------------------------------------------------------------------------------------|
 | Go 基座版本        | 两份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新）                          |
 | 某个工具版本       | 两份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）                            |
 | fnpack 版本        | 两份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`（默认值，可被手动触发的 `fnpack_version` 覆盖） |
+| wails3 版本        | 两份 `Dockerfile.wails3` 的 `WAILS3_VERSION`（默认 `latest`，可被 `wails3_version` 覆盖）    |
 | 下载源             | 构建脚本的 `MIRROR` / 构建参数                                                               |
-| 标签规则、冒烟断言 | 两份 `build-golang.sh` + 两份 `build-fnpack.sh`                                              |
+| 标签规则、冒烟断言 | 两份 `build-golang.sh` + 两份 `build-fnpack.sh` + 两份 `build-wails3.sh`                     |

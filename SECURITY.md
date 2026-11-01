@@ -1,11 +1,12 @@
 # 安全说明
 
-本仓库是一个自建镜像仓库，目前包含两个镜像：
+本仓库是一个自建镜像仓库，目前包含三个镜像：
 
 - `golang`：基于官方 `golang:1-trixie`（自动跟随最新稳定 Go），增加 UPX、nfpm、Node.js/pnpm 与常用 Go 工具。
 - `golang/fnpack`：在上面的镜像上加一个 `fnpack` 二进制。
+- `golang/wails3`：在上面的镜像上加 GTK4/WebKitGTK 6.0 开发包与 `wails3` CLI（`go install` 自源码构建）。
 
-两者都没有业务代码，也没有自研二进制。
+三者都没有业务代码，也没有自研二进制（`wails3` 由上游源码在本仓库构建时编译）。
 
 ## 支持范围
 
@@ -16,32 +17,34 @@
 | `latest`                        | 最近一次成功构建                               |
 | `<go 版本>-linux-{amd64,arm64}` | 单平台标签，从同一份 manifest 派生             |
 
-两个镜像的标签合同相同，但更新是分两步的：先构建并发布 `golang`，再以它为基座构建 `golang/fnpack`。`fnpack` 的 `<major.minor>` / `latest` 只有在 `golang` 的同一标签已经指向本次版本时才会提升，因此不会出现「fnpack 已更新、基座还是旧版」的错位。
+三个镜像的标签合同相同，但更新是分两步的：先构建并发布 `golang`，再以它为基座分别构建 `golang/fnpack` 与 `golang/wails3`。两个变体的 `<major.minor>` / `latest` 只有在 `golang` 的同一标签已经指向本次版本时才会提升，因此不会出现「变体已更新、基座还是旧版」的错位。
 
 固定产物请用 annotation 里的 digest，而不是标签：
 
 ```bash
 docker pull ghcr.io/dtapps/golang@sha256:<golang_digest>
 docker pull ghcr.io/dtapps/golang/fnpack@sha256:<fnpack_digest>
+docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
 ```
 
 ## 补丁节奏
 
-- 每天自动重建一次，分两段：`golang`（CNB 00:05、GitHub 16:35 UTC）与 `golang/fnpack`（CNB 03:05、GitHub 19:35 UTC）各自按错开的定时任务构建。
-- 每次重建都会重新拉取上游基座、重新下载依赖，因此上游重新推送同一 tag 时的安全修复能进入镜像。
+- 每天自动重建一次，分三段：`golang`（CNB 00:05、GitHub 16:35 UTC）、`golang/fnpack`（CNB 03:05、GitHub 19:35 UTC）与 `golang/wails3`（CNB 06:05、GitHub 22:35 UTC）各自按错开的定时任务构建。
+- 每次重建都会重新拉取上游基座、重新下载/重新编译依赖，因此上游重新推送同一 tag 时的安全修复能进入镜像。
 - Go 基座默认 `golang:1-trixie` 浮动标签，自动跟随最新稳定 Go（跨 minor 与大版本）；手动触发填 `version` 可钉住。
-- 工具版本（UPX、nfpm、Node、pnpm、各 Go 工具）默认 `latest`，构建时自动解析最新版：UPX 取 GitHub `releases.atom` 的首个稳定 tag，Node 查官方 dist 索引，nfpm 与各 Go 工具走 `go install @latest`。出现问题时可用 `--build-arg`（或改 Dockerfile 默认值）钉回具体版本。
+- 工具版本（UPX、nfpm、Node、pnpm、各 Go 工具）默认 `latest`，构建时自动解析最新版：UPX 取 GitHub `releases.atom` 的首个稳定 tag，Node 查官方 dist 索引，nfpm 与各 Go 工具走 `go install @latest`。wails3 同理：`WAILS3_VERSION` 默认 `latest`，CI 先用 `go list -m` 解析最新稳定 tag 再 `go install`。出现问题时可用 `--build-arg`（或改 Dockerfile 默认值）钉回具体版本。
 
 ## 信任面
 
-| 来源                                 | 用途                                                                     |
-|--------------------------------------|--------------------------------------------------------------------------|
-| Docker Hub `golang:1-trixie`         | 基础镜像                                                                 |
-| `github.com` / `files.m.daocloud.io` | 解析 UPX 最新版本号（`releases.atom`）与下载 GitHub Release              |
-| `nodejs.org` / `files.m.daocloud.io` | Node.js 官方 tar.xz 与版本索引（index.json）                             |
-| `static2.fnnas.com`                  | fnpack 二进制                                                            |
-| `mirrors.cloud.tencent.com`          | npm registry、Go module proxy（nfpm 与各 Go 工具）；Debian APT 仅 CNB 侧 |
-| `cnbcool/annotations:latest`         | 写 commit 元数据的 CI 插件                                               |
+| 来源                                      | 用途                                                                             |
+|-------------------------------------------|----------------------------------------------------------------------------------|
+| Docker Hub `golang:1-trixie`              | 基础镜像                                                                         |
+| `github.com` / `files.m.daocloud.io`      | 解析 UPX 最新版本号（`releases.atom`）与下载 GitHub Release                      |
+| `nodejs.org` / `files.m.daocloud.io`      | Node.js 官方 tar.xz 与版本索引（index.json）                                     |
+| `static2.fnnas.com`                       | fnpack 二进制                                                                    |
+| `github.com/wailsapp/wails`（经 GOPROXY） | wails3 CLI 源码（`go install`）                                                  |
+| `mirrors.cloud.tencent.com`               | npm registry、Go module proxy（nfpm 与各 Go 工具、wails3）；Debian APT 仅 CNB 侧 |
+| `cnbcool/annotations:latest`              | 写 commit 元数据的 CI 插件                                                       |
 
 GitHub 侧直连官方站，APT 与 Go module 用默认源；CNB 侧的 GitHub Release / `releases.atom` 与 nodejs.org 走 DaoCloud 代理，APT 与 Go module 走腾讯云。代理站本身也是供应链的一部分。
 
@@ -50,7 +53,8 @@ GitHub 侧直连官方站，APT 与 Go module 用默认源；CNB 侧的 GitHub R
 - 同一 digest = 同一份产物（按 `@sha256:...` 拉取）。
 - 每次构建都能回查，元数据按镜像分开写：
   - `golang`：`.cnb/annotation.json` / `.github/annotation.json`，含 `golang_digest`、`base_image`、`base_digest`、`built_at`。
-  - `golang/fnpack`：`.cnb/annotation-fnpack.json` / `.github/annotation-fnpack.json`，含 `fnpack_digest`、`fnpack_base_image`、`fnpack_base_digest`、`built_at`。
+  - `golang/fnpack`：`.cnb/annotation-fnpack.json` / `.github/annotation-fnpack.json`，含 `fnpack_digest`、`fnpack_version`、`fnpack_base_image`、`fnpack_base_digest`、`built_at`。
+  - `golang/wails3`：`.cnb/annotation-wails3.json` / `.github/annotation-wails3.json`，含 `wails3_digest`、`wails3_version`、`wails3_base_image`、`wails3_base_digest`、`built_at`。
 - 标签会随重建前移，不能作为固定点；也不承诺「同样的命令每次都产出相同的字节」。
 - 构建启用 buildx 层缓存（`<镜像>:buildcache`），但缓存键跟着「解析出的工具版本 + 基座 digest」走：上游没发新版才命中，发新版或基座 digest 变化都会重建对应层。需要一次干净的全量重建时设 `CACHE=off`。
 

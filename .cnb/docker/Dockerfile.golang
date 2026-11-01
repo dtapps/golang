@@ -99,11 +99,17 @@ ENV GO111MODULE=on \
     GOPATH=/go \
     PATH="$GOPATH/bin:$PATH"
 
+# 1.1 时区与语言：容器内统一北京时间 + UTF-8，构建日志与产物时间戳才对得上
+#（tzdata 在下一步装；${TZ} 由本 ENV 提供，apt 那段直接用它建 /etc/localtime）
+ENV TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
 # 2. 替换 Debian APT 加速源
 RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null \
     || sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list
 
-# 3. 安装基础构建工具
+# 3. 安装基础构建工具（含 tzdata，配合上面的 TZ）
 RUN export DEBIAN_FRONTEND=noninteractive; \
     apt-get update && apt-get install -y --no-install-recommends \
     wget \
@@ -114,7 +120,14 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     git \
     make \
     jq \
-    && rm -rf /var/lib/apt/lists/*
+    zip \
+    unzip \
+    pkg-config \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*; \
+    ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime; \
+    printf '%s\n' "${TZ}" > /etc/timezone; \
+    date
 
 # 4. 安装 UPX 工具
 RUN set -eux; \
@@ -182,46 +195,46 @@ RUN set -eux; \
 #     所以不再需要「同一层内 rm -rf /go/pkg/mod /root/.cache/go-build」。
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION} \
+    go install -v github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION} \
     && echo "==> nfpm 安装完成 (${NFPM_VERSION})" \
-    && go install github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION} \
+    && go install -v github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION} \
     && echo "==> sqlc 安装完成 (${SQLC_VERSION})"
 
 # 6.1 ent / entc
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install entgo.io/ent/cmd/ent@${ENT_VERSION} \
-    && go install entgo.io/ent/cmd/entc@${ENT_VERSION} \
+    go install -v entgo.io/ent/cmd/ent@${ENT_VERSION} \
+    && go install -v entgo.io/ent/cmd/entc@${ENT_VERSION} \
     && echo "==> ent / entc 安装完成 (${ENT_VERSION})"
 
 # 6.2 golangci-lint / govulncheck
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION} \
+    go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION} \
     && echo "==> golangci-lint 安装完成 (${GOLANGCI_LINT_VERSION})" \
-    && go install golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} \
+    && go install -v golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} \
     && echo "==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})"
 
 # 6.3 shfmt / dockerfmt / yamlfmt / gojq
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
+    go install -v mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
     && echo "==> shfmt 安装完成 (${SHFMT_VERSION})" \
-    && go install github.com/reteps/dockerfmt@${DOCKERFMT_VERSION} \
+    && go install -v github.com/reteps/dockerfmt@${DOCKERFMT_VERSION} \
     && echo "==> dockerfmt 安装完成 (${DOCKERFMT_VERSION})" \
-    && go install github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION} \
+    && go install -v github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION} \
     && echo "==> yamlfmt 安装完成 (${YAMLFMT_VERSION})" \
-    && go install github.com/itchyny/gojq/cmd/gojq@${GOJQ_VERSION} \
+    && go install -v github.com/itchyny/gojq/cmd/gojq@${GOJQ_VERSION} \
     && echo "==> gojq 安装完成 (${GOJQ_VERSION})"
 
 # 6.4 sql-formatter / gotestsum / markdownfmt
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
+    go install -v github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
     && echo "==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})" \
-    && go install gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
+    && go install -v gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
     && echo "==> gotestsum 安装完成 (${GOTESTSUM_VERSION})" \
-    && go install github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
+    && go install -v github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
     && echo "==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})" \
     && echo "--- Go 工具链安装完成 ---" \
     && ls -l "$GOPATH/bin"
