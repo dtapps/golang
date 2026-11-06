@@ -1,7 +1,7 @@
 branch:
   - buttons:
       - name: 打包 Golang 镜像（多架构 amd64 + arm64）
-        description: 构建并推送 golang 基础镜像（不含 fnpack）到制品库，含多架构 manifest list 与单平台标签
+        description: 构建并推送 golang 基础镜像（amd64 + arm64 多架构），产出版本、latest 与单平台标签；不含 fnpack / wails3
         event: web_trigger_build_golang # 触发的 CI 事件名
         permissions:
           roles:
@@ -15,7 +15,7 @@ branch:
             type: input
             default: ''
       - name: 打包 Golang + fnpack 镜像（多架构 amd64 + arm64）
-        description: 基于已推送的 golang 基础镜像，构建并推送 golang/fnpack（只多一个 fnpack 二进制）
+        description: 基于已推送的 golang 基础镜像，构建并推送 golang/fnpack（amd64 + arm64 多架构，只多一个 fnpack 二进制）
         event: web_trigger_build_fnpack # 触发的 CI 事件名
         permissions:
           roles:
@@ -34,7 +34,7 @@ branch:
             type: input
             default: ''
       - name: 打包 Golang + wails3 镜像（多架构 amd64 + arm64）
-        description: 基于已推送的 golang 基础镜像，构建并推送 golang/wails3（加 GTK4/WebKitGTK 开发包与 wails3 CLI）
+        description: 基于已推送的 golang 基础镜像，构建并推送 golang/wails3（amd64 + arm64 多架构，含 GTK4 / WebKitGTK 与 wails3 CLI）
         event: web_trigger_build_wails3 # 触发的 CI 事件名
         permissions:
           roles:

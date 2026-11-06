@@ -2,16 +2,16 @@
 
 ## 一张表
 
-| 依赖                              | GitHub Actions                   | CNB                                                    |
-|-----------------------------------|----------------------------------|--------------------------------------------------------|
-| GitHub Release（UPX）             | 直连 `github.com`                | `https://files.m.daocloud.io/github.com/...`           |
-| GitHub Release Atom（UPX 版本号） | 直连 `github.com`                | `https://files.m.daocloud.io/github.com/...`（同域名） |
-| Node.js 官方 tar.xz 与版本索引    | 直连 `nodejs.org`                | `https://files.m.daocloud.io/nodejs.org/...`           |
-| nfpm 与各 Go 工具（`go install`） | Go module（`proxy.golang.org`）  | `mirrors.cloud.tencent.com/go/`                        |
-| fnpack                            | 直连 `static2.fnnas.com`         | 直连 `static2.fnnas.com`                               |
-| wails3（`go install` 与版本解析） | Go module（`proxy.golang.org`）  | `mirrors.cloud.tencent.com/go/`                        |
-| Debian APT                        | 默认 `deb.debian.org`            | `mirrors.cloud.tencent.com`                            |
-| npm / pnpm registry               | `mirrors.cloud.tencent.com/npm/` | `mirrors.cloud.tencent.com/npm/`                       |
+| 依赖                              | GitHub Actions                  | CNB                                                    |
+|-----------------------------------|---------------------------------|--------------------------------------------------------|
+| GitHub Release（UPX）             | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`           |
+| GitHub Release Atom（UPX 版本号） | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`（同域名） |
+| Node.js 官方 tar.xz 与版本索引    | 直连 `nodejs.org`               | `https://files.m.daocloud.io/nodejs.org/...`           |
+| nfpm 与各 Go 工具（`go install`） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| fnpack                            | 直连 `static2.fnnas.com`        | 直连 `static2.fnnas.com`                               |
+| wails3（`go install` 与版本解析） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| Debian APT                        | 默认 `deb.debian.org`           | `mirrors.cloud.tencent.com`                            |
+| npm / pnpm registry               | 默认 `registry.npmjs.org`       | `mirrors.cloud.tencent.com/npm/`                       |
 
 ## 开关
 
@@ -42,7 +42,7 @@ wails3 镜像不新增开关：`go install` 与版本解析（`go list -m`）都
 
 ## 为什么 GitHub 侧不传
 
-GitHub hosted runner 在海外，直连 `github.com` / `nodejs.org` 比绕道 DaoCloud 更快、更少一个故障点。CNB runner 在国内，直连 GitHub 容易超时，所以走 DaoCloud。
+GitHub hosted runner 在海外，直连 `github.com` / `nodejs.org` 比绕道 DaoCloud 更快、更少一个故障点；npm / pnpm 同理用官方默认 `registry.npmjs.org`，APT 用 `deb.debian.org`，Go module 用 `proxy.golang.org`，都不设镜像。CNB runner 在国内，直连 GitHub 容易超时，所以走 DaoCloud，APT / Go module / npm 也换腾讯云。
 
 ## Go module proxy
 
@@ -73,6 +73,6 @@ curl -sI https://static2.fnnas.com/fnpack/fnpack-1.2.3-linux-arm | head -1
 ## 注意
 
 - DaoCloud 是第三方代理，域名规则是 `<代理前缀>/<原域名>/<原路径>`。
-- npm registry 两侧都用腾讯云；APT 与 Go module proxy 只有 CNB 侧用腾讯云，GitHub 侧用 Debian / Go 默认源。
+- npm registry 只有 CNB 侧用腾讯云，GitHub 侧用官方默认 `registry.npmjs.org`；APT 与 Go module proxy 同理，GitHub 侧用 Debian / Go 默认源。
 - fnpack 没有做镜像，直接访问 `static2.fnnas.com`；该站本身在国内，通常不需要代理。
 - 如果 DaoCloud 某个路径 404，先用上面的 `curl` 验证原站是否仍提供该文件（可能只是版本号写错）。

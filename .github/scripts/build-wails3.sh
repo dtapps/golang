@@ -392,13 +392,34 @@ elif ! build_image on; then
   build_image plain || die "wails3 镜像 docker buildx build 失败"
 fi
 
+# ---------- imagetools create 重试包装 ----------
+# imagetools create 会把源清单及其 blob 流式复制到目标 tag，registry 刚写完缓存清单
+# 就回读时偶尔返回截断响应（copy ...: unexpected EOF）。这是瞬时故障，重推同一份
+# manifest 是幂等的：重试 3 次、间隔 5s/10s，全失败才交给调用方 die。
+create_tag_with_retry() (
+  tag=$1
+  src=$2
+  attempt=1
+  while [ "${attempt}" -le 3 ]; do
+    if docker buildx imagetools create -t "${tag}" "${src}"; then
+      return 0
+    fi
+    if [ "${attempt}" -eq 3 ]; then
+      return 1
+    fi
+    warn "imagetools create ${tag} 第 ${attempt} 次失败，$((attempt * 5)) 秒后重试"
+    sleep $((attempt * 5))
+    attempt=$((attempt + 1))
+  done
+  return 1
+)
+
 # ---------- 9. 从同一 manifest 派生单平台标签 ----------
 for arch in amd64 arm64; do
   digest="$(manifest_digest_for "${WAILS3_IMAGE}:${STAMP}" "${arch}")"
   [ -n "${digest}" ] || die "未在 ${WAILS3_IMAGE}:${STAMP} 中找到 linux/${arch} 条目"
-  docker buildx imagetools create -t "${WAILS3_IMAGE}:${STAMP}-linux-${arch}" \
-    "${WAILS3_IMAGE}@${digest}" \
-    || die "派生 ${STAMP}-linux-${arch} 失败"
+  create_tag_with_retry "${WAILS3_IMAGE}:${STAMP}-linux-${arch}" "${WAILS3_IMAGE}@${digest}" \
+    || die "派生 ${STAMP}-linux-${arch} 失败（已重试 3 次）"
   info "派生 ${WAILS3_IMAGE}:${STAMP}-linux-${arch} ← ${digest}"
 done
 
@@ -453,14 +474,28 @@ label_version="$(docker image inspect \
 # ---------- 11. 提升可变标签（冒烟通过、且基础镜像的移动标签已就位） ----------
 # 先确认 golang:<tag> 也指向本次 <go 版本>，避免 wails3 的 latest 跑到基础镜像前面。
 for tag in "${MINOR}" latest; do
-  base_tag_digest="$(docker buildx imagetools inspect "${IMAGE}:${tag}" \
-    --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
+  # inspect 读失败不能当成「基座未对齐」静默跳过：重试 3 次仍读不到时打明确告警。
+  base_tag_digest=""
+  inspect_n=1
+  while [ "${inspect_n}" -le 3 ]; do
+    if base_tag_digest="$(docker buildx imagetools inspect "${IMAGE}:${tag}" \
+      --format '{{.Manifest.Digest}}' 2>/dev/null)"; then
+      break
+    fi
+    if [ "${inspect_n}" -eq 3 ]; then
+      warn "读取 ${IMAGE}:${tag} 失败（已重试 3 次）：无法确认基座是否对齐，跳过提升"
+      break
+    fi
+    warn "读取 ${IMAGE}:${tag} 第 ${inspect_n} 次失败，$((inspect_n * 5)) 秒后重试"
+    sleep $((inspect_n * 5))
+    inspect_n=$((inspect_n + 1))
+  done
   if [ "${base_tag_digest}" != "${BASE_INDEX_DIGEST}" ]; then
     info "跳过 ${WAILS3_IMAGE}:${tag}：${IMAGE}:${tag} 尚未指向 ${STAMP}"
     continue
   fi
-  docker buildx imagetools create -t "${WAILS3_IMAGE}:${tag}" "${WAILS3_IMAGE}:${STAMP}" \
-    || die "提升 ${WAILS3_IMAGE}:${tag} 失败"
+  create_tag_with_retry "${WAILS3_IMAGE}:${tag}" "${WAILS3_IMAGE}:${STAMP}" \
+    || die "提升 ${WAILS3_IMAGE}:${tag} 失败（已重试 3 次）"
   info "提升 ${WAILS3_IMAGE}:${tag} → ${STAMP}"
 done
 

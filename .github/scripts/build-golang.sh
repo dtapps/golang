@@ -22,7 +22,7 @@
 #   version        选填，Go 版本：留空 = Dockerfile 的 GO_VERSION；
 #                  也可填 1.27 / 1.27.3
 #
-# 镜像源：直接访问 github.com / nodejs.org；CNB 侧才走 DaoCloud（见 CNB 脚本）。
+# 镜像源：Go / APT / npm / GitHub Release / nodejs.org 全走官方默认；CNB 侧才用国内镜像。
 #
 # 设计约束：
 #   1. 基座跟随上游：Dockerfile 的 GO_VERSION 默认 1（golang:1-trixie 浮动标签，
@@ -150,11 +150,9 @@ read_env() (
     | sed "s/.*${name}=//" | sed 's/[[:space:]\\]*$//'
 )
 
-# 从 Dockerfile 读 npm registry：解析 pnpm 版本要用同一个源
-read_npm_registry() (
-  grep -o 'npm config set registry [^;]*' "$1" | head -n 1 \
-    | sed 's/^npm config set registry //'
-)
+# GitHub 侧不设 npm 镜像：Dockerfile 里的 npm / pnpm 用官方默认源，
+# 解析 pnpm 版本也用同一个源，保证「解析到的版本」和「实际装的版本」一致。
+NPM_REGISTRY="https://registry.npmjs.org/"
 
 # ---------- 工具版本解析 ----------
 # go list -m 要的是模块路径，Dockerfile 里 go install 写的是包路径，所以单独登记。
@@ -334,7 +332,6 @@ MINOR="$(printf '%s' "${GO_REAL}" | cut -d. -f1,2)"
 # 把 latest 变成具体版本号再传给 Dockerfile，缓存键才会跟着版本走。
 # 解析失败不阻断构建：回退 latest，由 Dockerfile 在构建时自行解析（缓存不生效）。
 DOCKERFILE_GOPROXY="$(read_env GOPROXY "$DOCKERFILE_GOLANG")"
-NPM_REGISTRY="$(read_npm_registry "$DOCKERFILE_GOLANG")"
 TOOL_VARS="$(dockerfile_tool_vars "$DOCKERFILE_GOLANG") UPX_VERSION NODE_VERSION PNPM_VERSION"
 
 # 自检：Dockerfile 里出现的 go install 版本变量都要在 GO_TOOL_MODULES 里登记
@@ -443,14 +440,36 @@ GOLANG_INDEX_DIGEST="$(docker buildx imagetools inspect "${IMAGE}:${STAMP}" \
   --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
 [ -n "${GOLANG_INDEX_DIGEST}" ] || die "无法读取 ${IMAGE}:${STAMP} 的 index digest"
 
+# ---------- imagetools create 重试包装 ----------
+# imagetools create 会把源清单及其 blob 流式复制到目标 tag，registry 刚写完缓存清单
+# 就回读时偶尔返回截断响应（copy ...: unexpected EOF）。这是瞬时故障，重推同一份
+# manifest 是幂等的：重试 3 次、间隔 5s/10s，全失败才交给调用方 die。
+create_tag_with_retry() (
+  tag=$1
+  src=$2
+  attempt=1
+  while [ "${attempt}" -le 3 ]; do
+    if docker buildx imagetools create -t "${tag}" "${src}"; then
+      return 0
+    fi
+    if [ "${attempt}" -eq 3 ]; then
+      return 1
+    fi
+    warn "imagetools create ${tag} 第 ${attempt} 次失败，$((attempt * 5)) 秒后重试"
+    sleep $((attempt * 5))
+    attempt=$((attempt + 1))
+  done
+  return 1
+)
+
 # ---------- 8. 从同一 manifest 派生单平台标签 ----------
 derive_arch_tags() {
   img=$1
   for arch in amd64 arm64; do
     digest="$(manifest_digest_for "${img}:${STAMP}" "${arch}")"
     [ -n "${digest}" ] || die "未在 ${img}:${STAMP} 中找到 linux/${arch} 条目"
-    docker buildx imagetools create -t "${img}:${STAMP}-linux-${arch}" "${img}@${digest}" \
-      || die "派生 ${STAMP}-linux-${arch} 失败"
+    create_tag_with_retry "${img}:${STAMP}-linux-${arch}" "${img}@${digest}" \
+      || die "派生 ${STAMP}-linux-${arch} 失败（已重试 3 次）"
     info "派生 ${img}:${STAMP}-linux-${arch} ← ${digest}"
   done
 }
@@ -503,8 +522,8 @@ label_version="$(docker image inspect \
 
 # ---------- 10. 提升可变标签（冒烟通过后才动） ----------
 for tag in "${MINOR}" latest; do
-  docker buildx imagetools create -t "${IMAGE}:${tag}" "${IMAGE}:${STAMP}" \
-    || die "提升 ${IMAGE}:${tag} 失败"
+  create_tag_with_retry "${IMAGE}:${tag}" "${IMAGE}:${STAMP}" \
+    || die "提升 ${IMAGE}:${tag} 失败（已重试 3 次）"
   info "提升 ${IMAGE}:${tag} → ${STAMP}"
 done
 

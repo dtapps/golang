@@ -3,7 +3,7 @@
 #
 # 两个平台各留一份：.cnb/docker/Dockerfile.golang 与
 # .github/docker/Dockerfile.golang，各自维护、不互相引用。
-# 装包、升级工具版本时两处都要改；镜像源按平台不同（见各步骤注释）。
+# 装包、升级工具版本时两处都要改；GitHub 侧一律直连官方源，CNB 侧才用国内镜像。
 #
 # 镜像内容：
 #   Go 工具链 + UPX + nfpm + Node.js/pnpm
@@ -143,6 +143,7 @@ RUN set -eux; \
     upx --version
 
 # 4. 安装 Node.js 工具
+# GitHub runner 在海外，npm / pnpm 不设 registry（用官方默认 registry.npmjs.org）。
 RUN set -eux; \
     ARCH="$(uname -m)"; \
     case "$ARCH" in \
@@ -164,9 +165,7 @@ RUN set -eux; \
     NODE_URL="${NODE_BASE}/${NODE_TAG}/${NODE_DIR}.tar.xz"; \
     wget -q -O /tmp/node.tar.xz "${NODE_URL}"; \
     tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1; \
-    npm config set registry https://mirrors.cloud.tencent.com/npm/; \
     npm install -g pnpm@${PNPM_VERSION}; \
-    pnpm config set registry https://mirrors.cloud.tencent.com/npm/; \
     pnpm config set ignore-scripts false; \
     rm -rf /tmp/node.tar.xz /root/.npm /root/.cache/node; \
     echo "--- Node.js 安装的 (v${NODE_VER}) ---"; \

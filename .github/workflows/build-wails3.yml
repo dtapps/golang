@@ -15,6 +15,11 @@
 #         脚本构建前解析成具体 tag 再传进 build-arg，层缓存才跟得上版本）。
 #         手动触发可以填 wails3_version 钉住（如 v3.0.0 / v3.0.0-beta.34）。
 # ===================================================================
+# https://github.com/actions/runner-images
+# https://github.com/actions/checkout
+# https://github.com/docker/setup-qemu-action
+# https://github.com/docker/setup-buildx-action
+# https://github.com/actions/upload-artifact
 name: build-wails3
 
 on:
@@ -56,28 +61,36 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # go install 要按 amd64 + arm64 各编译一遍 wails3 CLI，arm64 那趟走 QEMU，
     # 比 fnpack（只下载二进制）慢得多。
     timeout-minutes: 120
     steps:
       - name: 检出源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 释放磁盘空间
-        # GTK4 / WebKitGTK 开发包不小，加上两平台构建缓存与 Go 编译缓存，
-        # 会吃掉 hosted runner 的临时盘。预装 SDK 与本构建无关。
+        # runner 临时盘约 14 GiB：删掉无关的预装 SDK，避免构建期 no space left on device。
+        # 并发删除预装 SDK：串行会把四个目录的 unlink 耗时相加，这里只等最慢的一个。
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet & p1=$!
+          sudo rm -rf /usr/local/lib/android & p2=$!
+          sudo rm -rf /opt/ghc & p3=$!
+          sudo rm -rf /opt/hostedtoolcache/CodeQL & p4=$!
+          rc=0
+          for pid in "$p1" "$p2" "$p3" "$p4"; do
+            wait "$pid" || rc=1
+          done
+          [ "$rc" -eq 0 ] || exit 1
           df -h /
 
       - name: 安装 QEMU（跨架构构建 arm64）
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 
       - name: 初始化 buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: 构建并推送多架构镜像
         id: build
@@ -108,7 +121,7 @@ jobs:
 
       - name: 上传构建元数据
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wails3-annotation
           path: .github/annotation-wails3.json

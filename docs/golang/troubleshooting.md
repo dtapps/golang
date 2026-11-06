@@ -57,6 +57,27 @@ wails3：解析版本（含 wails3 版本）→ 登录 → buildx 自检 → 等
 - 有的 registry 不接受 buildx 的缓存清单（未知 media type / 权限），而缓存导出发生在镜像推完之后，会表现为「构建成功但步骤失败」。脚本会自动去掉缓存重试一次，日志里会先出现「带缓存的构建失败」警告。
 - 想长期不用缓存：设 `CACHE=off`。
 
+### 派生标签报 `unexpected EOF`
+
+症状：`--push` 已经成功，紧接着出现
+
+```text
+[internal] pushing ... copying sha256:... ... unexpected EOF
+错误: 派生 <版本>-linux-amd64 失败
+```
+
+之后的冒烟、`latest` / `<major.minor>` 提升都没执行。
+
+原因：CNB 制品库不支持把镜像清单当 blob 读；`imagetools create` 在同仓库打标签时仍要走 blob copy，`copy sha256:... unexpected EOF` 在 `0.000s` 稳定复现，与基座几点构建、三条定时任务错开多久都无关。**重试无效**（3 次全挂已实测）。
+
+处置：
+
+- CNB 侧三份脚本改用 Registry V2 API：`registry_auth()` 复用 `docker login` 凭证换 Bearer token，`put_manifest()` 把源清单 `GET` 下来、原文 `PUT` 到新 tag。层 blob 本就在同一仓库，全程不触发复制，digest 不变；PUT 后校验 `Docker-Content-Digest`，不一致即失败。
+- 派生标签因此是单平台 manifest 原文（不再是包一层的 OCI index），`docker pull --platform` 行为不变。
+- GitHub 侧 GHCR 无此限制，保留 `create_tag_with_retry` 兜瞬时抖动；两侧实现不同、标签结果一致，别把 CNB 侧改回 `imagetools create`。
+- 提升标签前读基座 digest 也加了 3 次重试 + 告警，避免读失败被当成「基座未对齐」静默跳过。
+- 排障：`docker buildx imagetools inspect <镜像>:<版本>` 与 `...:<版本>-linux-amd64`；PUT 失败时日志会打印源引用与 `Content-Type`。
+
 ### 下载 404（UPX / nfpm / Node.js）
 
 1. 确认版本号 ARG 对应的文件确实存在。
@@ -131,7 +152,7 @@ wails3：解析版本（含 wails3 版本）→ 登录 → buildx 自检 → 等
 ### `npm install -g pnpm` 失败
 
 - 检查 `NODE_URL` 是否可下载。
-- npm registry 默认腾讯云；如果上游同步延迟，临时改回官方 registry 验证。
+- CNB 侧 npm registry 用腾讯云，上游同步延迟时可临时改回官方；GitHub 侧用官方默认 `registry.npmjs.org`，无需改动。
 - Node 版本与 pnpm 版本不兼容时，同步调整 `NODE_VERSION` / `PNPM_VERSION`。
 
 ### 脚本被 imports 改写

@@ -13,6 +13,11 @@
 #
 #   镜像源：fnpack 从 https://static2.fnnas.com 直接下载，不经过 GitHub Release 代理。
 # ===================================================================
+# https://github.com/actions/runner-images
+# https://github.com/actions/checkout
+# https://github.com/docker/setup-qemu-action
+# https://github.com/docker/setup-buildx-action
+# https://github.com/actions/upload-artifact
 name: build-fnpack
 
 on:
@@ -54,25 +59,34 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 90
     steps:
       - name: 检出源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 释放磁盘空间
-        # fnpack 层很薄，但 arm64 仿真与基础镜像拉取仍占用临时盘。
+        # runner 临时盘约 14 GiB：删掉无关的预装 SDK，避免构建期 no space left on device。
+        # 并发删除预装 SDK：串行会把四个目录的 unlink 耗时相加，这里只等最慢的一个。
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet & p1=$!
+          sudo rm -rf /usr/local/lib/android & p2=$!
+          sudo rm -rf /opt/ghc & p3=$!
+          sudo rm -rf /opt/hostedtoolcache/CodeQL & p4=$!
+          rc=0
+          for pid in "$p1" "$p2" "$p3" "$p4"; do
+            wait "$pid" || rc=1
+          done
+          [ "$rc" -eq 0 ] || exit 1
           df -h /
 
       - name: 安装 QEMU（跨架构构建 arm64）
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 
       - name: 初始化 buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: 构建并推送多架构镜像
         id: build
@@ -103,7 +117,7 @@ jobs:
 
       - name: 上传构建元数据
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fnpack-annotation
           path: .github/annotation-fnpack.json

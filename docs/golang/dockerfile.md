@@ -55,7 +55,7 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 1. **环境变量**：Go 侧 CNB 的 `GOPROXY` 指向腾讯云、GitHub 不设置（用默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。另有 `TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`：容器内统一北京时间与 UTF-8，构建日志、`go build` 产物里的时间戳才对得上。
 2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
-4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；npm / pnpm 使用腾讯云 registry，`pnpm config set ignore-scripts false`。
+4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；GitHub 侧不配置 registry（npm / pnpm 用官方默认 `registry.npmjs.org`），CNB 侧才用腾讯云；两侧都设 `pnpm config set ignore-scripts false`。
 5. **Go 工具链（含 nfpm）**：按工具分成 5 层 `go install -v`（nfpm+sqlc / ent+entc / golangci-lint+govulncheck / shfmt+dockerfmt+yamlfmt+gojq / sql-formatter+gotestsum+markdownfmt），`-v` 会打印每个被编译的包，CI 日志里能直接看出卡在哪个工具、哪个包上；每层都挂 BuildKit 缓存目录：
    - `--mount=type=cache,target=/go/pkg/mod`：模块缓存
    - `--mount=type=cache,target=/root/.cache/go-build`：编译缓存
