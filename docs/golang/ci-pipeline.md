@@ -41,6 +41,8 @@ fnpack / wails3 镜像都 `FROM` 同版本的 golang 基础镜像，所以顺序
 
 GitHub 也按错开的定时任务跑：16:35 UTC 的 golang、19:35 UTC 的 fnpack、22:35 UTC 的 wails3，每步之间留 3 小时给基础镜像构建；`build-fnpack` / `build-wails3` 还会等基础镜像标签出现最多 5 分钟。
 
+同一 workflow、同一分支的多次触发会串行排队：不取消正在运行的旧 run，最多 100 个 `pending` 按 FIFO 等待；三个 workflow 之间不互斥，它们的先后仍只靠上面的定时错开保证。配置与约束见 [GitHub Actions 与 GHCR — 并发与排队](../github.md#并发与排队)。
+
 ## 按钮、权限与输入（CNB）
 
 `.cnb/web_trigger.yml` 定义手动入口：

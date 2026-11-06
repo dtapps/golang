@@ -68,6 +68,28 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 
 `build-fnpack` / `build-wails3` 启动后都会最多等 5 分钟，让 `<go 版本>` 标签在 registry 里可读；仍然不存在就报错退出，不会自己重复安装一遍工具链。
 
+## 并发与排队
+
+三个 workflow 的 `concurrency` 同构（以 `build-golang` 为例）：
+
+```yaml
+concurrency:
+  group: build-golang-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
+```
+
+- `group`：`build-<镜像>-${{ github.ref }}`，按分支隔离；三个 workflow 的 group 各不相同，**彼此不互斥**。
+- `cancel-in-progress: false`：新触发的 run 进入 `pending` 等待，不取消正在运行的旧 run。
+- `queue: max`：同一 group 最多 100 个 `pending`，按进入等待的先后 FIFO 依次执行；只有队列满时溢出的新 run 才会被取消。
+
+`queue` 默认是 `single`（只留 1 个 pending，后来的 run 顶掉早先的 pending），这正是「连续触发时旧运行被取消」的来源；`max` 是 GitHub 2026-05 起支持的值。两条约束：
+
+- `queue: max` 不能与 `cancel-in-progress: true` 组合，否则 workflow 校验失败。
+- 排队只发生在「同一个 workflow、同一个分支」的多次触发之间。三个镜像的先后顺序仍只靠定时任务错开 3 小时保证；手动同时触发三个 workflow 时会并行，fnpack / wails3 依旧靠脚本里那 5 分钟等基础镜像标签。
+
+参考：[GitHub Docs — Control the concurrency of workflows and jobs](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/control-the-concurrency-of-workflows-and-jobs)。
+
 ## 变量契约
 
 workflow 只显式传四类变量：
@@ -90,11 +112,27 @@ env:
 
 权限：
 
+三个 workflow 的 `permissions` 相同：
+
 ```yaml
 permissions:
   contents: read
   packages: write
 ```
+
+显式声明 `permissions:` 后，未列出的权限一律不授予。`secrets.GITHUB_TOKEN` 经 `REGISTRY_TOKEN` 传给构建脚本，用于 `docker login` 和 GHCR 读写。
+
+- `contents: read`：`actions/checkout` 检出源码。
+- `packages: write`：脚本对 GHCR 的三类写操作：
+  1. `docker buildx build --push` 推多架构 manifest list；
+  2. `--cache-to type=registry` 写 `<镜像>:buildcache` 缓存清单；
+  3. `docker buildx imagetools create` 派生 `<版本>-linux-{amd64,arm64}`，冒烟通过后提升 `<major.minor>` / `latest`。
+
+  `write` 隐含 `read`：fnpack / wails3 还要 `imagetools inspect` 读基座 manifest digest。
+
+不需要 `id-token: write` / `attestations: write`（`--provenance=mode=min` 由 buildx 本地生成），也不需要 `actions: read`（`queue: max` 是平台层能力，`upload-artifact` 走 `ACTIONS_RUNTIME_TOKEN`）。
+
+> 降成 `packages: read` 会在首次 `--push` 时被拒，排查见 [构建失败排查](golang/troubleshooting.md#推送-ghcr-报-denied)。
 
 ## 与 CNB 的差异
 
