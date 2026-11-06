@@ -2,13 +2,14 @@
 
 [![定时构建](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/status/crontab)](https://cnb.cool/dtapp/golang/-/pipeline) [![流水线配置](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/pipeline-as-code)](https://cnb.cool/dtapp/golang/-/blob/main/.cnb.yml) [![漏洞扫描](https://cnb.cool/dtapp/golang/-/badge/security/vulnerability/full/latest)](https://cnb.cool/dtapp/golang/-/security) ![基础镜像](https://img.shields.io/badge/base-golang-00ADD8?logo=go&logoColor=white) ![架构](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-informational) ![镜像大小](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_size) ![arm64 大小](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_size_arm64) ![镜像摘要](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_digest_short) ![镜像版本](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/image_version)
 
-三个镜像共用一套 Go 工具链，区别只在于各自多装的 CLI：
+四个镜像共用一套 Go 工具链，区别只在于各自多装的 CLI：
 
-| 镜像            | 额外内容                             | 典型用途                                       |
-|-----------------|--------------------------------------|------------------------------------------------|
-| `golang`        | 无                                   | Go 编译、golangci-lint、前端依赖、deb/rpm 打包 |
-| `golang/fnpack` | `fnpack`                             | 在上一行的基础上给 FnOS 打 `.fpk` 包           |
-| `golang/wails3` | GTK4/WebKitGTK 开发包 + `wails3` CLI | 在容器里编译 Wails v3 桌面应用                 |
+| 镜像            | 额外内容                                 | 典型用途                                       |
+|-----------------|------------------------------------------|------------------------------------------------|
+| `golang`        | 无                                       | Go 编译、golangci-lint、前端依赖、deb/rpm 打包 |
+| `golang/fnpack` | `fnpack`                                 | 在上一行的基础上给 FnOS 打 `.fpk` 包           |
+| `golang/wails3` | GTK4/WebKitGTK 开发包 + `wails3` CLI     | 在容器里编译 Wails v3 桌面应用                 |
+| `golang/wails2` | GTK3/WebKit2GTK 4.1 开发包 + `wails` CLI | 在容器里编译 Wails v2 桌面应用                 |
 
 ## 镜像里有什么
 
@@ -19,16 +20,16 @@
 - 基础命令：git、curl、make、jq、zip/unzip、pkg-config
 - 时区与语言：`TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`，并装了 `tzdata`（容器内 `date` 显示 CST，构建日志与产物时间戳统一北京时间）
 
-`golang/fnpack` 只多一个 `/usr/local/bin/fnpack`；`golang/wails3` 多 GTK4/WebKitGTK 6.0 开发包与 `/go/bin/wails3`。两者都完全继承 `golang` 的其余内容（含 `zip`/`unzip`/`pkg-config`）。
+`golang/fnpack` 只多一个 `/usr/local/bin/fnpack`；`golang/wails3` 多 GTK4/WebKitGTK 6.0 开发包与 `/go/bin/wails3`；`golang/wails2` 多 GTK3/WebKit2GTK 4.1 开发包与 `/go/bin/wails`。三者都完全继承 `golang` 的其余内容（含 `zip`/`unzip`/`pkg-config`）。
 
 ## 地址与标签
 
-| 平台   | golang                         | golang/fnpack                         | golang/wails3                         |
-|--------|--------------------------------|---------------------------------------|---------------------------------------|
-| CNB    | `docker.cnb.cool/dtapp/golang` | `docker.cnb.cool/dtapp/golang/fnpack` | `docker.cnb.cool/dtapp/golang/wails3` |
-| GitHub | `ghcr.io/dtapps/golang`        | `ghcr.io/dtapps/golang/fnpack`        | `ghcr.io/dtapps/golang/wails3`        |
+| 平台   | golang                         | golang/fnpack                         | golang/wails3                         | golang/wails2                         |
+|--------|--------------------------------|---------------------------------------|---------------------------------------|---------------------------------------|
+| CNB    | `docker.cnb.cool/dtapp/golang` | `docker.cnb.cool/dtapp/golang/fnpack` | `docker.cnb.cool/dtapp/golang/wails3` | `docker.cnb.cool/dtapp/golang/wails2` |
+| GitHub | `ghcr.io/dtapps/golang`        | `ghcr.io/dtapps/golang/fnpack`        | `ghcr.io/dtapps/golang/wails3`        | `ghcr.io/dtapps/golang/wails2`        |
 
-三个镜像使用同一组标签：`1.27.3`、`1.27`、`latest`、`1.27.3-linux-amd64`、`1.27.3-linux-arm64`。完整契约见 [images-and-tags.md](images-and-tags.md)。
+四个镜像使用同一组标签：`1.27.3`、`1.27`、`latest`、`1.27.3-linux-amd64`、`1.27.3-linux-arm64`。完整契约见 [images-and-tags.md](images-and-tags.md)。
 
 ## 快速拉取
 

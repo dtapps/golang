@@ -52,6 +52,25 @@ branch:
             required: false
             type: input
             default: ''
+      - name: 打包 Golang + wails2 镜像（多架构 amd64 + arm64）
+        description: 基于已推送的 golang 基础镜像，构建并推送 golang/wails2（amd64 + arm64 多架构，含 GTK3 / WebKit2GTK 4.1 与 wails CLI）
+        event: web_trigger_build_wails2 # 触发的 CI 事件名
+        permissions:
+          roles:
+            - owner
+            - master
+            - developer
+        inputs:
+          version:
+            description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
+            required: false
+            type: input
+            default: ''
+          wails2_version:
+            description: 选填。wails2 版本：留空 = 解析上游最新稳定 tag（如 v2.17.1）；也可填 v2.17.1 / 2.17.1
+            required: false
+            type: input
+            default: ''
       - name: 生成 Code Wiki
         description: 重新分析仓库并生成 Code Wiki 文档（本仓库不发版，故提供手动入口）
         event: web_trigger_codewiki # 触发的 CI 事件名

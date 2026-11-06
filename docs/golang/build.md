@@ -65,7 +65,7 @@ arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-
 
 ## CI 构建流程
 
-三个镜像由三个脚本分别发布。基础镜像先跑，fnpack / wails3 再各自 `FROM` 它。
+四个镜像由四个脚本分别发布。基础镜像先跑，fnpack / wails3 / wails2 再各自 `FROM` 它。
 
 基础镜像（`.cnb/scripts/build-golang.sh` / `.github/scripts/build-golang.sh`）：
 

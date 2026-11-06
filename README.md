@@ -1,18 +1,19 @@
-# Golang 构建环境镜像（golang / golang+fnpack / golang+wails3）
+# Golang 构建环境镜像（golang / golang+fnpack / golang+wails3 / golang+wails2）
 
-[![定时构建](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/status/crontab)](https://cnb.cool/dtapp/golang/-/pipeline) [![流水线配置](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/pipeline-as-code)](https://cnb.cool/dtapp/golang/-/blob/main/.cnb.yml) [![漏洞扫描](https://cnb.cool/dtapp/golang/-/badge/security/vulnerability/full/latest)](https://cnb.cool/dtapp/golang/-/security) [![build-golang](https://github.com/dtapps/golang/actions/workflows/build-golang.yml/badge.svg)](https://github.com/dtapps/golang/actions/workflows/build-golang.yml) [![build-fnpack](https://github.com/dtapps/golang/actions/workflows/build-fnpack.yml/badge.svg)](https://github.com/dtapps/golang/actions/workflows/build-fnpack.yml) [![build-wails3](https://github.com/dtapps/golang/actions/workflows/build-wails3.yml/badge.svg)](https://github.com/dtapps/golang/actions/workflows/build-wails3.yml)
+[![定时构建](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/status/crontab)](https://cnb.cool/dtapp/golang/-/pipeline) [![流水线配置](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/pipeline-as-code)](https://cnb.cool/dtapp/golang/-/blob/main/.cnb.yml) [![漏洞扫描](https://cnb.cool/dtapp/golang/-/badge/security/vulnerability/full/latest)](https://cnb.cool/dtapp/golang/-/security) [![build-golang](https://github.com/dtapps/golang/actions/workflows/build-golang.yml/badge.svg)](https://github.com/dtapps/golang/actions/workflows/build-golang.yml) [![build-fnpack](https://github.com/dtapps/golang/actions/workflows/build-fnpack.yml/badge.svg)](https://github.com/dtapps/golang/actions/workflows/build-fnpack.yml) [![build-wails3](https://github.com/dtapps/golang/actions/workflows/build-wails3.yml/badge.svg)](https://github.com/dtapps/golang/actions/workflows/build-wails3.yml) [![build-wails2](https://github.com/dtapps/golang/actions/workflows/build-wails2.yml/badge.svg)](https://github.com/dtapps/golang/actions/workflows/build-wails2.yml)
 
-本仓库用两套平台构建三个自建镜像：CNB 推送到制品库（`docker.cnb.cool/dtapp/golang`），GitHub Actions 推送到 GHCR（`ghcr.io/dtapps/golang`）。每个镜像在每套平台上都有独立的 workflow 与构建脚本（各自维护，不互相引用），标签契约保持一致；改镜像内容或标签规则时两份都要改，见 [docs/github.md](docs/github.md)。
+本仓库用两套平台构建四个自建镜像：CNB 推送到制品库（`docker.cnb.cool/dtapp/golang`），GitHub Actions 推送到 GHCR（`ghcr.io/dtapps/golang`）。每个镜像在每套平台上都有独立的 workflow 与构建脚本（各自维护，不互相引用），标签契约保持一致；改镜像内容或标签规则时两份都要改，见 [docs/github.md](docs/github.md)。
 
-## 三个镜像
+## 四个镜像
 
 | 镜像                           | CNB 地址                              | GitHub 地址（GHCR）            | Dockerfile（CNB / GitHub）                                           | 文档                                  |
 |--------------------------------|---------------------------------------|--------------------------------|----------------------------------------------------------------------|---------------------------------------|
 | Golang 构建环境（不含 fnpack） | `docker.cnb.cool/dtapp/golang`        | `ghcr.io/dtapps/golang`        | `.cnb/docker/Dockerfile.golang` / `.github/docker/Dockerfile.golang` | [docs/golang/](docs/golang/README.md) |
 | Golang 构建环境 + fnpack       | `docker.cnb.cool/dtapp/golang/fnpack` | `ghcr.io/dtapps/golang/fnpack` | `.cnb/docker/Dockerfile.fnpack` / `.github/docker/Dockerfile.fnpack` | [docs/fnpack/](docs/fnpack/README.md) |
 | Golang 构建环境 + wails3       | `docker.cnb.cool/dtapp/golang/wails3` | `ghcr.io/dtapps/golang/wails3` | `.cnb/docker/Dockerfile.wails3` / `.github/docker/Dockerfile.wails3` | [docs/wails3/](docs/wails3/README.md) |
+| Golang 构建环境 + wails2       | `docker.cnb.cool/dtapp/golang/wails2` | `ghcr.io/dtapps/golang/wails2` | `.cnb/docker/Dockerfile.wails2` / `.github/docker/Dockerfile.wails2` | [docs/wails2/](docs/wails2/README.md) |
 
-构建脚本按镜像拆分：CNB 用 `.cnb/scripts/build-golang.sh`、`build-fnpack.sh` 与 `build-wails3.sh`，GitHub 用 `.github/scripts/` 下的同名三份。fnpack 与 wails3 都依赖同版本的 golang 基础镜像：先发布基础镜像，再 `FROM` 它构建各自的变体，两者平级、互不包含。两侧的标签名、提升规则、冒烟断言必须保持一致，平台胶水（触发器、镜像源、元数据落地）各自维护。
+构建脚本按镜像拆分：CNB 用 `.cnb/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh` 与 `build-wails2.sh`，GitHub 用 `.github/scripts/` 下的同名四份。三个变体都依赖同版本的 golang 基础镜像：先发布基础镜像，再 `FROM` 它构建各自的变体，彼此平级、互不包含。两侧的标签名、提升规则、冒烟断言必须保持一致，平台胶水（触发器、镜像源、元数据落地）各自维护。
 
 **镜像里有什么**
 
@@ -22,14 +23,15 @@
 - sqlc、ent/entc、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt（都用 `go install -v`，CI 日志能看编译进度）
 - 基础命令：git、curl、make、jq、zip/unzip、pkg-config
 - 时区与语言：`TZ=Asia/Shanghai`、`LANG`/`LC_ALL`=`C.UTF-8`，已装 `tzdata`
-- fnpack 镜像只在上面的基础上多一个 `fnpack`；wails3 镜像多 GTK4/WebKitGTK 开发包与 `wails3` CLI。三个镜像的工具链完全一致
+- fnpack 镜像只多一个 `fnpack`；wails3 镜像多 GTK4/WebKitGTK 开发包与 `wails3` CLI；wails2 镜像多 GTK3/WebKit2GTK 4.1 开发包与 `wails` CLI。四个镜像的工具链完全一致
 
-**三个镜像怎么选**
+**四个镜像怎么选**
 
 - 只需要 Go 构建、打包 deb/rpm、前端依赖或代码检查：用 `golang`。
 - 需要给 FnOS 打 `.fpk` 包：用 `golang/fnpack`。
 - 需要编译 Wails v3 桌面应用：用 `golang/wails3`。
-- 三个镜像的标签完全对应：同一个 `<go 版本>` 下，`fnpack` / `wails3` 就是基础镜像加各自的 CLI。
+- 需要编译 Wails v2 桌面应用：用 `golang/wails2`，构建时加 `-tags webkit2_41`（见 [docs/wails2/](docs/wails2/README.md)）。
+- 四个镜像的标签完全对应：同一个 `<go 版本>` 下，各变体就是基础镜像加各自的 CLI 与依赖。
 
 ## 快速使用
 
@@ -45,6 +47,10 @@ docker run --rm ghcr.io/dtapps/golang/fnpack:latest fnpack --help
 # 带 wails3 的版本
 docker run --rm docker.cnb.cool/dtapp/golang/wails3:latest wails3 version
 docker run --rm ghcr.io/dtapps/golang/wails3:latest wails3 version
+
+# 带 wails2 的版本（构建应用时加 -tags webkit2_41）
+docker run --rm docker.cnb.cool/dtapp/golang/wails2:latest wails version
+docker run --rm ghcr.io/dtapps/golang/wails2:latest wails version
 ```
 
 作为基础镜像：
@@ -55,6 +61,7 @@ FROM docker.cnb.cool/dtapp/golang:latest
 FROM ghcr.io/dtapps/golang:latest
 # 需要 fnpack：ghcr.io/dtapps/golang/fnpack:latest
 # 需要 wails3：ghcr.io/dtapps/golang/wails3:latest
+# 需要 wails2：ghcr.io/dtapps/golang/wails2:latest
 ```
 
 ## 仓库结构
@@ -62,30 +69,35 @@ FROM ghcr.io/dtapps/golang:latest
 ```text
 .cnb/
 ├── docker/
-│   ├── Dockerfile.golang           # golang 基础镜像（不含 fnpack / wails3）
+│   ├── Dockerfile.golang           # golang 基础镜像（不含 fnpack / wails3 / wails2）
 │   ├── Dockerfile.fnpack           # 在 golang 镜像上加 fnpack
-│   └── Dockerfile.wails3           # 在 golang 镜像上加 GTK4/WebKitGTK + wails3
+│   ├── Dockerfile.wails3           # 在 golang 镜像上加 GTK4/WebKitGTK + wails3
+│   └── Dockerfile.wails2           # 在 golang 镜像上加 GTK3/WebKit2GTK 4.1 + wails
 ├── scripts/
 │   ├── build-golang.sh             # CNB：构建、冒烟、发布 golang 基础镜像
 │   ├── build-fnpack.sh             # CNB：基于基础镜像构建、冒烟、发布 fnpack
-│   └── build-wails3.sh             # CNB：基于基础镜像构建、冒烟、发布 wails3
-├── workflows/                      # build-{golang,fnpack,wails3}.yml / 扫描与评审
-└── web_trigger.yml                 # 三个手动构建按钮（golang / fnpack / wails3）
+│   ├── build-wails3.sh             # CNB：基于基础镜像构建、冒烟、发布 wails3
+│   └── build-wails2.sh             # CNB：基于基础镜像构建、冒烟、发布 wails2
+├── workflows/                      # build-{golang,fnpack,wails3,wails2}.yml / 扫描与评审
+└── web_trigger.yml                 # 四个手动构建按钮（golang / fnpack / wails3 / wails2）
 .github/
 ├── docker/                         # GitHub 侧的 Dockerfile
-├── scripts/                        # GitHub 侧的三个构建脚本
+├── scripts/                        # GitHub 侧的四份构建脚本
 ├── workflows/
 │   ├── build-golang.yml            # GitHub：构建并推送 golang 基础镜像
 │   ├── build-fnpack.yml            # GitHub：定时构建并推送 fnpack
-│   └── build-wails3.yml            # GitHub：定时构建并推送 wails3
+│   ├── build-wails3.yml            # GitHub：定时构建并推送 wails3
+│   └── build-wails2.yml            # GitHub：定时构建并推送 wails2
 ├── annotation.json                 # golang 镜像元数据（CI 生成，.gitignore 已排除）
 ├── annotation-fnpack.json          # fnpack 镜像元数据（CI 生成，.gitignore 已排除）
 ├── annotation-wails3.json          # wails3 镜像元数据（CI 生成，.gitignore 已排除）
+├── annotation-wails2.json          # wails2 镜像元数据（CI 生成，.gitignore 已排除）
 └── dependabot.yml                  # GitHub Actions 依赖更新
 docs/
-├── golang/                         # 镜像层文档（README + 分册索引 + 分册，三个镜像合写）
+├── golang/                         # 镜像层文档（README + 分册索引 + 分册，四个镜像合写）
 ├── fnpack/                         # fnpack 专属文档（速查 + 索引 + 打包/Dockerfile/元数据徽章）
 ├── wails3/                         # wails3 专属文档（速查 + 版本策略 + 元数据）
+├── wails2/                         # wails2 专属文档（速查 + 版本策略 + build tag + 元数据）
 ├── cache-implementation.md         # buildx 层缓存的实现与失效边界
 ├── cnb.md                          # CNB 平台层说明
 └── github.md                       # GitHub Actions / GHCR 平台说明
@@ -94,20 +106,21 @@ docs/
 
 ## 镜像源
 
-| 平台           | GitHub Release / nodejs.org   | APT                 | Go module                   | npm / pnpm |
-|----------------|-------------------------------|---------------------|-----------------------------|------------|
-| GitHub Actions | 直连 github.com / nodejs.org  | 默认 deb.debian.org | 默认 proxy.golang.org       | 腾讯云     |
-| CNB            | `https://files.m.daocloud.io` | 腾讯云              | `mirrors.cloud.tencent.com` | 腾讯云     |
+| 平台           | GitHub Release / nodejs.org   | APT                 | Go module                   | npm / pnpm                |
+|----------------|-------------------------------|---------------------|-----------------------------|---------------------------|
+| GitHub Actions | 直连 github.com / nodejs.org  | 默认 deb.debian.org | 默认 proxy.golang.org       | 官方 `registry.npmjs.org` |
+| CNB            | `https://files.m.daocloud.io` | 腾讯云              | `mirrors.cloud.tencent.com` | 腾讯云                    |
 
-GitHub 的 Dockerfile 直接写死官方地址；CNB 的 Dockerfile 有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关，由构建脚本传入 DaoCloud 镜像。细节见 [docs/golang/mirrors.md](docs/golang/mirrors.md)。
+GitHub 的 Dockerfile 全部直连官方源（Go / APT / npm / 下载源都不设镜像）；CNB 的 Dockerfile 有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关，由构建脚本传入 DaoCloud 镜像，并把 APT、Go module、npm 换成腾讯云。细节见 [docs/golang/mirrors.md](docs/golang/mirrors.md)。
 
 ## 约定
 
 - 提交前跑 `make format`（yamlfmt / markdownfmt / shfmt / dockerfmt）与 `make lint-shell`；范围包含 `.cnb/` 与 `.github/` 两侧的脚本、Dockerfile 与 workflow。
 - CI 启用 buildx 层缓存（`<镜像>:buildcache`）：工具版本在构建前解析成具体版本号，上游没发新版时构建只拉基座、跑冒烟。需要一次干净的全量重建时设 `CACHE=off`，见 [docs/golang/build.md](docs/golang/build.md#缓存)。
 - 标签是对外契约：`<go 版本>` / `<major.minor>` / `latest`，外加 `<go 版本>-linux-{amd64,arm64}`。标签每天可能被同名覆盖，固定产物请用元数据里的 digest。
-- fnpack / wails3 镜像永远基于同版本的 golang 基础镜像构建；基础镜像的 `latest` / `<minor>` 没跟上时，两者不会单独提升这两个标签。
-- 变体 CLI 的版本跟随上游最新：wails3 的 `WAILS3_VERSION` 默认 `latest`，CI 构建前用 `go list -m` 解析成具体 tag 再传进 `--build-arg`（层缓存才跟得上版本）；fnpack 上游没有 latest 接口，`FNPACK_VERSION` 是具体版本号（当前 `1.2.3`）。实际安装的版本记录在元数据 `fnpack_version` / `wails3_version`，不占标签。
+- fnpack / wails3 / wails2 镜像永远基于同版本的 golang 基础镜像构建；基础镜像的 `latest` / `<minor>` 没跟上时，各变体都不会单独提升这两个标签。
+- 变体 CLI 的版本跟随上游最新：wails3 的 `WAILS3_VERSION` 与 wails2 的 `WAILS2_VERSION` 默认都是 `latest`，CI 构建前用 `go list -m` 解析成具体 tag 再传进 `--build-arg`（层缓存才跟得上版本）；fnpack 上游没有 latest 接口，`FNPACK_VERSION` 是具体版本号（当前 `1.2.3`）。实际安装的版本记录在元数据 `fnpack_version` / `wails3_version` / `wails2_version`，不占标签。
+- wails2 镜像装的是 WebKit2GTK 4.1，编译应用时要加 `-tags webkit2_41`，见 [docs/wails2/](docs/wails2/README.md)。
 - 两个平台的 Dockerfile 与脚本各自维护（`.cnb/` 与 `.github/`）：改镜像内容、标签规则或冒烟断言时两处都要改；只改平台胶水时各改各的。平台层说明见 [docs/cnb.md](docs/cnb.md) 与 [docs/github.md](docs/github.md)。
 - 安全报告走 [SECURITY.md](SECURITY.md)，贡献流程与硬性规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 - 文档入口：[docs/README.md](docs/README.md)。

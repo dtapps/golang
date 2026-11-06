@@ -1,12 +1,13 @@
 # 安全说明
 
-本仓库是一个自建镜像仓库，目前包含三个镜像：
+本仓库是一个自建镜像仓库，目前包含四个镜像：
 
 - `golang`：基于官方 `golang:1-trixie`（自动跟随最新稳定 Go），增加 UPX、nfpm、Node.js/pnpm 与常用 Go 工具。
 - `golang/fnpack`：在上面的镜像上加一个 `fnpack` 二进制。
 - `golang/wails3`：在上面的镜像上加 GTK4/WebKitGTK 6.0 开发包与 `wails3` CLI（`go install` 自源码构建）。
+- `golang/wails2`：在上面的镜像上加 GTK3/WebKit2GTK 4.1 开发包与 `wails` CLI（`go install` 自源码构建）。
 
-三者都没有业务代码，也没有自研二进制（`wails3` 由上游源码在本仓库构建时编译）。
+四者都没有业务代码，也没有自研二进制（`wails3` / `wails` 由上游源码在本仓库构建时编译）。
 
 ## 支持范围
 
@@ -17,7 +18,7 @@
 | `latest`                        | 最近一次成功构建                               |
 | `<go 版本>-linux-{amd64,arm64}` | 单平台标签，从同一份 manifest 派生             |
 
-三个镜像的标签合同相同，但更新是分两步的：先构建并发布 `golang`，再以它为基座分别构建 `golang/fnpack` 与 `golang/wails3`。两个变体的 `<major.minor>` / `latest` 只有在 `golang` 的同一标签已经指向本次版本时才会提升，因此不会出现「变体已更新、基座还是旧版」的错位。
+四个镜像的标签合同相同，但更新是分两步的：先构建并发布 `golang`，再以它为基座分别构建 `golang/fnpack`、`golang/wails3` 与 `golang/wails2`。三个变体的 `<major.minor>` / `latest` 只有在 `golang` 的同一标签已经指向本次版本时才会提升，因此不会出现「变体已更新、基座还是旧版」的错位。
 
 固定产物请用 annotation 里的 digest，而不是标签：
 

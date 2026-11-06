@@ -7,8 +7,9 @@
 | `golang`        | `.cnb/workflows/build-golang.yml` | `build-golang.yml` |
 | `golang/fnpack` | `.cnb/workflows/build-fnpack.yml` | `build-fnpack.yml` |
 | `golang/wails3` | `.cnb/workflows/build-wails3.yml` | `build-wails3.yml` |
+| `golang/wails2` | `.cnb/workflows/build-wails2.yml` | `build-wails2.yml` |
 
-fnpack / wails3 镜像都 `FROM` 同版本的 golang 基础镜像，所以顺序是「先基础镜像、后两个变体」，两个变体彼此独立。
+fnpack / wails3 / wails2 镜像都 `FROM` 同版本的 golang 基础镜像，所以顺序是「先基础镜像、后三个变体」，三个变体彼此独立。
 
 ## 事件矩阵
 
@@ -19,14 +20,16 @@ fnpack / wails3 镜像都 `FROM` 同版本的 golang 基础镜像，所以顺序
 | `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang 基础镜像；不传 version          |
 | `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack 镜像；使用 00:05 产出的基础镜像 |
 | `'crontab: 5 6 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 06:05 构建 wails3 镜像；使用 00:05 产出的基础镜像 |
+| `'crontab: 5 9 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 09:05 构建 wails2 镜像；使用 00:05 产出的基础镜像 |
 | `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                        |
 | `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version`     |
 | `web_trigger_build_wails3`          | `.cnb/workflows/build-wails3.yml`                                   | 手动构建 wails3，可传 `version` / `wails3_version`     |
+| `web_trigger_build_wails2`          | `.cnb/workflows/build-wails2.yml`                                   | 手动构建 wails2，可传 `version` / `wails2_version`     |
 | `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                                   |
 | `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验                        |
 | `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                              |
 
-三条定时任务各错开三小时：03:05 的 fnpack、06:05 的 wails3 都要求 00:05 推好的 `<go 版本>` 标签已经存在。
+四条定时任务各错开三小时：03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2 都要求 00:05 推好的 `<go 版本>` 标签已经存在。
 
 ### GitHub Actions
 
@@ -38,10 +41,12 @@ fnpack / wails3 镜像都 `FROM` 同版本的 golang 基础镜像，所以顺序
 | `build-fnpack` | `workflow_dispatch`                             | 手动构建，可传 `version` / `fnpack_version`（要求基础镜像已存在） |
 | `build-wails3` | `schedule` 每天 `35 22 * * *` UTC（北京 06:35） | 构建并推送 wails3（要求基础镜像已存在）                           |
 | `build-wails3` | `workflow_dispatch`                             | 手动构建，可传 `version` / `wails3_version`（要求基础镜像已存在） |
+| `build-wails2` | `schedule` 每天 `35 1 * * *` UTC（北京 09:35）  | 构建并推送 wails2（要求基础镜像已存在）                           |
+| `build-wails2` | `workflow_dispatch`                             | 手动构建，可传 `version` / `wails2_version`（要求基础镜像已存在） |
 
-GitHub 也按错开的定时任务跑：16:35 UTC 的 golang、19:35 UTC 的 fnpack、22:35 UTC 的 wails3，每步之间留 3 小时给基础镜像构建；`build-fnpack` / `build-wails3` 还会等基础镜像标签出现最多 5 分钟。
+GitHub 也按错开的定时任务跑：16:35 UTC 的 golang、19:35 UTC 的 fnpack、22:35 UTC 的 wails3、01:35 UTC 的 wails2，每步之间留 3 小时给基础镜像构建；各变体 workflow 还会等基础镜像标签出现最多 5 分钟。
 
-同一 workflow、同一分支的多次触发会串行排队：不取消正在运行的旧 run，最多 100 个 `pending` 按 FIFO 等待；三个 workflow 之间不互斥，它们的先后仍只靠上面的定时错开保证。配置与约束见 [GitHub Actions 与 GHCR — 并发与排队](../github.md#并发与排队)。
+同一 workflow、同一分支的多次触发会串行排队：不取消正在运行的旧 run，最多 100 个 `pending` 按 FIFO 等待；四个 workflow 之间不互斥，它们的先后仍只靠上面的定时错开保证。配置与约束见 [GitHub Actions 与 GHCR — 并发与排队](../github.md#并发与排队)。
 
 ## 按钮、权限与输入（CNB）
 
@@ -52,9 +57,10 @@ GitHub 也按错开的定时任务跑：16:35 UTC 的 golang、19:35 UTC 的 fnp
 | 打包 Golang 镜像（多架构）          | `web_trigger_build_golang` | owner / master / developer | `version`：留空 / 1.27 / 1.27.3                                   |
 | 打包 Golang + fnpack 镜像（多架构） | `web_trigger_build_fnpack` | owner / master / developer | `version`：同上；`fnpack_version`：留空 / 1.2.3                   |
 | 打包 Golang + wails3 镜像（多架构） | `web_trigger_build_wails3` | owner / master / developer | `version`：同上；`wails3_version`：留空 / v3.1.0 / v3.0.0-beta.34 |
+| 打包 Golang + wails2 镜像（多架构） | `web_trigger_build_wails2` | owner / master / developer | `version`：同上；`wails2_version`：留空 / v2.17.1 / 2.17.1        |
 | 生成 Code Wiki                      | `web_trigger_codewiki`     | owner / master / developer | 无                                                                |
 
-`event` 必须与 workflow 文件里的事件键逐字一致，否则按钮点下去不会产生流水线。`fnpack_version` 留空表示使用 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）；`wails3_version` 留空表示先解析上游最新稳定 tag（`go list -m github.com/wailsapp/wails/v3@latest`，如 `v3.1.0`），解析失败才回退 Dockerfile 的 `WAILS3_VERSION=latest`。
+`event` 必须与 workflow 文件里的事件键逐字一致，否则按钮点下去不会产生流水线。`fnpack_version` 留空表示使用 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）；`wails3_version` 留空表示先解析上游最新稳定 tag（`go list -m github.com/wailsapp/wails/v3@latest`，如 `v3.1.0`）；`wails2_version` 留空表示解析 `github.com/wailsapp/wails/v2@latest`（如 `v2.17.1`）。两者解析失败都回退对应 Dockerfile 的 `WAILS*_VERSION=latest`。
 
 ## imports 的坑
 

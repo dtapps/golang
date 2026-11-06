@@ -1,0 +1,75 @@
+# ===================================================================
+# Golang 构建环境镜像 + wails2
+#
+# 在 Dockerfile.golang 产出的镜像之上做两件事：
+#   1. 安装 GTK3 / WebKit2GTK 4.1 开发包（wails2 编译 webview 所需）
+#   2. go install wails CLI
+#
+# 两个平台各留一份：本文件（GitHub 侧）与
+# .cnb/docker/Dockerfile.wails2（CNB 侧），各自维护、不互相引用。
+#
+# 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
+#   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
+# 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
+# APT / GOPROXY 继承基座镜像，本文件没有额外的镜像源开关。
+#
+# wails2：https://github.com/wailsapp/wails/releases
+# 模块根在仓库的 v2/ 子目录，go install 路径带 /v2，命令名是 wails。
+# Debian trixie 已移除 libwebkit2gtk-4.0-dev，这里装 4.1；
+# 使用该镜像构建应用时要加 -tags webkit2_41。
+# WAILS2_VERSION 默认 latest；CI 会先解析成具体 tag 再传进来，裸 build 由 go install 解析。
+# ===================================================================
+
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+
+ARG GOLANG_IMAGE
+ARG WAILS2_VERSION=latest
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+ARG BASE_DIGEST=unknown
+ARG IMAGE_SOURCE
+
+# 1. 安装 GTK3 / WebKit2GTK 4.1 开发包
+# libgtk-3-dev / libwebkit2gtk-4.1-dev 提供 gtk+-3.0.pc / webkit2gtk-4.1.pc：
+# 后续 wails build / go build / go test 都需要 pkg-config 找到这些头文件。
+# 这些是使用镜像时也要用的编译依赖，不能像基座镜像那样在最后 purge 掉。
+# 装完立刻用 pkg-config 验证两个 .pc 真的可解析：否则问题会以 cgo 报错的形式
+# 推迟到使用镜像的人身上。
+RUN export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libgtk-3-dev \
+    libwebkit2gtk-4.1-dev \
+    && rm -rf /var/lib/apt/lists/*; \
+    pkg-config --exists gtk+-3.0; \
+    pkg-config --exists webkit2gtk-4.1
+
+# 2. 安装 wails CLI
+# 模块缓存与编译缓存挂在构建节点上，不进入镜像层。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    echo "wails2 目标版本: ${WAILS2_VERSION}"; \
+    go install -v "github.com/wailsapp/wails/v2/cmd/wails@${WAILS2_VERSION}"; \
+    test -x "${GOPATH}/bin/wails"; \
+    echo "--- wails2 CLI 安装的 ---"; \
+    wails version || true
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# apt 与 go install 这两层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + wails2：在 golang 镜像基础上增加 GTK3/WebKit2GTK 4.1 开发包与 wails CLI" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+CMD ["bash"]

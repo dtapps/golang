@@ -132,7 +132,7 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 - 徽章显示灰色 `unknown` 通常意味着：这次构建失败（`cnbcool/annotations` 那步没跑）、key 从未写入，或体积解析拿到了非镜像清单（日志里会有「体积解析失败」警告）。
 - GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact `wails3-annotation`（保留 30 天）。跨平台核对以 artifact 为准。
 
-## 三个镜像的关系
+## 四个镜像的关系
 
 同一 `<go 版本>` 下：
 
@@ -140,6 +140,7 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 golang:1.27.3        = 基座 + 全部工具链
 golang/fnpack:1.27.3 = golang:1.27.3 + fnpack
 golang/wails3:1.27.3 = golang:1.27.3 + GTK4/WebKitGTK + wails3
+golang/wails2:1.27.3 = golang:1.27.3 + GTK3/WebKit2GTK 4.1 + wails
 ```
 
-fnpack 与 wails3 是两个**平级**的变体，互不包含：需要打包 `.fpk` 用 `fnpack`，需要编译 Wails v3 应用用 `wails3`，两者都要就在自己 Dockerfile 里 `FROM golang:latest` 再各装一个。
+fnpack、wails3 与 wails2 是三个**平级**的变体，互不包含：需要打包 `.fpk` 用 `fnpack`，需要编译 Wails v3 应用用 `wails3`，编译 Wails v2 应用用 `wails2`；都要就在自己 Dockerfile 里 `FROM golang:latest` 再各装一个。

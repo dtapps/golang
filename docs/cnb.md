@@ -48,9 +48,11 @@ WAILS3_IMAGE="${IMAGE}/wails3"                                     # golang/wail
 | `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang；不传 version               |
 | `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack（用 00:05 的基础镜像）      |
 | `'crontab: 5 6 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 06:05 构建 wails3（用 00:05 的基础镜像）      |
+| `'crontab: 5 9 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 09:05 构建 wails2（用 00:05 的基础镜像）      |
 | `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                    |
 | `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version` |
 | `web_trigger_build_wails3`          | `.cnb/workflows/build-wails3.yml`                                   | 手动构建 wails3，可传 `version` / `wails3_version` |
+| `web_trigger_build_wails2`          | `.cnb/workflows/build-wails2.yml`                                   | 手动构建 wails2，可传 `version` / `wails2_version` |
 | `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                               |
 | `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验                    |
 | `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                          |
@@ -66,9 +68,12 @@ WAILS3_IMAGE="${IMAGE}/wails3"                                     # golang/wail
 | 打包 Golang 镜像（多架构）          | `web_trigger_build_golang` | owner / master / developer | `version`：留空 / 1.27 / 1.27.3                                   |
 | 打包 Golang + fnpack 镜像（多架构） | `web_trigger_build_fnpack` | owner / master / developer | `version`：同上；`fnpack_version`：留空 / 1.2.3                   |
 | 打包 Golang + wails3 镜像（多架构） | `web_trigger_build_wails3` | owner / master / developer | `version`：同上；`wails3_version`：留空 / v3.1.0 / v3.0.0-beta.34 |
+| 打包 Golang + wails2 镜像（多架构） | `web_trigger_build_wails2` | owner / master / developer | `version`：同上；`wails2_version`：留空 / v2.17.1 / 2.17.1        |
 | 生成 Code Wiki                      | `web_trigger_codewiki`     | owner / master / developer | 无                                                                |
 
 `version` 留空表示使用 Dockerfile 的 `GO_VERSION`。fnpack / wails3 按钮都要求对应版本的基础镜像已经推送。`fnpack_version` 留空表示使用 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）；`wails3_version` 留空表示解析上游最新稳定 tag（`go list -m github.com/wailsapp/wails/v3@latest`，例如 `v3.1.0`），解析失败时回退 `latest` 交给 `go install`。
+
+wails2 按钮同样要求对应版本的基础镜像已经推送；`wails2_version` 留空表示解析上游最新稳定 tag（`go list -m github.com/wailsapp/wails/v2@latest`，例如 `v2.17.1`），解析失败时回退 `latest` 交给 `go install`。wails2 只在 CNB 侧有流水线，镜像装 GTK3 / WebKit2GTK 4.1，构建应用时要加 `-tags webkit2_41`。
 
 ## imports 与脚本执行
 
