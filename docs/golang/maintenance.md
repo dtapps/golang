@@ -4,17 +4,19 @@
 
 - CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像。
 - GitHub：每天 16:35 UTC（北京 00:35）构建 golang 基础镜像，19:35 UTC（北京 03:35）构建 fnpack 镜像。
+- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:35 UTC golang、19:35 UTC fnpack、22:35 UTC wails3、01:35 UTC wails2，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)。
 
-默认不会自动升级 Go 版本，因为 `GO_VERSION` 在 Dockerfile 里是钉死的。定时构建会重新解析上游各工具的最新版本：版本变了才重建对应那一层，没变就全命中缓存（只拉基座、跑冒烟）。上游重新推送同一 tag 的基座（安全修复）时，digest 一变，apt 之后的层会全部重建，同样能吃到更新。
+`GO_VERSION` 默认是 `1`（`golang:1-trixie` 浮动标签），上游发布新 Go 后下一次构建会自动跟随；想钉版本时手动填 `version`，或直接改三份 Dockerfile 的 `GO_VERSION`。定时构建还会重新解析上游各工具的最新版本：版本变了才重建对应那一层，没变就全命中缓存（只拉基座、跑冒烟）。上游重新推送同一 tag 的基座（安全修复）时，digest 一变，apt 之后的层会全部重建，同样能吃到更新。
 
-需要一次干净的全量重建时，手动触发并设 `CACHE=off`（或本地 `CACHE=off source .cnb/scripts/build-golang.sh`）。
+需要一次干净的全量重建时，手动触发并设 `CACHE=off`（或本地 `CACHE=off source .cnb/scripts/build-golang.sh`、`.github/scripts/build-golang.sh`、`.gitlab/scripts/build-golang.sh`）。
 
 ## 升级 Go 版本
 
-1. 同步修改两份 Dockerfile 的 `GO_VERSION`：
+1. 同步修改三份 Dockerfile 的 `GO_VERSION`：
    - `.cnb/docker/Dockerfile.golang`
    - `.github/docker/Dockerfile.golang`
-2. 如果 Debian 代号也变（如 `trixie` → `forky`），同时改 `DEBIAN_VERSION`，两份都改。
+   - `.gitlab/docker/Dockerfile.golang`
+2. 如果 Debian 代号也变（如 `trixie` → `forky`），同时改 `DEBIAN_VERSION`，三份都改。
 3. 本地构建验证：
 
    ```bash
@@ -28,7 +30,7 @@
 
 ## 升级工具版本
 
-在**两份** `Dockerfile.golang` 里改对应的 `ARG`：
+在**三份** `Dockerfile.golang` 里改对应的 `ARG`：
 
 | 工具          | ARG                      |
 |---------------|--------------------------|
@@ -52,10 +54,11 @@
 
 ## 升级 fnpack
 
-改两份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`：
+改三份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`：
 
 - `.cnb/docker/Dockerfile.fnpack`
 - `.github/docker/Dockerfile.fnpack`
+- `.gitlab/docker/Dockerfile.fnpack`
 
 版本号以 [fnpack 官方文档](https://developer.fnnas.com/docs/cli/fnpack/) 为准。下载地址格式：
 
@@ -63,39 +66,46 @@
 https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
 ```
 
-`<arch>` 为 `amd64` 或 `arm`（ARM 用 `arm`，不是 `arm64`）。升级后两个文件都要先用 `curl -sI` 确认对应产物存在。
+`<arch>` 为 `amd64` 或 `arm`（ARM 用 `arm`，不是 `arm64`）。升级后三个文件都要先用 `curl -sI` 确认对应产物存在。
 
-想先验证某个版本时，可以手动触发 `build-fnpack` / GitHub 的 `build-fnpack` 工作流并填 `fnpack_version`，确认产物可用后再改两份 Dockerfile 的默认值；不填则使用 Dockerfile 里的默认版本（当前 `1.2.3`，上游暂无 latest 查询接口，暂作为最新版本）。
+想先验证某个版本时，可以手动触发 CNB / GitHub / GitLab 各自的 `build-fnpack` 并填 `fnpack_version`，确认产物可用后再改三份 Dockerfile 的默认值；不填则使用 Dockerfile 里的默认版本（当前 `1.2.3`，上游暂无 latest 查询接口，暂作为最新版本）。
 
 ## 升级 wails3
 
-**通常什么都不用做**：两份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 06:05 / GitHub 22:35 UTC）自动进镜像，版本号会写进元数据 `wails3_version` 与徽章。
+**通常什么都不用做**：三份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 06:05 / GitHub 22:35 UTC / GitLab 22:35 UTC）自动进镜像，版本号会写进元数据 `wails3_version` 与徽章。
 
 需要人工介入的两种情况：
 
 1. **想钉住某个版本**（复现、回滚、或 latest 解析出的版本有问题）：手动触发 `build-wails3` 工作流并填 `wails3_version`（`v3.1.0` / `3.1.0` / `v3.0.0-beta.34` 都接受）。这只影响本次构建，不改默认值。
-2. **想长期钉住**：把两份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 改成具体 tag（如 `v3.1.0`）。脚本遇到「Dockerfile 默认值不是 `latest`」时会尊重它、跳过网络解析——恢复追新时把默认值改回 `latest`。
+2. **想长期钉住**：把三份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 改成具体 tag（如 `v3.1.0`）。脚本遇到「Dockerfile 默认值不是 `latest`」时会尊重它、跳过网络解析——恢复追新时把默认值改回 `latest`。
 
 wails3 版本**不占标签**：`golang/wails3:<go 版本>` 永远是「该 Go 版本下最近一次成功构建」，换了 wails3 版本标签会被同名覆盖。回查某次构建装的是哪个 wails3，看元数据 `wails3_version`；固定产物用 `wails3_digest`。
 
+## 升级 wails2
+
+**通常什么都不用做**：三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v2@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 09:05 / GitHub 01:35 UTC / GitLab 01:35 UTC）自动进镜像，版本号会写进元数据 `wails2_version` 与徽章。
+
+需要人工介入的两种情况与 wails3 相同：手动触发 `build-wails2` 并填 `wails2_version`（`v2.17.1` / `2.17.1` 都接受），或把三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 改成具体 tag。wails2 版本同样不占标签，复现某次产物请用元数据里的 `wails2_digest`。
+
 ## 新增工具
 
-1. 在两份 `Dockerfile.golang` 里加 `ARG` 与安装命令。
-2. 在两份 `build-golang.sh` 的冒烟命令列表里加上二进制名。
-3. 如果是 Go 工具：在两份 `build-golang.sh` 的 `GO_TOOL_MODULES` 里登记「版本变量 → 模块路径」。漏登记时脚本会在构建前直接报错（`go list -m` 要模块路径，Dockerfile 里写的是包路径）。
-4. 如果工具也应该在 fnpack 镜像里被检查，同步两份 `build-fnpack.sh` 的继承断言。
+1. 在三份 `Dockerfile.golang` 里加 `ARG` 与安装命令。
+2. 在三份 `build-golang.sh` 的冒烟命令列表里加上二进制名。
+3. 如果是 Go 工具：在三份 `build-golang.sh` 的 `GO_TOOL_MODULES` 里登记「版本变量 → 模块路径」。漏登记时脚本会在构建前直接报错（`go list -m` 要模块路径，Dockerfile 里写的是包路径）。
+4. 如果工具也应该在 fnpack 镜像里被检查，同步三份 `build-fnpack.sh` 的继承断言。
 5. 更新 [dockerfile.md](dockerfile.md) 的版本表。
-6. 如果工具是 GitHub Release 下载，CNB 侧必须支持 `GITHUB_MIRROR`（走 DaoCloud）；GitHub 侧直接写死官方地址。走 `curl` 自己解析版本的，记得同时改两份脚本里的解析逻辑（`resolve_versions`）。
+6. 如果工具是 GitHub Release 下载，CNB 侧必须支持 `GITHUB_MIRROR`（走 DaoCloud）；GitHub / GitLab 侧直接写死官方地址。走 `curl` 自己解析版本的，记得同时改三份脚本里的解析逻辑（`resolve_versions`）。
 
 ## 同步检查清单
 
 改镜像内容后：
 
-- [ ] `.cnb/docker/Dockerfile.golang` 与 `.github/docker/Dockerfile.golang` 一致
-- [ ] `.cnb/docker/Dockerfile.fnpack` 与 `.github/docker/Dockerfile.fnpack` 一致
-- [ ] 两份 `build-golang.sh` 的标签规则、冒烟断言一致
-- [ ] 两份 `build-golang.sh` 的 `GO_TOOL_MODULES` 覆盖 Dockerfile 里所有 `go install` 版本变量（脚本会自检）
-- [ ] 两份 `build-fnpack.sh` 的标签规则、基础镜像检查、冒烟断言一致
+- [ ] `.cnb/docker/`、`.github/docker/`、`.gitlab/docker/` 下的五个 Dockerfile 内容一致（镜像源差异除外）
+- [ ] 三份 `build-golang.sh` 的标签规则、冒烟断言一致
+- [ ] 三份 `build-golang.sh` 的 `GO_TOOL_MODULES` 覆盖 Dockerfile 里所有 `go install` 版本变量（脚本会自检）
+- [ ] 三份 `build-fnpack.sh` 的标签规则、基础镜像检查、冒烟断言一致
+- [ ] 三份 `build-wails3.sh` / `build-wails2.sh` 的标签规则、基础镜像检查、冒烟断言一致
+- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向四个镜像
 - [ ] `make format` 通过
 - [ ] `make lint-shell` 通过
 
@@ -105,4 +115,4 @@ wails3 版本**不占标签**：`golang/wails3:<go 版本>` 永远是「该 Go �
 - golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升。
 - fnpack 的 `latest` / `<major.minor>` 只在基础镜像对应标签也指向本次版本时提升。
 - 固定产物请用 annotation 里的 digest。
-- GHCR / CNB 制品库可能有保留策略，长期归档请自行保存 digest 或复制到别处。
+- GHCR / CNB / GitLab Container Registry 可能有保留策略，长期归档请自行保存 digest 或复制到别处。

@@ -4,8 +4,8 @@
 # 在 Dockerfile.golang 产出的镜像之上只加一个 fnpack 二进制，
 # 保证「有 fnpack」与「无 fnpack」两个镜像的工具链完全一致。
 #
-# 两个平台各留一份：.cnb/docker/Dockerfile.fnpack 与
-# .github/docker/Dockerfile.fnpack，各自维护、不互相引用。
+# 三个平台各留一份：本文件（GitHub 侧）、.cnb/docker/Dockerfile.fnpack（CNB 侧）与
+# .gitlab/docker/Dockerfile.fnpack（GitLab 侧），各自维护、不互相引用。
 #
 # 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
 #   GOLANG_IMAGE=<registry>/<repo>:<go 版本>

@@ -4,7 +4,7 @@
 
 在 [Golang 构建环境镜像](../golang/README.md) 之上做两件事：装 GTK4 / WebKitGTK 6.0 开发包，再 `go install` 一份 `wails3` CLI。用于在 CI / 容器里编译 [Wails v3](https://github.com/wailsapp/wails) 桌面应用（Linux 侧 webview 走 GTK4 + WebKitGTK 6.0）。
 
-> **本目录的分工**：wails3 镜像 = 基座镜像 + GTK4/WebKitGTK + `wails3` 二进制，所以这里只收 wails3 专属的内容（版本策略、构建用法、元数据）。构建、CI、标签、镜像源、维护、排错等共用机制都在 [`docs/golang/`](../golang/index.md)，不在这里重复。文档与实现冲突时，以两份 `Dockerfile.wails3` 与两份 `build-wails3.sh` 为准。
+> **本目录的分工**：wails3 镜像 = 基座镜像 + GTK4/WebKitGTK + `wails3` 二进制，所以这里只收 wails3 专属的内容（版本策略、构建用法、元数据）。构建、CI、标签、镜像源、维护、排错等共用机制都在 [`docs/golang/`](../golang/index.md)，不在这里重复。文档与实现冲突时，以三份 `Dockerfile.wails3` 与三份 `build-wails3.sh` 为准。
 
 ## 镜像里有什么
 
@@ -37,10 +37,11 @@ pkg-config --exists webkitgtk-6.0
 
 ## 地址与标签
 
-| 平台   | 地址                                  |
-|--------|---------------------------------------|
-| CNB    | `docker.cnb.cool/dtapp/golang/wails3` |
-| GitHub | `ghcr.io/dtapps/golang/wails3`        |
+| 平台   | 地址                                       |
+|--------|--------------------------------------------|
+| CNB    | `docker.cnb.cool/dtapp/golang/wails3`      |
+| GitHub | `ghcr.io/dtapps/golang/wails3`             |
+| GitLab | `registry.gitlab.com/dtapps/golang/wails3` |
 
 标签与基座同一套契约：`<go 版本>` / `<major.minor>` / `latest` / `<go 版本>-linux-{amd64,arm64}`。`<major.minor>` / `latest` 只在基座对应标签已指向同一 digest 时提升，所以 wails3 的移动标签永远不会跑到基座前面。完整契约见 [../golang/images-and-tags.md](../golang/images-and-tags.md)。
 
@@ -72,6 +73,7 @@ docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
 
 - CNB：`.cnb/workflows/build-wails3.yml`，每天 06:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05 之后）；也可用「打包 Golang + wails3 镜像（多架构）」按钮手动触发，可填 `version` / `wails3_version`。
 - GitHub：`.github/workflows/build-wails3.yml`，每天 22:35 UTC（北京 06:35）定时触发（基座 16:35 UTC、fnpack 19:35 UTC 之后）；手动触发同样可填 `version` / `wails3_version`。
+- GitLab：`.gitlab/workflows/build-wails3.yml`，在 UI / API 建 `TARGET=wails3` 的 schedule 定时触发（基座先构建）；手动 Run pipeline 时填 `TARGET=wails3`，可再填 `VERSION` / `WAILS3_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 脚本先等 `golang:<go 版本>` 就绪（等不到直接失败），再从它构建、派生单平台标签、跑冒烟、提升移动标签。冒烟断言：
 
@@ -84,7 +86,7 @@ docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
 
 ## 元数据与徽章
 
-CNB 侧写 `.cnb/annotation-wails3.json`，GitHub 侧写 `.github/annotation-wails3.json`（两者都不入库）。
+CNB 侧写 `.cnb/annotation-wails3.json`，GitHub 侧写 `.github/annotation-wails3.json`，GitLab 侧写 `.gitlab/annotation-wails3.json`（都不入库）。
 
 | 键                   | 含义                                        |
 |----------------------|---------------------------------------------|
@@ -130,7 +132,7 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 - `commit/latest` 是「最新提交」这一维度，与镜像标签 `latest` 同名但无关。
 - `type: ADD` 对同一 commit 是覆盖语义：同名 key 只保留最后一次构建。要长期锁定某次产物，记下当时的 `wails3_digest` 并按 digest 拉取。
 - 徽章显示灰色 `unknown` 通常意味着：这次构建失败（`cnbcool/annotations` 那步没跑）、key 从未写入，或体积解析拿到了非镜像清单（日志里会有「体积解析失败」警告）。
-- GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact `wails3-annotation`（保留 30 天）。跨平台核对以 artifact 为准。
+- GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact `wails3-annotation`（保留 30 天）。GitLab 侧同样不写 commit 注解，JSON 作为 job artifact 保留 30 天。跨平台核对以 artifact 为准。
 
 ## 四个镜像的关系
 

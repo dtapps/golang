@@ -1,0 +1,21 @@
+# 构建并推送 golang + wails2 变体镜像
+# 由根 .gitlab-ci.yml 的 include 引入；workflow / stages / variables / default 都在根文件里。
+# 基础镜像 ${CI_REGISTRY_IMAGE}:<go 版本> 必须已经由 build-golang 作业推好；
+# 脚本会最多等 5 分钟，仍然不存在就报错退出。
+build-wails2:
+  resource_group: build-wails2
+  stage: variants
+  timeout: 120m
+  script:
+    - |
+      set -eu
+      export version="${VERSION:-}"
+      export wails2_version="${WAILS2_VERSION:-}"
+      . ./.gitlab/scripts/build-wails2.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - .gitlab/annotation-wails2.json
+  rules:
+    - if: '$TARGET == "" || $TARGET == "wails2"'

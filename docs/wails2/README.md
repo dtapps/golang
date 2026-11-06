@@ -4,7 +4,7 @@
 
 在 [Golang 构建环境镜像](../golang/README.md) 之上做两件事：装 GTK3 / WebKit2GTK 4.1 开发包，再 `go install` 一份 `wails` CLI。用于在 CI / 容器里编译 [Wails v2](https://github.com/wailsapp/wails) 桌面应用（Linux 侧 webview 走 GTK3 + WebKit2GTK 4.1）。
 
-> **本目录的分工**：wails2 镜像 = 基座镜像 + GTK3/WebKit2GTK 4.1 + `wails` 二进制，所以这里只收 wails2 专属的内容（版本策略、build tag、构建用法、元数据）。构建、CI、标签、镜像源、维护、排错等共用机制都在 [`docs/golang/`](../golang/index.md)，不在这里重复。文档与实现冲突时，以两份 `Dockerfile.wails2` 与两份 `build-wails2.sh` 为准。
+> **本目录的分工**：wails2 镜像 = 基座镜像 + GTK3/WebKit2GTK 4.1 + `wails` 二进制，所以这里只收 wails2 专属的内容（版本策略、build tag、构建用法、元数据）。构建、CI、标签、镜像源、维护、排错等共用机制都在 [`docs/golang/`](../golang/index.md)，不在这里重复。文档与实现冲突时，以三份 `Dockerfile.wails2` 与三份 `build-wails2.sh` 为准。
 
 ## 镜像里有什么
 
@@ -67,10 +67,11 @@ RUN wails build -tags webkit2_41
 
 ## 地址与标签
 
-| 平台   | 地址                                  |
-|--------|---------------------------------------|
-| CNB    | `docker.cnb.cool/dtapp/golang/wails2` |
-| GitHub | `ghcr.io/dtapps/golang/wails2`        |
+| 平台   | 地址                                       |
+|--------|--------------------------------------------|
+| CNB    | `docker.cnb.cool/dtapp/golang/wails2`      |
+| GitHub | `ghcr.io/dtapps/golang/wails2`             |
+| GitLab | `registry.gitlab.com/dtapps/golang/wails2` |
 
 标签与基座同一套契约：`<go 版本>` / `<major.minor>` / `latest` / `<go 版本>-linux-{amd64,arm64}`。`<major.minor>` / `latest` 只在基座对应标签已指向同一 digest 时提升，所以移动标签永远不会跑到基座前面。完整契约见 [../golang/images-and-tags.md](../golang/images-and-tags.md)。
 
@@ -102,6 +103,7 @@ docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 
 - CNB：`.cnb/workflows/build-wails2.yml`，每天 09:05 由 `.cnb.yml` 定时触发；也可用「打包 Golang + wails2 镜像（多架构 amd64 + arm64）」按钮手动触发，可填 `version` / `wails2_version`。
 - GitHub：`.github/workflows/build-wails2.yml`，每天 01:35 UTC（北京 09:35）定时触发；手动触发同样可填 `version` / `wails2_version`。
+- GitLab：`.gitlab/workflows/build-wails2.yml`，在 UI / API 建 `TARGET=wails2` 的 schedule 定时触发；手动 Run pipeline 时填 `TARGET=wails2`，可再填 `VERSION` / `WAILS2_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 脚本先等 `golang:<go 版本>` 就绪（等不到直接失败），再从它构建、派生单平台标签、跑冒烟、提升移动标签。冒烟断言：
 
@@ -114,7 +116,7 @@ docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 
 ## 元数据与徽章
 
-CNB 侧写 `.cnb/annotation-wails2.json`，GitHub 侧写 `.github/annotation-wails2.json`（两者都不入库）。
+CNB 侧写 `.cnb/annotation-wails2.json`，GitHub 侧写 `.github/annotation-wails2.json`，GitLab 侧写 `.gitlab/annotation-wails2.json`（都不入库）。
 
 | 键                   | 含义                                        |
 |----------------------|---------------------------------------------|
@@ -160,7 +162,7 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 - `commit/latest` 是「最新提交」这一维度，与镜像标签 `latest` 同名但无关。
 - `type: ADD` 对同一 commit 是覆盖语义：同名 key 只保留最后一次构建。要长期锁定某次产物，记下当时的 `wails2_digest` 并按 digest 拉取。
 - 徽章显示灰色 `unknown` 通常意味着：这次构建失败（`cnbcool/annotations` 那步没跑）、key 从未写入，或体积解析拿到了非镜像清单。
-- GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact `wails2-annotation`（保留 30 天）。跨平台核对以 artifact 为准。
+- GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact `wails2-annotation`（保留 30 天）。GitLab 侧同样不写 commit 注解，JSON 作为 job artifact 保留 30 天。跨平台核对以 artifact 为准。
 
 ## 变体镜像的关系
 

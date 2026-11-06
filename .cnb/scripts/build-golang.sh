@@ -9,8 +9,8 @@
 # 它 FROM 本流水线推好的 <go 版本> 标签，只追加一个 fnpack 二进制。
 # 两个流水线各自对应一个镜像地址。
 #
-# CNB 侧独立实现，与 .github/scripts/build-golang.sh 各自维护、不互相引用。
-# 两侧的标签规则、冒烟断言必须保持一致；平台胶水（变量来源、镜像源、元数据落地）
+# CNB 侧独立实现，与 .github/scripts/build-golang.sh、.gitlab/scripts/build-golang.sh 各自维护、不互相引用。
+# 三侧的标签规则、冒烟断言必须保持一致；平台胶水（变量来源、镜像源、元数据落地）
 # 各自维护。
 #
 # 与 GitHub 侧的差异：

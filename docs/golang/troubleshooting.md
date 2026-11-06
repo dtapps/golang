@@ -27,14 +27,16 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 原因：在 amd64 runner 上构建 arm64，没有 QEMU/binfmt。
 
 - GitHub：确认 workflow 里有 `docker/setup-qemu-action@v3`（`platforms: arm64`）。
+- GitLab：确认 `.gitlab-ci.yml` 的 `before_script` 里，`tonistiigi/binfmt --install amd64,arm64` 没有失败，且 runner 允许 privileged 容器。
 - CNB：确认 `services: docker` 已启用；CNB 的 docker 服务自带多架构支持。
 
 ### `no space left on device`
 
-基础镜像与两平台构建缓存较大。GitHub 侧已有「释放磁盘空间」步骤；如果仍然不够：
+基础镜像与多架构构建缓存较大。GitHub 侧已有「释放磁盘空间」步骤；GitLab 侧的 dind 与 buildx 缓存都在 runner 自己的磁盘上，更容易满。如果仍然不够：
 
-- 确认该步骤没有删错目录；
+- 确认 GitHub 的「释放磁盘空间」步骤没有删错目录；
 - 不要在同一个 runner 上同时跑其他重构建；
+- GitLab 侧给 runner 留足磁盘，或把四个镜像拆到不同 runner / schedule；
 - 本地构建时先 `docker buildx prune -af`。
 
 ### 容器内时间不是北京时间
@@ -77,7 +79,7 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 
 - CNB 侧三份脚本改用 Registry V2 API：`registry_auth()` 复用 `docker login` 凭证换 Bearer token，`put_manifest()` 把源清单 `GET` 下来、原文 `PUT` 到新 tag。层 blob 本就在同一仓库，全程不触发复制，digest 不变；PUT 后校验 `Docker-Content-Digest`，不一致即失败。
 - 派生标签因此是单平台 manifest 原文（不再是包一层的 OCI index），`docker pull --platform` 行为不变。
-- GitHub 侧 GHCR 无此限制，保留 `create_tag_with_retry` 兜瞬时抖动；两侧实现不同、标签结果一致，别把 CNB 侧改回 `imagetools create`。
+- GitHub / GitLab 侧的 GHCR / GitLab Registry 无此限制，保留 `create_tag_with_retry` 兜瞬时抖动；CNB 侧实现不同、标签结果一致，别把 CNB 侧改回 `imagetools create`。
 - 提升标签前读基座 digest 也加了 3 次重试 + 告警，避免读失败被当成「基座未对齐」静默跳过。
 - 排障：`docker buildx imagetools inspect <镜像>:<版本>` 与 `...:<版本>-linux-amd64`；PUT 失败时日志会打印源引用与 `Content-Type`。
 
@@ -86,15 +88,16 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 1. 确认版本号 ARG 对应的文件确实存在。
 2. 用 [mirrors.md](mirrors.md) 的 `curl -sI` 验证原站与镜像站。
 3. CNB 上如果原站可访问、DaoCloud 404，可能是代理尚未同步；临时改成直连验证。
-4. 两侧 Dockerfile 的版本 ARG 必须同步。
+4. 三侧 Dockerfile 的版本 ARG 必须同步。
 
-### fnpack / wails3 找不到基础镜像
+### fnpack / wails3 / wails2 找不到基础镜像
 
 症状：`基础镜像 <registry>/<repo>:<go 版本> 不存在`。
 
 - 变体镜像必须 `FROM` 同版本的 golang 基础镜像，不会自己安装工具链。
-- CNB：确认 00:05 的 `build-golang` 定时任务成功；03:05 的 fnpack、06:05 的 wails3 才有基础可用。
-- GitHub：确认 16:35 UTC 的 `build-golang` 定时任务成功；19:35 UTC 的 fnpack、22:35 UTC 的 wails3 才有基础可用。手动触发前先跑一次 build-golang。
+- CNB：确认 00:05 的 `build-golang` 定时任务成功；03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2 才有基础可用。
+- GitHub：确认 16:35 UTC 的 `build-golang` 定时任务成功；19:35 UTC 的 fnpack、22:35 UTC 的 wails3、01:35 UTC 的 wails2 才有基础可用。手动触发前先跑一次 build-golang。
+- GitLab：确认 `TARGET=golang` 的 schedule 或手动流水线成功；其余三个 `TARGET` 的 schedule 才有基础可用。手动触发变体前先跑一次 `TARGET=golang`。
 - 刚推完基础镜像就手动跑变体时，脚本会最多等 5 分钟，仍然失败说明基础镜像确实没推上去。
 
 ### wails3 冒烟报 `pkg:gtk4` / `pkg:webkitgtk-6.0`
@@ -107,7 +110,7 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 
 症状：日志里出现「无法解析 wails3 最新版本…回退 latest」，元数据 `wails3_version` 是 `latest`。
 
-- 解析用 `go list -m github.com/wailsapp/wails/v3@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧是腾讯云镜像，同步有延迟时会失败；等下一次定时任务，或手动触发并显式填 `wails3_version`。
+- 解析用 `go list -m github.com/wailsapp/wails/v3@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧是腾讯云镜像，同步有延迟时会失败；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。等下一次定时任务，或手动触发并显式填 `wails3_version`。
 - 回退不会阻断构建，但层缓存会失效（缓存键永远等于 `latest`），且冒烟只验证 `wails3` 可执行、不比对版本。
 
 ### wails3 冒烟报 `wails3-version(...)`
@@ -116,7 +119,7 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 
 - `go install` 装成了别的版本：检查 `--build-arg WAILS3_VERSION` 与日志里的「wails3_version …」是否一致；
 - 手动填了预发布 tag（如 `v3.0.0-beta.34`），但 GOPROXY 上没有对应版本、`go install` 落到了别的 tag：本地用相同 `GOPROXY` 复现 `go install ...@<tag>`；
-- 想放宽断言时改两份 `build-wails3.sh` 的冒烟段，别只改一侧。
+- 想放宽断言时改三份 `build-wails3.sh` 的冒烟段，别只改一侧。
 
 ### fnpack 下载失败
 
@@ -131,6 +134,7 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 ### `docker login` 失败
 
 - GitHub：workflow 必须传 `REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}`，并给 `packages: write`。
+- GitLab：确认使用的是 GitLab 自动注入的 `CI_REGISTRY_USER` / `CI_REGISTRY_PASSWORD`，没有被同名项目变量覆盖；job 还必须能访问 `CI_REGISTRY_IMAGE`。
 - CNB：确认 `imports` 引用的 `docker.yml` 正常，`CNB_TOKEN` / `CNB_TOKEN_USER_NAME` 存在。
 
 ### 推送 GHCR 报 denied
@@ -148,14 +152,14 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 
 ### `go install` 失败
 
-- 检查 `GOPROXY` 是否可达（CNB 镜像为腾讯云，GitHub 镜像为 Go 默认代理）。
+- 检查 `GOPROXY` 是否可达（CNB 镜像为腾讯云，GitHub / GitLab 镜像为 Go 默认代理）。
 - 私有模块需要自行配置 `GOPRIVATE` / 认证，镜像不预置私有源设置。
 - 某个工具版本与 Go 版本不兼容时，先在本机用相同 Go 版本复现。
 
 ### `npm install -g pnpm` 失败
 
 - 检查 `NODE_URL` 是否可下载。
-- CNB 侧 npm registry 用腾讯云，上游同步延迟时可临时改回官方；GitHub 侧用官方默认 `registry.npmjs.org`，无需改动。
+- CNB 侧 npm registry 用腾讯云，上游同步延迟时可临时改回官方；GitHub / GitLab 侧用官方默认 `registry.npmjs.org`，无需改动。
 - Node 版本与 pnpm 版本不兼容时，同步调整 `NODE_VERSION` / `PNPM_VERSION`。
 
 ### 脚本被 imports 改写
@@ -171,12 +175,18 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 sh -n .cnb/scripts/build-golang.sh
 sh -n .cnb/scripts/build-fnpack.sh
 sh -n .cnb/scripts/build-wails3.sh
+sh -n .cnb/scripts/build-wails2.sh
 sh -n .github/scripts/build-golang.sh
 sh -n .github/scripts/build-fnpack.sh
 sh -n .github/scripts/build-wails3.sh
+sh -n .github/scripts/build-wails2.sh
+sh -n .gitlab/scripts/build-golang.sh
+sh -n .gitlab/scripts/build-fnpack.sh
+sh -n .gitlab/scripts/build-wails3.sh
+sh -n .gitlab/scripts/build-wails2.sh
 
 # ShellCheck
-shellcheck -s sh -S warning .cnb/scripts/*.sh .github/scripts/*.sh
+shellcheck -s sh -S warning .cnb/scripts/*.sh .github/scripts/*.sh .gitlab/scripts/*.sh
 
 # 构建（CNB 镜像源）
 docker build -f .cnb/docker/Dockerfile.golang \
@@ -189,6 +199,12 @@ docker build -f .cnb/docker/Dockerfile.fnpack \
 docker build -f .cnb/docker/Dockerfile.wails3 \
   --build-arg GOLANG_IMAGE=golang:local \
   -t golang-wails3:local .
+
+# 构建（GitLab / GitHub 侧：直连官方源）
+docker build -f .gitlab/docker/Dockerfile.golang -t golang:local .
+docker build -f .gitlab/docker/Dockerfile.fnpack \
+  --build-arg GOLANG_IMAGE=golang:local \
+  -t golang-fnpack:local .
 ```
 
 ## 还是不行

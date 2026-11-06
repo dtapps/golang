@@ -61,13 +61,13 @@ docker buildx build \
   --push .   # 多架构只能推 registry 或 --load 单平台
 ```
 
-arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-qemu-action`，CNB 的 docker 服务自带多架构支持。
+arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-qemu-action`，GitLab job 在 `before_script` 里跑 `tonistiigi/binfmt`，CNB 的 docker 服务自带多架构支持。
 
 ## CI 构建流程
 
 四个镜像由四个脚本分别发布。基础镜像先跑，fnpack / wails3 / wails2 再各自 `FROM` 它。
 
-基础镜像（`.cnb/scripts/build-golang.sh` / `.github/scripts/build-golang.sh`）：
+基础镜像（`.cnb/scripts/build-golang.sh` / `.github/scripts/build-golang.sh` / `.gitlab/scripts/build-golang.sh`）：
 
 1. 解析 Dockerfile 的 `GO_VERSION` / `DEBIAN_VERSION`，可选被 `version` 输入覆盖。
 2. 起一次性容器执行 `go version`，得到实际版本（如 `1.27.3`）。
@@ -80,7 +80,7 @@ arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-
 9. 提升 `<major.minor>` 与 `latest`。
 10. 写 golang 元数据（含 `tools`：本次各工具的实际版本）。
 
-fnpack 镜像（`.cnb/scripts/build-fnpack.sh` / `.github/scripts/build-fnpack.sh`）：
+fnpack 镜像（`.cnb/scripts/build-fnpack.sh` / `.github/scripts/build-fnpack.sh` / `.gitlab/scripts/build-fnpack.sh`）：
 
 1. 从同一份 Dockerfile.golang 解析 `GO_VERSION` / `DEBIAN_VERSION`，得到同一个 `<go 版本>` 标签（两侧解析的是同一个上游浮动引用 `golang:1-trixie`；若上游恰好在两条流水线之间发了新版，fnpack 会因找不到对应标签而安全失败，次日自动对齐）。
 2. 等 `golang:<go 版本>` 在 registry 出现（两侧都靠错开的定时任务保证）。
@@ -92,7 +92,7 @@ fnpack 镜像（`.cnb/scripts/build-fnpack.sh` / `.github/scripts/build-fnpack.s
 8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 fnpack 的对应标签。
 9. 写 fnpack 元数据。
 
-wails3 镜像（`.cnb/scripts/build-wails3.sh` / `.github/scripts/build-wails3.sh`）：
+wails3 镜像（`.cnb/scripts/build-wails3.sh` / `.github/scripts/build-wails3.sh` / `.gitlab/scripts/build-wails3.sh`）：
 
 1. 解析同一个 `<go 版本>` 标签。
 2. 确定 `WAILS3_VERSION`：输入优先；留空时先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析最新稳定 tag（走基座 Dockerfile 的 `GOPROXY`），解析不到才回退 `latest` 交给 `go install`。
@@ -130,7 +130,7 @@ wails3 镜像：
 
 ### 缓存
 
-两侧都启用 **buildx 层缓存**，写到 `<镜像>:buildcache`（CNB 制品库 / GHCR 各一份），`mode=min`：单阶段构建，每一层都在最终镜像里，min 已覆盖整条链，而且不会产生没人引用的孤儿 blob。
+三侧都启用 **buildx 层缓存**，写到 `<镜像>:buildcache`（CNB 制品库 / GHCR / GitLab Registry 各一份），`mode=min`：单阶段构建，每一层都在最终镜像里，min 已覆盖整条链，而且不会产生没人引用的孤儿 blob。
 
 工作方式：
 
@@ -157,5 +157,8 @@ CACHE=off source .cnb/scripts/build-golang.sh
 | CNB    | fnpack | 仓库页面按钮「打包 Golang + fnpack 镜像」                 | 同上                            |
 | GitHub | golang | Actions → build-golang → Run workflow                     | 同上                            |
 | GitHub | fnpack | Actions → build-fnpack → Run workflow（需基础镜像已存在） | 同上                            |
+| GitLab | 任意   | CI/CD → Pipelines → Run pipeline                          | `TARGET` 选镜像；`VERSION` 同上 |
+| GitLab | golang | 定时 schedule，`TARGET=golang`                            | `VERSION`：留空 / 1.27 / 1.27.3 |
+| GitLab | fnpack | 定时 schedule，`TARGET=fnpack`（需基础镜像已存在）        | 同上 + `FNPACK_VERSION`         |
 
 留空表示使用 Dockerfile 的默认值：`golang:1-trixie` 自动跟随最新稳定 Go。填 `1.27` 会跟随该 minor 的最新补丁，填 `1.27.3` 精确到补丁版本。标签里的版本始终是解析后的实际版本。

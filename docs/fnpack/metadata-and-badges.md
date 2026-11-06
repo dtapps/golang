@@ -1,6 +1,6 @@
 # 构建元数据与徽章（fnpack）
 
-> 每次 fnpack 构建把 fnpack 版本、两层 digest（本镜像与基座）、两个平台的体积、两个时间戳写成当前 commit 的元数据，README 徽章从这批 key 取值。golang 基座有一套对应的 `golang_*` 元数据（两套键同挂一个 commit），跨镜像的总表与 digest 固定方式见 [../golang/images-and-tags.md](../golang/images-and-tags.md)，平台层的写入与读取链路见 [../cnb.md](../cnb.md)。
+> 每次 fnpack 构建把 fnpack 版本、两层 digest（本镜像与基座）、两个平台的体积、两个时间戳写成当前 commit 的元数据，README 徽章从这批 key 取值。golang 基座有一套对应的 `golang_*` 元数据（两套键同挂一个 commit），跨镜像的总表与 digest 固定方式见 [../golang/images-and-tags.md](../golang/images-and-tags.md)，平台层的写入与读取链路见 [../cnb.md](../cnb.md)、[../github.md](../github.md) 与 [../gitlab.md](../gitlab.md)。
 
 ## 生成的 JSON
 
@@ -63,7 +63,7 @@ stages 第二步：image: cnbcool/annotations:latest
 当前 commit 的元数据  ←  /-/badge/annotation/commit/latest/{key}
 ```
 
-GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact（`fnpack-annotation`，保留 30 天）。CNB 的徽章地址在 GitHub 侧没有对应物，跨平台核对元数据以 artifact 为准。
+GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact（`fnpack-annotation`，保留 30 天）。GitLab 侧同样不写 commit 注解，JSON 作为 job artifact 留在 `.gitlab/annotation-fnpack.json`（保留 30 天）。CNB 的徽章地址在 GitHub / GitLab 侧没有对应物，跨平台核对元数据以 artifact 为准。
 
 体积算法与 golang 侧一致：先按平台从版本标签的 index 里挑出该平台的镜像清单 digest，再对清单原文求和（只认含 `layers` 的清单）。清单 digest 取不到、取到的不是镜像清单、或求和小于经验下界，三种情况都输出 `unknown` 并往构建日志打一行警告；徽章上的灰色 `unknown` 也可能是这个 key 从未被写入过——排查顺序：
 
@@ -115,4 +115,5 @@ docker buildx imagetools inspect "${IMAGE}@${PLATFORM_DIGEST}" --raw \
 
 - [基座镜像与标签](../golang/images-and-tags.md)——两套键的总表、digest 固定
 - [CNB 平台层](../cnb.md)——注解插件、徽章地址来源
+- [GitHub](../github.md) / [GitLab](../gitlab.md)——Step Summary / job artifact 的写入与读取方式
 - [Dockerfile.fnpack 解析](dockerfile.md)——`fnpack_version` 的来源

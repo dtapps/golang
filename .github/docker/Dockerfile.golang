@@ -1,9 +1,9 @@
 # ===================================================================
 # Golang 构建环境镜像（不含 fnpack）
 #
-# 两个平台各留一份：.cnb/docker/Dockerfile.golang 与
-# .github/docker/Dockerfile.golang，各自维护、不互相引用。
-# 装包、升级工具版本时两处都要改；GitHub 侧一律直连官方源，CNB 侧才用国内镜像。
+# 三个平台各留一份：本文件（GitHub 侧）、.cnb/docker/Dockerfile.golang（CNB 侧）与
+# .gitlab/docker/Dockerfile.golang（GitLab 侧），各自维护、不互相引用。
+# 装包、升级工具版本时三处都要改；GitHub / GitLab 侧一律直连官方源，CNB 侧才用国内镜像。
 #
 # 镜像内容：
 #   Go 工具链 + UPX + nfpm + Node.js/pnpm

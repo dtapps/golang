@@ -5,8 +5,8 @@
 #   1. 安装 WebKitGTK / GTK4 开发包（wails3 编译 webview 所需）
 #   2. go install wails3 CLI
 #
-# 两个平台各留一份：本文件（GitHub 侧）与
-# .cnb/docker/Dockerfile.wails3（CNB 侧），各自维护、不互相引用。
+# 三个平台各留一份：本文件（GitHub 侧）、.cnb/docker/Dockerfile.wails3（CNB 侧）与
+# .gitlab/docker/Dockerfile.wails3（GitLab 侧），各自维护、不互相引用。
 #
 # 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
 #   GOLANG_IMAGE=<registry>/<repo>:<go 版本>

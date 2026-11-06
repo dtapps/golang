@@ -1,0 +1,22 @@
+# 构建并推送 golang 基础镜像
+# 由根 .gitlab-ci.yml 的 include 引入；workflow / stages / variables / default 都在根文件里。
+# 本 job 只负责把表单变量映射成脚本认识的 lowercase 变量，其余平台胶水在根文件与脚本里。
+#
+# 与 GitHub 的 .github/workflows/build-golang.yml 同语义：多架构构建、派生单平台标签、
+# 冒烟通过后才提升 <major.minor> / latest。
+build-golang:
+  resource_group: build-golang
+  stage: golang
+  timeout: 180m
+  script:
+    - |
+      set -eu
+      export version="${VERSION:-}"
+      . ./.gitlab/scripts/build-golang.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - .gitlab/annotation.json
+  rules:
+    - if: '$TARGET == "" || $TARGET == "golang"'

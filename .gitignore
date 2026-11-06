@@ -8,3 +8,8 @@
 .github/annotation-fnpack.json
 .github/annotation-wails3.json
 .github/annotation-wails2.json
+# CI 生成物：GitLab CI 构建写入的镜像元数据，随 job artifacts 保留
+.gitlab/annotation.json
+.gitlab/annotation-fnpack.json
+.gitlab/annotation-wails3.json
+.gitlab/annotation-wails2.json

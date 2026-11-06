@@ -1,6 +1,6 @@
 # Dockerfile.fnpack 解析
 
-两个平台各一份：`.cnb/docker/Dockerfile.fnpack` 与 `.github/docker/Dockerfile.fnpack`，内容一致、各自维护。整个文件只做两件事——下载 fnpack、打 OCI 标签，其余全部继承基座；基座镜像的 Dockerfile（工具链、镜像源、层拆分）见 [../golang/dockerfile.md](../golang/dockerfile.md)。
+三个平台各一份：`.cnb/docker/Dockerfile.fnpack`、`.github/docker/Dockerfile.fnpack` 与 `.gitlab/docker/Dockerfile.fnpack`，内容一致、各自维护。整个文件只做两件事——下载 fnpack、打 OCI 标签，其余全部继承基座；基座镜像的 Dockerfile（工具链、镜像源、层拆分）见 [../golang/dockerfile.md](../golang/dockerfile.md)。
 
 ## 基座
 
@@ -34,7 +34,7 @@ RUN set -eux; \
 
 逐点看：
 
-- **下载地址**：`https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>`，直连官方站，不走 GitHub Release，所以两个平台都没有镜像前缀开关（对比基座镜像的 `GITHUB_MIRROR` / `NODE_MIRROR`）。
+- **下载地址**：`https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>`，直连官方站，不走 GitHub Release，所以三个平台都没有镜像前缀开关（对比基座镜像的 `GITHUB_MIRROR` / `NODE_MIRROR`）。
 - **架构映射是这里唯一的坑**：fnpack 上游的 ARM 产物文件名是 `arm`，**不是** `arm64`；而 `uname -m` 在 arm64 上返回 `aarch64`，必须映射成 `arm` 才能拼出正确的 URL。amd64 是平凡的 `x86_64` → `amd64`。映射错了会 404，构建直接失败。
 - **安装即校验**：`chmod +x` → `test -x` → 跑一次 `fnpack --help`。部分版本的 `--help` 返回非 0，所以加了 `|| true`——这一步只验证「二进制能执行」，不校验退出码；更完整的断言在构建脚本的冒烟测试里（检查 `fnpack` 存在且可执行、Go 版本一致、基座工具链齐全）。
 - **缓存友好**：这一层只依赖 `GOLANG_IMAGE` 与 `FNPACK_VERSION` 两个 build-arg。基座 digest 没变、fnpack 版本没升时，层缓存全命中，构建接近瞬时；机制见 [../cache-implementation.md](../cache-implementation.md)。
@@ -50,7 +50,7 @@ RUN set -eux; \
 | 手动覆盖 | 手动触发时传 `version`            | 手动触发时传 `fnpack_version`    |
 | 原因     | 上游有可查询的版本渠道            | 下载地址不支持 latest 语义       |
 
-脚本先用 `read_arg` 从 `Dockerfile.fnpack` 读出 `FNPACK_VERSION` 作为默认值：定时任务、以及手动触发时留空的 `fnpack_version`，都用这个值（当前 `1.2.3`，暂作为最新版本）。手动填了 `fnpack_version`（如 `1.2.3`）就直接覆盖，原样传给 `--build-arg`，不经转换。升级默认版本仍要改两份 Dockerfile，流程见 [../golang/maintenance.md](../golang/maintenance.md) 的「升级 fnpack」：先 `curl -sI` 确认对应产物存在。
+脚本先用 `read_arg` 从 `Dockerfile.fnpack` 读出 `FNPACK_VERSION` 作为默认值：定时任务、以及手动触发时留空的 `fnpack_version`，都用这个值（当前 `1.2.3`，暂作为最新版本）。手动填了 `fnpack_version`（如 `1.2.3`）就直接覆盖，原样传给 `--build-arg`，不经转换。升级默认版本仍要改三份 Dockerfile，流程见 [../golang/maintenance.md](../golang/maintenance.md) 的「升级 fnpack」：先 `curl -sI` 确认对应产物存在。
 
 ## OCI 标签
 

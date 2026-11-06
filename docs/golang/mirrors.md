@@ -2,7 +2,7 @@
 
 ## 一张表
 
-| 依赖                              | GitHub Actions                  | CNB                                                    |
+| 依赖                              | GitHub Actions / GitLab CI      | CNB                                                    |
 |-----------------------------------|---------------------------------|--------------------------------------------------------|
 | GitHub Release（UPX）             | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`           |
 | GitHub Release Atom（UPX 版本号） | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`（同域名） |
@@ -10,12 +10,13 @@
 | nfpm 与各 Go 工具（`go install`） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
 | fnpack                            | 直连 `static2.fnnas.com`        | 直连 `static2.fnnas.com`                               |
 | wails3（`go install` 与版本解析） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| wails2（`go install` 与版本解析） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
 | Debian APT                        | 默认 `deb.debian.org`           | `mirrors.cloud.tencent.com`                            |
 | npm / pnpm registry               | 默认 `registry.npmjs.org`       | `mirrors.cloud.tencent.com/npm/`                       |
 
 ## 开关
 
-CNB 的 Dockerfile 里有两个构建参数（GitHub 侧没有，直接写死官方地址）：
+CNB 的 Dockerfile 里有两个构建参数（GitHub / GitLab 侧没有，直接写死官方地址）：
 
 ```dockerfile
 ARG GITHUB_MIRROR=""
@@ -35,19 +36,22 @@ NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"  # nodejs.org
 |--------|-----------------------------------|----------------------------------|
 | CNB    | `.cnb/scripts/build-golang.sh`    | 传 `https://files.m.daocloud.io` |
 | GitHub | `.github/scripts/build-golang.sh` | 无参数（Dockerfile 直连）        |
+| GitLab | `.gitlab/scripts/build-golang.sh` | 无参数（Dockerfile 直连）        |
 
-fnpack 镜像只从 `https://static2.fnnas.com` 下载二进制，两个平台的 `build-fnpack.sh` 都不传镜像参数。
+fnpack 镜像只从 `https://static2.fnnas.com` 下载二进制，三个平台的 `build-fnpack.sh` 都不传镜像参数。
 
-wails3 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧因为 `Dockerfile.golang` 已设成腾讯云，子镜像自动继承；GitHub 侧用 Go 默认代理。两侧的 `build-wails3.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」走同一个源。
+wails3 / wails2 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧因为 `Dockerfile.golang` 已设成腾讯云，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」走同一个源。
 
-## 为什么 GitHub 侧不传
+## 为什么 GitHub / GitLab 侧不传
 
-GitHub hosted runner 在海外，直连 `github.com` / `nodejs.org` 比绕道 DaoCloud 更快、更少一个故障点；npm / pnpm 同理用官方默认 `registry.npmjs.org`，APT 用 `deb.debian.org`，Go module 用 `proxy.golang.org`，都不设镜像。CNB runner 在国内，直连 GitHub 容易超时，所以走 DaoCloud，APT / Go module / npm 也换腾讯云。
+GitHub hosted runner 与 GitLab.com 的 runner 都在海外，直连 `github.com` / `nodejs.org` 比绕道 DaoCloud 更快、更少一个故障点；npm / pnpm 同理用官方默认 `registry.npmjs.org`，APT 用 `deb.debian.org`，Go module 用 `proxy.golang.org`，都不设镜像。CNB runner 在国内，直连 GitHub 容易超时，所以走 DaoCloud，APT / Go module / npm 也换腾讯云。
+
+> 自建 GitLab runner 如果部署在国内，也可以按 CNB 的方式加镜像参数；但 GitLab 侧脚本目前不读 `GITHUB_MIRROR` / `NODE_MIRROR`，需要连同 Dockerfile 与脚本一起改。
 
 ## Go module proxy
 
 - CNB 镜像：`GOPROXY=https://mirrors.cloud.tencent.com/go/,direct`。
-- GitHub 镜像：不设置 `GOPROXY`，使用 Go 默认的 `https://proxy.golang.org,direct`。
+- GitHub / GitLab 镜像：不设置 `GOPROXY`，使用 Go 默认的 `https://proxy.golang.org,direct`。
 
 ## 验证下载地址
 
@@ -73,6 +77,6 @@ curl -sI https://static2.fnnas.com/fnpack/fnpack-1.2.3-linux-arm | head -1
 ## 注意
 
 - DaoCloud 是第三方代理，域名规则是 `<代理前缀>/<原域名>/<原路径>`。
-- npm registry 只有 CNB 侧用腾讯云，GitHub 侧用官方默认 `registry.npmjs.org`；APT 与 Go module proxy 同理，GitHub 侧用 Debian / Go 默认源。
+- npm registry 只有 CNB 侧用腾讯云，GitHub / GitLab 侧用官方默认 `registry.npmjs.org`；APT 与 Go module proxy 同理，GitHub / GitLab 侧用 Debian / Go 默认源。
 - fnpack 没有做镜像，直接访问 `static2.fnnas.com`；该站本身在国内，通常不需要代理。
 - 如果 DaoCloud 某个路径 404，先用上面的 `curl` 验证原站是否仍提供该文件（可能只是版本号写错）。

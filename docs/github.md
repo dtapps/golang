@@ -1,10 +1,10 @@
 # GitHub Actions 与 GHCR
 
-> 和 [CNB 流水线](cnb.md) 对称的一篇：讲 GitHub 侧的目录、触发方式、镜像地址、变量契约与已知差异。
+> 和 [CNB 流水线](cnb.md)、[GitLab CI](gitlab.md) 对称的一篇：讲 GitHub 侧的目录、触发方式、镜像地址、变量契约与已知差异。
 
-## 设计前提：两份独立实现，各自演进
+## 设计前提：三份独立实现，各自演进
 
-GitHub 侧不 `source` CNB 的脚本，也不与 CNB 共用 Dockerfile：
+GitHub 侧不 `source` CNB / GitLab 的脚本，也不与它们共用 Dockerfile：
 
 | 职责       | CNB 侧                                                                                         | GitHub 侧                                                                                         |
 |------------|------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
@@ -13,9 +13,11 @@ GitHub 侧不 `source` CNB 的脚本，也不与 CNB 共用 Dockerfile：
 | 流水线     | `.cnb.yml` + `.cnb/workflows/`                                                                 | `.github/workflows/`                                                                              |
 | 元数据     | `.cnb/annotation{,-fnpack,-wails3,-wails2}.json`                                               | `.github/annotation{,-fnpack,-wails3,-wails2}.json`                                               |
 
-各自独立而不是共用的原因：两侧的标签规则、冒烟断言是同构的，但平台胶水完全不同——CNB 读 `CNB_*` 变量、用 `##[set-output]`、写 commit annotation；GitHub 读 Actions 上下文、写 Step Summary/artifact、用 QEMU + buildx。共用意味着任何一侧改平台细节都要考虑另一侧。
+GitLab 侧的同构清单（以及三侧完整对照表）见 [gitlab.md](gitlab.md)，本页不再重复。
 
-代价只有一条，且是硬性规则：**改镜像内容、标签规则、冒烟断言时，两份都要改**（见 [CONTRIBUTING](../CONTRIBUTING.md)）。只改平台胶水时各改各的。
+各自独立而不是共用的原因：三侧的标签规则、冒烟断言是同构的，但平台胶水完全不同——CNB 读 `CNB_*` 变量、用 `##[set-output]`、写 commit annotation；GitHub 读 Actions 上下文、写 Step Summary/artifact、用 QEMU + buildx；GitLab 读 `CI_*` 变量、用 job artifacts、同样用 QEMU + buildx。共用意味着任何一侧改平台细节都要考虑另外两侧。
+
+代价只有一条，且是硬性规则：**改镜像内容、标签规则、冒烟断言时，三份都要改**（见 [CONTRIBUTING](../CONTRIBUTING.md)）。只改平台胶水时各改各的。
 
 ## 镜像地址
 
@@ -164,9 +166,11 @@ permissions:
 | 元数据        | commit annotation                                      | Step Summary + artifact                      |
 | 磁盘准备      | 无                                                     | 删除预装 SDK，释放空间                       |
 
+GitLab 与 GitHub 的差异（镜像名来源、登录、定时任务、并发、元数据）见 [gitlab.md](gitlab.md#与-github-的差异)。
+
 ## 标签契约
 
-与 CNB 完全一致：
+与 CNB / GitLab 完全一致：
 
 ```text
 <go 版本>                 1.27.3
@@ -176,7 +180,7 @@ latest                    latest
 <go 版本>-linux-arm64     1.27.3-linux-arm64
 ```
 
-各变体镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack / wails3 只在基础镜像对应标签也指向本次版本时才提升。
+各变体镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack / wails3 / wails2 只在基础镜像对应标签也指向本次版本时才提升。
 
 ## 缓存
 
@@ -199,9 +203,10 @@ env:
 docker pull ghcr.io/dtapps/golang@sha256:<golang_digest>
 docker pull ghcr.io/dtapps/golang/fnpack@sha256:<fnpack_digest>
 docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
+docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 ```
 
-golang 的 digest 在 `golang-annotation` artifact / Step Summary 里；fnpack 的在 `fnpack-annotation` 里；wails3 的在 `wails3-annotation` 里。
+golang 的 digest 在 `golang-annotation` artifact / Step Summary 里；fnpack / wails3 / wails2 分别在 `fnpack-annotation` / `wails3-annotation` / `wails2-annotation` 里。
 
 ## 常见问题
 

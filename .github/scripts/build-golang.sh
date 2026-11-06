@@ -9,8 +9,8 @@
 # 负责：它 FROM 本工作流推好的 <go 版本> 标签，只追加一个 fnpack 二进制。
 # 两个工作流各自对应一个镜像地址。
 #
-# 这是 GitHub 侧独立实现，与 .cnb/scripts/build-golang.sh 各自维护、不互相引用。
-# 两侧的标签规则、冒烟断言必须保持一致；平台胶水（变量来源、镜像源、元数据落地）
+# 这是 GitHub 侧独立实现，与 .cnb/scripts/build-golang.sh、.gitlab/scripts/build-golang.sh 各自维护、不互相引用。
+# 三侧的标签规则、冒烟断言必须保持一致；平台胶水（变量来源、镜像源、元数据落地）
 # 各自维护。
 #
 # 环境变量（默认从 GitHub Actions 内置变量派生，显式传同名变量可覆盖）：

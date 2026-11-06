@@ -1,6 +1,6 @@
 # CNB 流水线（平台层）
 
-> 和 [GitHub Actions 与 GHCR](github.md) 对称的一篇：讲 CNB 侧怎么触发、镜像地址从哪来、元数据怎么落地、与 GitHub 侧差在哪。
+> 和 [GitHub Actions 与 GHCR](github.md)、[GitLab CI](gitlab.md) 对称的一篇：讲 CNB 侧怎么触发、镜像地址从哪来、元数据怎么落地、与另外两侧差在哪。
 
 ## 目录与职责
 
@@ -16,7 +16,7 @@
 | `.cnb/annotation-wails3.json` | wails3 构建元数据（`.gitignore` 已排除）                                 |
 | `.cnb/security/`              | 代码扫描配置                                                             |
 
-GitHub 侧有一份对应的实现（`.github/`），两边不互相引用，见文末「跨平台同步」。
+GitHub 与 GitLab 侧各有一份对应的实现（`.github/`、`.gitlab/`），三边不互相引用，见文末「跨平台同步」。
 
 ## 镜像地址不是写死的
 
@@ -113,7 +113,7 @@ docker buildx build \
   ...
 ```
 
-CNB 侧 APT / Go module / npm 使用腾讯云镜像；GitHub 侧 APT 与 Go module 用默认源。详见 [golang/mirrors.md](golang/mirrors.md)。
+CNB 侧 APT / Go module / npm 使用腾讯云镜像；GitHub / GitLab 侧 APT 与 Go module 用默认源。详见 [golang/mirrors.md](golang/mirrors.md)。
 
 ## 缓存
 
@@ -132,7 +132,7 @@ CNB 文档里的**节点文件缓存**（`docker.volumes` + `copy-on-write`）�
 
 ## 跨平台同步
 
-`build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh` 与 Dockerfile 在 CNB 和 GitHub 各有一份。改以下内容时两边都要改：
+`build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh` 与 Dockerfile 在 CNB、GitHub、GitLab 各有一份。改以下内容时三边都要改：
 
 - 镜像里装什么、版本 ARG、清理逻辑
 - 标签规则、提升顺序、冒烟断言
@@ -142,3 +142,4 @@ CNB 文档里的**节点文件缓存**（`docker.volumes` + `copy-on-write`）�
 
 - CNB：`CNB_*` 变量、`imports`、`##[set-output]`、annotation 插件
 - GitHub：Actions 上下文、Step Summary、artifact、QEMU / buildx 初始化
+- GitLab：`CI_*` 变量、job artifacts、QEMU / buildx 初始化、`resource_group`

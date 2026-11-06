@@ -24,10 +24,11 @@
 
 ## 地址与标签
 
-| 平台   | golang                         | golang/fnpack                         | golang/wails3                         | golang/wails2                         |
-|--------|--------------------------------|---------------------------------------|---------------------------------------|---------------------------------------|
-| CNB    | `docker.cnb.cool/dtapp/golang` | `docker.cnb.cool/dtapp/golang/fnpack` | `docker.cnb.cool/dtapp/golang/wails3` | `docker.cnb.cool/dtapp/golang/wails2` |
-| GitHub | `ghcr.io/dtapps/golang`        | `ghcr.io/dtapps/golang/fnpack`        | `ghcr.io/dtapps/golang/wails3`        | `ghcr.io/dtapps/golang/wails2`        |
+| 平台   | golang                              | golang/fnpack                              | golang/wails3                              | golang/wails2                              |
+|--------|-------------------------------------|--------------------------------------------|--------------------------------------------|--------------------------------------------|
+| CNB    | `docker.cnb.cool/dtapp/golang`      | `docker.cnb.cool/dtapp/golang/fnpack`      | `docker.cnb.cool/dtapp/golang/wails3`      | `docker.cnb.cool/dtapp/golang/wails2`      |
+| GitHub | `ghcr.io/dtapps/golang`             | `ghcr.io/dtapps/golang/fnpack`             | `ghcr.io/dtapps/golang/wails3`             | `ghcr.io/dtapps/golang/wails2`             |
+| GitLab | `registry.gitlab.com/dtapps/golang` | `registry.gitlab.com/dtapps/golang/fnpack` | `registry.gitlab.com/dtapps/golang/wails3` | `registry.gitlab.com/dtapps/golang/wails2` |
 
 四个镜像使用同一组标签：`1.27.3`、`1.27`、`latest`、`1.27.3-linux-amd64`、`1.27.3-linux-arm64`。完整契约见 [images-and-tags.md](images-and-tags.md)。
 
@@ -37,6 +38,9 @@
 docker run --rm -it ghcr.io/dtapps/golang:latest bash
 docker run --rm ghcr.io/dtapps/golang/fnpack:latest fnpack --help
 docker run --rm ghcr.io/dtapps/golang/wails3:latest wails3 version
+docker run --rm ghcr.io/dtapps/golang/wails2:latest wails version
+# GitLab Registry 同标签
+docker run --rm -it registry.gitlab.com/dtapps/golang:latest bash
 ```
 
 ## 怎么构建
@@ -47,8 +51,9 @@ make format && make lint-shell   # 提交前
 
 CI 按平台和镜像拆开，每个镜像一条流水线：
 
-- CNB：`.cnb/workflows/build-{golang,fnpack,wails3}.yml`，每日由 `.cnb.yml` 的定时任务先后触发（00:05 / 03:05 / 06:05）。
-- GitHub：`.github/workflows/build-{golang,fnpack,wails3}.yml`，三者各自按定时任务触发（16:35 / 19:35 / 22:35 UTC）。
+- CNB：`.cnb/workflows/build-{golang,fnpack,wails3,wails2}.yml`，每日由 `.cnb.yml` 的定时任务先后触发（00:05 / 03:05 / 06:05 / 09:05）。
+- GitHub：`.github/workflows/build-{golang,fnpack,wails3,wails2}.yml`，四者各自按定时任务触发（16:35 / 19:35 / 22:35 UTC / 01:35 UTC）。
+- GitLab：`.gitlab/workflows/build-{golang,fnpack,wails3,wails2}.yml`，由 Pipeline schedules 触发（建议同样错开三小时），`TARGET` 选镜像。
 
 本地构建见 [build.md](build.md)，事件矩阵见 [ci-pipeline.md](ci-pipeline.md)。
 

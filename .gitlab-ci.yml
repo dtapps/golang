@@ -1,0 +1,127 @@
+# ===================================================================
+# GitLab CI：构建并推送四个 Golang 构建环境镜像
+#
+#   产物（地址由 CI_REGISTRY_IMAGE 派生，不写死）：
+#     ${CI_REGISTRY_IMAGE}          → golang
+#     ${CI_REGISTRY_IMAGE}/fnpack   → golang + fnpack
+#     ${CI_REGISTRY_IMAGE}/wails3   → golang + GTK4/WebKitGTK + wails3 CLI
+#     ${CI_REGISTRY_IMAGE}/wails2   → golang + GTK3/WebKit2GTK 4.1 + wails CLI
+#
+# 与 GitHub Actions 的四条 workflow 同语义：每个镜像一个作业、一份 Dockerfile、
+# 一份构建脚本，标签规则与冒烟断言保持一致。平台胶水各自维护。
+#
+# 触发方式（GitLab 的 cron 不在 YAML 里，定时任务要建在 UI / API 里）：
+#   - Pipeline schedules：建议建四条，变量 TARGET 分别填 golang / fnpack / wails3 / wails2
+#   - Run pipeline（手动）：TARGET 留空 = 四个都构建；也可只填一个，只重建那个镜像
+#
+# 四个作业都需要 Docker daemon 来 buildx / 拉镜像做冒烟。这里用
+# docker:cli + docker:dind，并在 before_script 里准备两件事：
+#   1. arm64 QEMU binfmt（runner 已注册就跳过）
+#   2. docker-container 驱动的 buildx builder（docker 驱动不支持多架构 manifest list）
+# 因此 runner 必须允许 privileged 容器（dind 的前提）。runner 要求与
+# GitLab.com 共享 runner 的限制见 docs/gitlab.md。
+#
+# 文件分工（include 在流水线创建时展开合并成一份配置）：
+#   本文件（必须在仓库根）        workflow / stages / variables / default —— 全局只此一处
+#   .gitlab/workflows/build-*.yml 四个镜像各自的 job（不含 rules 以外的胶水）
+#   .gitlab/docker/Dockerfile.*   镜像本身
+#   .gitlab/scripts/build-*.sh    构建、派生、冒烟、提升标签
+#
+# 两条纪律，和 .cnb/、.github/ 一致：
+#   1. 一个 job 只在一个文件里定义。同名 job 跨文件是深合并，不是整体覆盖
+#   2. default / variables / stages 只写在根文件。default.before_script 会被 job 级
+#      整体替换，藏进被 include 的文件后，读另一个文件的人根本看不见这条规则
+include:
+  - local: .gitlab/workflows/build-golang.yml
+  - local: .gitlab/workflows/build-fnpack.yml
+  - local: .gitlab/workflows/build-wails3.yml
+  - local: .gitlab/workflows/build-wails2.yml
+
+# 只有定时流水线和手动 Run pipeline 会建流水线：
+#   - push / MR / tag 不建，避免每次提交都跑 3 小时的镜像构建
+#   - 其它来源（API / trigger）也不建；需要时在 UI 里手动 Run pipeline
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - when: never
+
+stages:
+  - golang
+  - variants
+
+variables:
+  # Run pipeline 页面会把带 description 的变量列成表单，方便手填。
+  TARGET:
+    value: ''
+    description: '要构建的镜像：留空 = 四个都构建；也可填 golang / fnpack / wails3 / wails2'
+  VERSION:
+    value: ''
+    description: '选填：Go 版本。留空 = 跟随 Dockerfile 的 GO_VERSION（golang:1-trixie，最新稳定 Go）；也可填 1.27 / 1.27.3'
+  FNPACK_VERSION:
+    value: ''
+    description: '选填：fnpack 版本。留空 = 使用 Dockerfile 的 FNPACK_VERSION（当前 1.2.3，暂作为最新版本）；也可填 1.2.3'
+  WAILS3_VERSION:
+    value: ''
+    description: '选填：wails3 版本。留空 = 解析上游最新稳定 tag（如 v3.1.0）；也可填 v3.0.0 / 3.1.0 / v3.0.0-beta.34'
+  WAILS2_VERSION:
+    value: ''
+    description: '选填：wails2 版本。留空 = 解析上游最新稳定 tag（如 v2.17.1）；也可填 v2.17.1 / 2.17.1'
+  CACHE:
+    value: ''
+    description: '选填：on / off。off = 关闭 buildx 层缓存并强制全量重建；留空 = on'
+
+  # docker:cli 通过 TLS 连 docker:dind；这四项是 GitLab 官方 dind 示例的标准配置。
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_CERTDIR: '/certs'
+  DOCKER_TLS_VERIFY: '1'
+  DOCKER_CERT_PATH: '/certs/client'
+
+default:
+  image: docker:cli
+  services:
+    - name: docker:dind
+      alias: docker
+  # 构建中途被新流水线打断会留下半个 release，和 GitHub 侧 cancel-in-progress: false 同语义
+  interruptible: false
+  before_script:
+    - |
+      set -eu
+      i=0
+      until docker info >/dev/null 2>&1; do
+        i=$((i + 1))
+        if [ "$i" -ge 30 ]; then
+          echo "docker:dind 未就绪（等待 30 秒），检查 runner 是否允许 privileged / dind" >&2
+          exit 1
+        fi
+        sleep 1
+      done
+      echo "docker:dind 已就绪"
+    - |
+      set -eu
+      # 两个架构都要能跑：amd64 runner 缺 arm64，arm64 runner 缺 amd64。
+      # 已注册的架构直接跳过；缺的用 QEMU 补（需要 privileged）。
+      missing=""
+      docker run --rm --platform linux/amd64 alpine:3 true >/dev/null 2>&1 || missing="${missing},amd64"
+      docker run --rm --platform linux/arm64 alpine:3 true >/dev/null 2>&1 || missing="${missing},arm64"
+      if [ -n "${missing}" ]; then
+        echo "注册 QEMU binfmt: ${missing#,}"
+        docker run --privileged --rm tonistiigi/binfmt --install "${missing#,}"
+      else
+        echo "amd64 / arm64 binfmt 已就绪，跳过 QEMU 安装"
+      fi
+    - |
+      set -eu
+      # 默认 docker 驱动不支持多架构 manifest list；docker-container 驱动才行。
+      # 但 buildx 不能直接用 DOCKER_HOST + DOCKER_TLS_* 环境变量建 builder
+      # （could not create a builder instance with TLS data loaded from environment），
+      # 要先把当前环境固化成 docker context，再把 builder 的 endpoint 指向它。
+      docker context inspect tls-environment >/dev/null 2>&1 \
+        || docker context create tls-environment
+      # 名字带 CI_JOB_ID：每个作业有自己的 dind，同名前缀互不影响。
+      # 回退到 use：socket runner 上 builder 可能跨作业保留（例如同一 job 重试）。
+      docker buildx create --name "gitlab-${CI_JOB_ID}" --driver docker-container \
+        --use tls-environment || docker buildx use "gitlab-${CI_JOB_ID}"
+      docker buildx inspect --bootstrap
+  # 层缓存走 registry（<镜像>:buildcache），这里的 GitLab cache 不需要
+  cache: {}

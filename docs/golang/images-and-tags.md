@@ -8,6 +8,7 @@
 |--------|-----------------------------------------------------|--------------------|--------------------|--------------------|
 | CNB    | `${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}` | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` |
 | GitHub | `ghcr.io/${GITHUB_REPOSITORY}`（小写）              | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` |
+| GitLab | `${CI_REGISTRY_IMAGE}`                              | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` |
 
 本仓库当前的实际值：
 
@@ -20,6 +21,10 @@ ghcr.io/dtapps/golang
 ghcr.io/dtapps/golang/fnpack
 ghcr.io/dtapps/golang/wails3
 ghcr.io/dtapps/golang/wails2
+registry.gitlab.com/dtapps/golang
+registry.gitlab.com/dtapps/golang/fnpack
+registry.gitlab.com/dtapps/golang/wails3
+registry.gitlab.com/dtapps/golang/wails2
 ```
 
 fork 或改名后自动跟着变，不需要改脚本。
@@ -64,7 +69,7 @@ ghcr.io/dtapps/golang/wails3:1.27.3-linux-arm64
 
 fnpack / wails3 / wails2 的 `<major.minor>` / `latest` 只在基础镜像的对应标签也已指向本次版本时才提升。所以它们的 `latest` 不会跑到基础镜像前面，也不会出现「只有变体成功」的错位。失败时 `<go 版本>` 标签可能已经指向坏产物，但它不是移动标签，下游按 `latest` / `<major.minor>` 拉取不受影响。
 
-调度上，CNB 依次跑 00:05 的 golang、03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2；GitHub 依次跑 16:35 UTC 的 golang、19:35 UTC 的 fnpack、22:35 UTC 的 wails3、01:35 UTC 的 wails2。
+调度上，CNB 依次跑 00:05 的 golang、03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2；GitHub 依次跑 16:35 UTC 的 golang、19:35 UTC 的 fnpack、22:35 UTC 的 wails3、01:35 UTC 的 wails2；GitLab 用 Pipeline schedules 配同样的时间，变量 `TARGET` 分别指向四个镜像，也可以一条 schedule 不填 `TARGET` 一次构建全部。
 
 ## 固定某一份产物
 
@@ -79,10 +84,10 @@ docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 
 构建元数据由四条流水线分别写入：
 
-- golang：`.cnb/annotation.json` / `.github/annotation.json`
-- fnpack：`.cnb/annotation-fnpack.json` / `.github/annotation-fnpack.json`
-- wails3：`.cnb/annotation-wails3.json` / `.github/annotation-wails3.json`
-- wails2：`.cnb/annotation-wails2.json` / `.github/annotation-wails2.json`
+- golang：`.cnb/annotation.json` / `.github/annotation.json` / `.gitlab/annotation.json`
+- fnpack：`.cnb/annotation-fnpack.json` / `.github/annotation-fnpack.json` / `.gitlab/annotation-fnpack.json`
+- wails3：`.cnb/annotation-wails3.json` / `.github/annotation-wails3.json` / `.gitlab/annotation-wails3.json`
+- wails2：`.cnb/annotation-wails2.json` / `.github/annotation-wails2.json` / `.gitlab/annotation-wails2.json`
 
 | 键                   | 含义                                        |
 |----------------------|---------------------------------------------|
@@ -114,7 +119,7 @@ docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 
 wails2 的元数据键与上表同构，前缀换成 `wails2_`：`wails2_image` / `wails2_digest` / `wails2_digest_short` / `wails2_size` / `wails2_size_arm64` / `wails2_version` / `wails2_base_image` / `wails2_base_digest`。完整说明见 [../wails2/README.md](../wails2/README.md#元数据与徽章)。
 
-CNB 侧从 `/-/badge/annotation/commit/latest/{key}` 读取；GitHub 侧写进 Step Summary 并上传 artifact（`golang-annotation` / `fnpack-annotation` / `wails3-annotation` / `wails2-annotation`）。
+CNB 侧从 `/-/badge/annotation/commit/latest/{key}` 读取；GitHub 侧写进 Step Summary 并上传 artifact（`golang-annotation` / `fnpack-annotation` / `wails3-annotation` / `wails2-annotation`）；GitLab 侧写进 `.gitlab/annotation*.json`，随 job artifacts 保留 30 天。
 
 ## 四个镜像的对应关系
 
