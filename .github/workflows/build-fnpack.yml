@@ -22,9 +22,9 @@ name: build-fnpack
 
 on:
   schedule:
-    # 每天 19:35 UTC（北京 03:35），比 build-golang 的 16:35 UTC 晚 3 小时，
-    # 给基础镜像留出构建时间。
-    - cron: '35 19 * * *'
+    # 每天 03:05（Asia/Shanghai）= 19:05 UTC，与 CNB 的 crontab '5 3 * * *' 同刻。
+    # 比 build-golang 的 16:05 UTC 晚 3 小时，给基础镜像留出构建时间。
+    - cron: '5 19 * * *'
   workflow_dispatch:
     inputs:
       version:

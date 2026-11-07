@@ -55,7 +55,7 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 ### `build-fnpack.yml`
 
 - 触发：
-  - `schedule`：每天 19:35 UTC（北京 03:35），比 `build-golang` 晚 3 小时
+  - `schedule`：每天 19:05 UTC（北京 03:05），比 `build-golang` 晚 3 小时
   - `workflow_dispatch`：手动，要求对应版本的基础镜像已存在；可填 `version` / `fnpack_version`
 - `build` 作业：检出 → 释放磁盘 → QEMU → buildx → `source .github/scripts/build-fnpack.sh` → Step Summary → artifact
 - 超时：90 分钟
@@ -63,7 +63,7 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 ### `build-wails3.yml`
 
 - 触发：
-  - `schedule`：每天 22:35 UTC（北京 06:35），比 `build-fnpack` 再晚 3 小时
+  - `schedule`：每天 22:05 UTC（北京 06:05），比 `build-fnpack` 再晚 3 小时
   - `workflow_dispatch`：手动，要求对应版本的基础镜像已存在；可填 `version` / `wails3_version`
 - `build` 作业：检出 → 释放磁盘 → QEMU → buildx → `source .github/scripts/build-wails3.sh` → Step Summary → artifact
 - 超时：120 分钟（`go install` 要按 amd64 + arm64 各编译一遍 wails3 CLI，arm64 那趟走 QEMU）
@@ -75,7 +75,7 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 ### `build-wails2.yml`
 
 - 触发：
-  - `schedule`：每天 01:35 UTC（北京 09:35）
+  - `schedule`：每天 01:05 UTC（北京 09:05）
   - `workflow_dispatch`：手动，要求对应版本的基础镜像已存在；可填 `version` / `wails2_version`
 - `build` 作业：检出 → 释放磁盘 → QEMU → buildx → `source .github/scripts/build-wails2.sh` → Step Summary → artifact
 - 超时：120 分钟（`go install` 要按 amd64 + arm64 各编译一遍 wails CLI，arm64 那趟走 QEMU）
@@ -160,7 +160,7 @@ permissions:
 |---------------|--------------------------------------------------------|----------------------------------------------|
 | 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE`      | `ghcr.io` + `GITHUB_REPOSITORY`              |
 | 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`                    | `GITHUB_ACTOR` / `GITHUB_TOKEN`              |
-| 定时任务      | golang 00:05、fnpack 03:05、wails3 06:05 Asia/Shanghai | golang 16:35、fnpack 19:35、wails3 22:35 UTC |
+| 定时任务      | golang 00:05、fnpack 03:05、wails3 06:05 Asia/Shanghai | golang 16:05、fnpack 19:05、wails3 22:05 UTC |
 | 多架构        | docker 服务自带                                        | `setup-qemu-action` + `setup-buildx-action`  |
 | GitHub 下载源 | `https://files.m.daocloud.io`                          | 直连 `github.com` / `nodejs.org`             |
 | 元数据        | commit annotation                                      | Step Summary + artifact                      |

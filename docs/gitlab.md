@@ -63,14 +63,16 @@ GitLab 侧不写死地址，全部从 `CI_REGISTRY_IMAGE` 派生。本仓库在 
 
 ### 触发：定时与手动
 
-GitLab 的 cron 不在 YAML 里，定时任务要建在 **CI/CD → Schedules**（或 API）里。 建议建四条，和 GitHub 的四条 `schedule` 对应：
+GitLab 的 cron 不在 YAML 里，定时任务要建在 **CI/CD → Schedules**（或 API）里。 时间以 CNB 的 Asia/Shanghai 定时为准，与 GitHub 的 `schedule` 同刻，各平台换算如下：
 
-| 镜像   | 建议 cron（UTC） | 变量            | 对应 GitHub              |
-|--------|------------------|-----------------|--------------------------|
-| golang | `35 16 * * *`    | `TARGET=golang` | 16:35 UTC `build-golang` |
-| fnpack | `35 19 * * *`    | `TARGET=fnpack` | 19:35 UTC `build-fnpack` |
-| wails3 | `35 22 * * *`    | `TARGET=wails3` | 22:35 UTC `build-wails3` |
-| wails2 | `35 1 * * *`     | `TARGET=wails2` | 01:35 UTC `build-wails2` |
+> GitLab 的 Pipeline schedule 创建时可选 cron 时区。**推荐把时区选成 `Asia/Shanghai`，直接照抄下表的 cron，零换算**；若用默认 `UTC`，则按右侧 UTC 一列填。
+
+| 镜像   | 建议 cron（Asia/Shanghai） | 对应 UTC（cron 选 UTC 时用） | 变量            | 对应 GitHub |
+|--------|----------------------------|------------------------------|-----------------|-------------|
+| golang | `5 0 * * *`  （00:05）     | `5 16 * * *`（16:05 UTC）    | `TARGET=golang` | 16:05 UTC   |
+| fnpack | `5 3 * * *`  （03:05）     | `5 19 * * *`（19:05 UTC）    | `TARGET=fnpack` | 19:05 UTC   |
+| wails3 | `5 6 * * *`  （06:05）     | `5 22 * * *`（22:05 UTC）    | `TARGET=wails3` | 22:05 UTC   |
+| wails2 | `5 9 * * *`  （09:05）     | `5 1 * * *`（01:05 UTC）     | `TARGET=wails2` | 01:05 UTC   |
 
 也可以只建一条每天一次的 schedule，不填 `TARGET`——四个镜像会按 `golang → variants` 的顺序在一条流水线里全部构建。这样总时长更长，但配置更少。
 

@@ -28,8 +28,9 @@ name: build-golang
 
 on:
   schedule:
-    # 每天 00:35（Asia/Shanghai）= 16:35 UTC。GitHub 的 cron 只按 UTC 解析。
-    - cron: '35 16 * * *'
+    # 每天 00:05（Asia/Shanghai）= 16:05 UTC，与 CNB 的 crontab '5 0 * * *' 同刻。
+    # GitHub 的 cron 只按 UTC 解析。
+    - cron: '5 16 * * *'
   workflow_dispatch:
     inputs:
       version:

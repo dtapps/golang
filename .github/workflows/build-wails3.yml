@@ -24,9 +24,9 @@ name: build-wails3
 
 on:
   schedule:
-    # 每天 22:35 UTC（北京 06:35），比 build-fnpack 的 19:35 UTC 晚 3 小时，
-    # 给基础镜像留出构建时间。
-    - cron: '35 22 * * *'
+    # 每天 06:05（Asia/Shanghai）= 22:05 UTC，与 CNB 的 crontab '5 6 * * *' 同刻。
+    # 比 build-fnpack 的 19:05 UTC 晚 3 小时，给基础镜像留出构建时间。
+    - cron: '5 22 * * *'
   workflow_dispatch:
     inputs:
       version:
