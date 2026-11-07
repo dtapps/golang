@@ -1,20 +1,21 @@
 # ===================================================================
-# GitLab CI：构建并推送四个 Golang 构建环境镜像
+# GitLab CI：构建并推送五个 Golang 构建环境镜像
 #
 #   产物（地址由 CI_REGISTRY_IMAGE 派生，不写死）：
 #     ${CI_REGISTRY_IMAGE}          → golang
 #     ${CI_REGISTRY_IMAGE}/fnpack   → golang + fnpack
 #     ${CI_REGISTRY_IMAGE}/wails3   → golang + GTK4/WebKitGTK + wails3 CLI
 #     ${CI_REGISTRY_IMAGE}/wails2   → golang + GTK3/WebKit2GTK 4.1 + wails CLI
+#     ${CI_REGISTRY_IMAGE}/fyne     → golang + OpenGL/X11/Wayland + fyne CLI
 #
-# 与 GitHub Actions 的四条 workflow 同语义：每个镜像一个作业、一份 Dockerfile、
+# 与 GitHub Actions 的五条 workflow 同语义：每个镜像一个作业、一份 Dockerfile、
 # 一份构建脚本，标签规则与冒烟断言保持一致。平台胶水各自维护。
 #
 # 触发方式（GitLab 的 cron 不在 YAML 里，定时任务要建在 UI / API 里）：
-#   - Pipeline schedules：建议建四条，变量 TARGET 分别填 golang / fnpack / wails3 / wails2
-#   - Run pipeline（手动）：TARGET 留空 = 四个都构建；也可只填一个，只重建那个镜像
+#   - Pipeline schedules：建议建五条，变量 TARGET 分别填 golang / fnpack / wails3 / wails2 / fyne
+#   - Run pipeline（手动）：TARGET 留空 = 五个都构建；也可只填一个，只重建那个镜像
 #
-# 四个作业都需要 Docker daemon 来 buildx / 拉镜像做冒烟。这里用
+# 五个作业都需要 Docker daemon 来 buildx / 拉镜像做冒烟。这里用
 # docker:cli + docker:dind，并在 before_script 里准备两件事：
 #   1. arm64 QEMU binfmt（runner 已注册就跳过）
 #   2. docker-container 驱动的 buildx builder（docker 驱动不支持多架构 manifest list）
@@ -23,7 +24,7 @@
 #
 # 文件分工（include 在流水线创建时展开合并成一份配置）：
 #   本文件（必须在仓库根）        workflow / stages / variables / default —— 全局只此一处
-#   .gitlab/workflows/build-*.yml 四个镜像各自的 job（不含 rules 以外的胶水）
+#   .gitlab/workflows/build-*.yml 五个镜像各自的 job（不含 rules 以外的胶水）
 #   .gitlab/docker/Dockerfile.*   镜像本身
 #   .gitlab/scripts/build-*.sh    构建、派生、冒烟、提升标签
 #
@@ -36,6 +37,7 @@ include:
   - local: .gitlab/workflows/build-fnpack.yml
   - local: .gitlab/workflows/build-wails3.yml
   - local: .gitlab/workflows/build-wails2.yml
+  - local: .gitlab/workflows/build-fyne.yml
 
 # 只有定时流水线和手动 Run pipeline 会建流水线：
 #   - push / MR / tag 不建，避免每次提交都跑 3 小时的镜像构建
@@ -54,7 +56,7 @@ variables:
   # Run pipeline 页面会把带 description 的变量列成表单，方便手填。
   TARGET:
     value: ''
-    description: '要构建的镜像：留空 = 四个都构建；也可填 golang / fnpack / wails3 / wails2'
+    description: '要构建的镜像：留空 = 五个都构建；也可填 golang / fnpack / wails3 / wails2 / fyne'
   VERSION:
     value: ''
     description: '选填：Go 版本。留空 = 跟随 Dockerfile 的 GO_VERSION（golang:1-trixie，最新稳定 Go）；也可填 1.27 / 1.27.3'
@@ -67,6 +69,9 @@ variables:
   WAILS2_VERSION:
     value: ''
     description: '选填：wails2 版本。留空 = 解析上游最新稳定 tag（如 v2.17.1）；也可填 v2.17.1 / 2.17.1'
+  FYNE_VERSION:
+    value: ''
+    description: '选填：fyne CLI 版本。留空 = 解析上游最新稳定 tag（如 v1.7.4）；也可填 v1.7.4 / 1.7.4'
   CACHE:
     value: ''
     description: '选填：on / off。off = 关闭 buildx 层缓存并强制全量重建；留空 = on'

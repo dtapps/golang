@@ -16,6 +16,12 @@ RUN go build -trimpath -ldflags="-s -w" -o app .
 FROM ghcr.io/dtapps/golang/fnpack:latest
 ```
 
+需要编译 Fyne 桌面应用时换镜像：
+
+```dockerfile
+FROM ghcr.io/dtapps/golang/fyne:latest
+```
+
 ## 常见用法
 
 ### Go 构建 + 压缩
@@ -99,6 +105,19 @@ docker run --rm -v "$PWD":/src -w /src ghcr.io/dtapps/golang/fnpack:latest sh -c
 ```
 
 具体命令以 [fnpack 官方文档](https://developer.fnnas.com/docs/cli/fnpack/) 为准；镜像只负责提供二进制。
+
+### 编译 Fyne 桌面应用
+
+```bash
+docker run --rm -v "$PWD":/src -w /src ghcr.io/dtapps/golang/fyne:latest sh -c '
+  fyne version
+  go build -o dist/app .
+'
+```
+
+镜像已装 OpenGL / X11 / Wayland 开发包（`gl` / `x11` / `xrandr` / `xcursor` / `xinerama` / `xi` / `xxf86vm` / `wayland-client` / `xkbcommon` 都能被 `pkg-config` 解析），所以 cgo 阶段直接可用。`fyne.io/fyne/v2` 的版本由你自己的 `go.mod` 决定，镜像只提供 `fyne` CLI。
+
+运行带窗口的二进制需要真实显示环境（容器里要自己准备 X11/Wayland），这个镜像只保证**构建**可用。
 
 ## 在 GitHub Actions 里用
 

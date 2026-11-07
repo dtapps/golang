@@ -102,7 +102,7 @@ docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 ## 怎么构建
 
 - CNB：`.cnb/workflows/build-wails2.yml`，每天 09:05 由 `.cnb.yml` 定时触发；也可用「打包 Golang + wails2 镜像（多架构 amd64 + arm64）」按钮手动触发，可填 `version` / `wails2_version`。
-- GitHub：`.github/workflows/build-wails2.yml`，每天 01:35 UTC（北京 09:35）定时触发；手动触发同样可填 `version` / `wails2_version`。
+- GitHub：`.github/workflows/build-wails2.yml`，每天 01:05 UTC（北京 09:05）定时触发；手动触发同样可填 `version` / `wails2_version`。
 - GitLab：`.gitlab/workflows/build-wails2.yml`，在 UI / API 建 `TARGET=wails2` 的 schedule 定时触发；手动 Run pipeline 时填 `TARGET=wails2`，可再填 `VERSION` / `WAILS2_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 脚本先等 `golang:<go 版本>` 就绪（等不到直接失败），再从它构建、派生单平台标签、跑冒烟、提升移动标签。冒烟断言：
@@ -172,6 +172,7 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 golang:1.27.3        = 基座 + 全部工具链
 golang/fnpack:1.27.3 = golang:1.27.3 + fnpack
 golang/wails2:1.27.3 = golang:1.27.3 + GTK3/WebKit2GTK 4.1 + wails
+golang/fyne:1.27.3   = golang:1.27.3 + OpenGL/X11/Wayland + fyne
 ```
 
-变体之间**平级**、互不包含：需要打包 `.fpk` 用 `fnpack`，需要编译 Wails v2 桌面应用用本镜像；两者都要就在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个。
+变体之间**平级**、互不包含：需要打包 `.fpk` 用 `fnpack`，需要编译 Wails v2 桌面应用用本镜像，编译 Fyne 桌面应用用 `fyne`；都要就在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个。

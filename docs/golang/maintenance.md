@@ -2,9 +2,9 @@
 
 ## 日常构建
 
-- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像。
-- GitHub：每天 16:35 UTC（北京 00:35）构建 golang 基础镜像，19:35 UTC（北京 03:35）构建 fnpack 镜像。
-- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:35 UTC golang、19:35 UTC fnpack、22:35 UTC wails3、01:35 UTC wails2，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)。
+- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像，06:05 构建 wails3，09:05 构建 wails2，12:05 构建 fyne。
+- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack 镜像，22:05 UTC（北京 06:05）构建 wails3，01:05 UTC（北京 09:05）构建 wails2，04:05 UTC（北京 12:05）构建 fyne。
+- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:05 UTC golang、19:05 UTC fnpack、22:05 UTC wails3、01:05 UTC wails2、04:05 UTC fyne，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)。
 
 `GO_VERSION` 默认是 `1`（`golang:1-trixie` 浮动标签），上游发布新 Go 后下一次构建会自动跟随；想钉版本时手动填 `version`，或直接改三份 Dockerfile 的 `GO_VERSION`。定时构建还会重新解析上游各工具的最新版本：版本变了才重建对应那一层，没变就全命中缓存（只拉基座、跑冒烟）。上游重新推送同一 tag 的基座（安全修复）时，digest 一变，apt 之后的层会全部重建，同样能吃到更新。
 
@@ -72,7 +72,7 @@ https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
 
 ## 升级 wails3
 
-**通常什么都不用做**：三份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 06:05 / GitHub 22:35 UTC / GitLab 22:35 UTC）自动进镜像，版本号会写进元数据 `wails3_version` 与徽章。
+**通常什么都不用做**：三份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 06:05 / GitHub 22:05 UTC / GitLab 22:05 UTC）自动进镜像，版本号会写进元数据 `wails3_version` 与徽章。
 
 需要人工介入的两种情况：
 
@@ -83,9 +83,19 @@ wails3 版本**不占标签**：`golang/wails3:<go 版本>` 永远是「该 Go �
 
 ## 升级 wails2
 
-**通常什么都不用做**：三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v2@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 09:05 / GitHub 01:35 UTC / GitLab 01:35 UTC）自动进镜像，版本号会写进元数据 `wails2_version` 与徽章。
+**通常什么都不用做**：三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v2@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 09:05 / GitHub 01:05 UTC / GitLab 01:05 UTC）自动进镜像，版本号会写进元数据 `wails2_version` 与徽章。
 
 需要人工介入的两种情况与 wails3 相同：手动触发 `build-wails2` 并填 `wails2_version`（`v2.17.1` / `2.17.1` 都接受），或把三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 改成具体 tag。wails2 版本同样不占标签，复现某次产物请用元数据里的 `wails2_digest`。
+
+## 升级 fyne
+
+**通常什么都不用做**：三份 `Dockerfile.fyne` 的 `FYNE_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m fyne.io/tools@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 12:05 / GitHub 04:05 UTC / GitLab 04:05 UTC）自动进镜像，版本号会写进元数据 `fyne_version` 与徽章。
+
+> fyne CLI 的模块是 `fyne.io/tools`。上游把 `v1.26.0` / `v1.26.1` 标了 retract（误发），解析结果里出现它们时不要当成新版本。
+
+需要人工介入的两种情况与 wails3 相同：手动触发 `build-fyne` 并填 `fyne_version`（`v1.7.4` / `1.7.4` 都接受），或把三份 `Dockerfile.fyne` 的 `FYNE_VERSION` 改成具体 tag。fyne 版本同样不占标签，复现某次产物请用元数据里的 `fyne_digest`。
+
+升级 OpenGL/X11/Wayland 依赖时改三份 `Dockerfile.fyne` 的 apt 列表，并同步 `pkg-config --exists` 断言（`gl` / `x11` / `xrandr` / `xcursor` / `xinerama` / `xi` / `xxf86vm` / `wayland-client` / `xkbcommon`），三份 `build-fyne.sh` 的冒烟段也要跟着改。
 
 ## 新增工具
 
@@ -104,8 +114,8 @@ wails3 版本**不占标签**：`golang/wails3:<go 版本>` 永远是「该 Go �
 - [ ] 三份 `build-golang.sh` 的标签规则、冒烟断言一致
 - [ ] 三份 `build-golang.sh` 的 `GO_TOOL_MODULES` 覆盖 Dockerfile 里所有 `go install` 版本变量（脚本会自检）
 - [ ] 三份 `build-fnpack.sh` 的标签规则、基础镜像检查、冒烟断言一致
-- [ ] 三份 `build-wails3.sh` / `build-wails2.sh` 的标签规则、基础镜像检查、冒烟断言一致
-- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向四个镜像
+- [ ] 三份 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` 的标签规则、基础镜像检查、冒烟断言一致
+- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向五个镜像
 - [ ] `make format` 通过
 - [ ] `make lint-shell` 通过
 

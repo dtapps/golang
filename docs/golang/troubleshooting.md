@@ -2,7 +2,7 @@
 
 ## 先定位是哪一步
 
-四条流水线各自输出：
+五条流水线各自输出：
 
 ```text
 golang：解析基座 → 解析工具版本 → 登录 → buildx 自检 → 构建 golang
@@ -16,6 +16,9 @@ wails3：解析版本（含 wails3 版本）→ 登录 → buildx 自检 → 等
 
 wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等待基础镜像 → 构建 wails2
        → 派生单平台标签 → 冒烟 wails2 → 提升标签 → 元数据
+
+fyne：解析版本（含 fyne 版本）→ 登录 → buildx 自检 → 等待基础镜像 → 构建 fyne
+     → 派生单平台标签 → 冒烟 fyne → 提升标签 → 元数据
 ```
 
 日志里最后一次出现的「构建 …」「等待 …」或「冒烟测试 …」就是失败点。变体作业失败时先确认对应版本的 golang 作业是否成功。
@@ -36,7 +39,7 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 
 - 确认 GitHub 的「释放磁盘空间」步骤没有删错目录；
 - 不要在同一个 runner 上同时跑其他重构建；
-- GitLab 侧给 runner 留足磁盘，或把四个镜像拆到不同 runner / schedule；
+- GitLab 侧给 runner 留足磁盘，或把五个镜像拆到不同 runner / schedule；
 - 本地构建时先 `docker buildx prune -af`。
 
 ### 容器内时间不是北京时间
@@ -73,7 +76,7 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 
 之后的冒烟、`latest` / `<major.minor>` 提升都没执行。
 
-原因：CNB 制品库不支持把镜像清单当 blob 读；`imagetools create` 在同仓库打标签时仍要走 blob copy，`copy sha256:... unexpected EOF` 在 `0.000s` 稳定复现，与基座几点构建、四条定时任务错开多久都无关。**重试无效**（3 次全挂已实测）。
+原因：CNB 制品库不支持把镜像清单当 blob 读；`imagetools create` 在同仓库打标签时仍要走 blob copy，`copy sha256:... unexpected EOF` 在 `0.000s` 稳定复现，与基座几点构建、五条定时任务错开多久都无关。**重试无效**（3 次全挂已实测）。
 
 处置：
 
@@ -90,14 +93,14 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 3. CNB 上如果原站可访问、DaoCloud 404，可能是代理尚未同步；临时改成直连验证。
 4. 三侧 Dockerfile 的版本 ARG 必须同步。
 
-### fnpack / wails3 / wails2 找不到基础镜像
+### fnpack / wails3 / wails2 / fyne 找不到基础镜像
 
 症状：`基础镜像 <registry>/<repo>:<go 版本> 不存在`。
 
 - 变体镜像必须 `FROM` 同版本的 golang 基础镜像，不会自己安装工具链。
-- CNB：确认 00:05 的 `build-golang` 定时任务成功；03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2 才有基础可用。
-- GitHub：确认 16:35 UTC 的 `build-golang` 定时任务成功；19:35 UTC 的 fnpack、22:35 UTC 的 wails3、01:35 UTC 的 wails2 才有基础可用。手动触发前先跑一次 build-golang。
-- GitLab：确认 `TARGET=golang` 的 schedule 或手动流水线成功；其余三个 `TARGET` 的 schedule 才有基础可用。手动触发变体前先跑一次 `TARGET=golang`。
+- CNB：确认 00:05 的 `build-golang` 定时任务成功；03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2、12:05 的 fyne 才有基础可用。
+- GitHub：确认 16:05 UTC 的 `build-golang` 定时任务成功；19:05 UTC 的 fnpack、22:05 UTC 的 wails3、01:05 UTC 的 wails2、04:05 UTC 的 fyne 才有基础可用。手动触发前先跑一次 build-golang。
+- GitLab：确认 `TARGET=golang` 的 schedule 或手动流水线成功；其余四个 `TARGET` 的 schedule 才有基础可用。手动触发变体前先跑一次 `TARGET=golang`。
 - 刚推完基础镜像就手动跑变体时，脚本会最多等 5 分钟，仍然失败说明基础镜像确实没推上去。
 
 ### wails3 冒烟报 `pkg:gtk4` / `pkg:webkitgtk-6.0`
@@ -120,6 +123,31 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 - `go install` 装成了别的版本：检查 `--build-arg WAILS3_VERSION` 与日志里的「wails3_version …」是否一致；
 - 手动填了预发布 tag（如 `v3.0.0-beta.34`），但 GOPROXY 上没有对应版本、`go install` 落到了别的 tag：本地用相同 `GOPROXY` 复现 `go install ...@<tag>`；
 - 想放宽断言时改三份 `build-wails3.sh` 的冒烟段，别只改一侧。
+
+### fyne 冒烟报 `pkg:gl` / `pkg:x11` / `pkg:wayland-client` 等
+
+- 说明镜像里对应的 `.pc` 文件解析失败。先看 Dockerfile 的 apt 那层日志：装包成功时同一层就会断言 `gl` / `x11` / `xrandr` / `xcursor` / `xinerama` / `xi` / `xxf86vm` / `wayland-client` / `xkbcommon`，失败会直接停在那里。
+- 本地验证：`docker run --rm golang-fyne:local sh -c 'pkg-config --list-all | grep -E "gl|x11|wayland|xkbcommon"'`。
+- 上层镜像如果自己 `purge` 掉了 `libgl1-mesa-dev` / `xorg-dev` / `libwayland-dev` / `libxkbcommon-dev`，也会命中这个断言。
+
+### fyne 版本回退成 `latest`
+
+症状：日志里出现「无法解析 fyne 最新版本…回退 latest」，元数据 `fyne_version` 是 `latest`。
+
+- 解析用 `go list -m fyne.io/tools@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧是腾讯云镜像，同步有延迟时会失败；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。等下一次定时任务，或手动触发并显式填 `fyne_version`。
+- 回退不会阻断构建，但层缓存会失效（缓存键永远等于 `latest`），且冒烟只验证 `fyne` 可执行、不比对版本。
+
+### fyne 冒烟报 `fyne-version(...)`
+
+冒烟用 `go version -m <fyne 二进制>` 读内嵌模块版本（`fyne.io/tools`），与本次目标版本不一致时报这个。常见原因：
+
+- `go install` 装成了别的版本：检查 `--build-arg FYNE_VERSION` 与日志里的「fyne_version …」是否一致；
+- 解析到了被 retract 的 `v1.26.0` / `v1.26.1`：这两个 tag 是上游误发并标了 retract，`go list -m fyne.io/tools@latest` 正常不会返回它们，出现时请显式填 `fyne_version`；
+- 想放宽断言时改三份 `build-fyne.sh` 的冒烟段，别只改一侧。
+
+### fyne 镜像里 `wails3` 也缺失/多余
+
+`golang/fyne` 是 golang + fyne，不包含 wails2 / wails3。冒烟会断言 `fnpack` 与 `wails3` **不存在**；需要多个变体时请在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个，不要指望某个变体镜像里带另一个。
 
 ### fnpack 下载失败
 
@@ -166,7 +194,7 @@ wails2：解析版本（含 wails2 版本）→ 登录 → buildx 自检 → 等
 
 症状：`sed: can't read "${DOCKERFILE...}"` 或自检直接报「脚本被外部改写」。
 
-原因：把 `build-golang.sh` / `build-fnpack.sh` / `build-wails3.sh` 放进了 CNB 的 `imports`。把它从 `imports` 移除，改用 `source` 执行。
+原因：把 `build-golang.sh` / `build-fnpack.sh` / `build-wails3.sh` / `build-fyne.sh` 放进了 CNB 的 `imports`。把它从 `imports` 移除，改用 `source` 执行。
 
 ## 本地复现 CI
 
@@ -176,14 +204,17 @@ sh -n .cnb/scripts/build-golang.sh
 sh -n .cnb/scripts/build-fnpack.sh
 sh -n .cnb/scripts/build-wails3.sh
 sh -n .cnb/scripts/build-wails2.sh
+sh -n .cnb/scripts/build-fyne.sh
 sh -n .github/scripts/build-golang.sh
 sh -n .github/scripts/build-fnpack.sh
 sh -n .github/scripts/build-wails3.sh
 sh -n .github/scripts/build-wails2.sh
+sh -n .github/scripts/build-fyne.sh
 sh -n .gitlab/scripts/build-golang.sh
 sh -n .gitlab/scripts/build-fnpack.sh
 sh -n .gitlab/scripts/build-wails3.sh
 sh -n .gitlab/scripts/build-wails2.sh
+sh -n .gitlab/scripts/build-fyne.sh
 
 # ShellCheck
 shellcheck -s sh -S warning .cnb/scripts/*.sh .github/scripts/*.sh .gitlab/scripts/*.sh
@@ -199,6 +230,9 @@ docker build -f .cnb/docker/Dockerfile.fnpack \
 docker build -f .cnb/docker/Dockerfile.wails3 \
   --build-arg GOLANG_IMAGE=golang:local \
   -t golang-wails3:local .
+docker build -f .cnb/docker/Dockerfile.fyne \
+  --build-arg GOLANG_IMAGE=golang:local \
+  -t golang-fyne:local .
 
 # 构建（GitLab / GitHub 侧：直连官方源）
 docker build -f .gitlab/docker/Dockerfile.golang -t golang:local .

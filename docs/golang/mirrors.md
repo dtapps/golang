@@ -11,6 +11,7 @@
 | fnpack                            | 直连 `static2.fnnas.com`        | 直连 `static2.fnnas.com`                               |
 | wails3（`go install` 与版本解析） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
 | wails2（`go install` 与版本解析） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| fyne（`go install` 与版本解析）   | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
 | Debian APT                        | 默认 `deb.debian.org`           | `mirrors.cloud.tencent.com`                            |
 | npm / pnpm registry               | 默认 `registry.npmjs.org`       | `mirrors.cloud.tencent.com/npm/`                       |
 
@@ -40,7 +41,9 @@ NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"  # nodejs.org
 
 fnpack 镜像只从 `https://static2.fnnas.com` 下载二进制，三个平台的 `build-fnpack.sh` 都不传镜像参数。
 
-wails3 / wails2 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧因为 `Dockerfile.golang` 已设成腾讯云，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」走同一个源。
+wails3 / wails2 / fyne 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧因为 `Dockerfile.golang` 已设成腾讯云，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」走同一个源。
+
+fyne 的 apt 开发包（OpenGL/X11/Wayland）不单独配源：继承基座镜像的 APT 配置，CNB 侧即腾讯云，GitHub / GitLab 侧即 `deb.debian.org`。
 
 ## 为什么 GitHub / GitLab 侧不传
 

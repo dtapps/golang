@@ -37,7 +37,7 @@ docker run --rm registry.gitlab.com/dtapps/golang/fnpack:latest fnpack --help
 ## 怎么构建
 
 - CNB：`.cnb/workflows/build-fnpack.yml`，每天 03:05 由 `.cnb.yml` 定时触发（基座 00:05 先构建）；也可用「打包 Golang + fnpack 镜像（多架构）」按钮手动触发，可填 `version` / `fnpack_version`。
-- GitHub：`.github/workflows/build-fnpack.yml`，每天 19:35 UTC（北京 03:35）定时触发（基座 16:35 UTC 先构建）；手动触发时可填 `version` / `fnpack_version`。
+- GitHub：`.github/workflows/build-fnpack.yml`，每天 19:05 UTC（北京 03:05）定时触发（基座 16:05 UTC 先构建）；手动触发时可填 `version` / `fnpack_version`。
 - GitLab：`.gitlab/workflows/build-fnpack.yml`，在 UI / API 建 `TARGET=fnpack` 的 schedule 定时触发（基座先构建）；手动 Run pipeline 时填 `TARGET=fnpack`，可再填 `VERSION` / `FNPACK_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 构建脚本先等 `golang:<go 版本>` 就绪（等不到直接失败），再从它构建、跑冒烟（检查 fnpack 与基座工具链都在）、提升移动标签。事件矩阵与冒烟断言见 [../golang/ci-pipeline.md](../golang/ci-pipeline.md)，发布顺序见 [../golang/images-and-tags.md](../golang/images-and-tags.md)。

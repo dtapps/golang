@@ -1,7 +1,7 @@
 branch:
   - buttons:
       - name: 打包 Golang 镜像（多架构 amd64 + arm64）
-        description: 构建并推送 golang 基础镜像（amd64 + arm64 多架构），产出版本、latest 与单平台标签；不含 fnpack / wails3
+        description: 构建并推送 golang 基础镜像（amd64 + arm64 多架构），产出版本、latest 与单平台标签；不含 fnpack / wails3 / wails2 / fyne
         event: web_trigger_build_golang # 触发的 CI 事件名
         permissions:
           roles:
@@ -68,6 +68,25 @@ branch:
             default: ''
           wails2_version:
             description: 选填。wails2 版本：留空 = 解析上游最新稳定 tag（如 v2.17.1）；也可填 v2.17.1 / 2.17.1
+            required: false
+            type: input
+            default: ''
+      - name: 打包 Golang + fyne 镜像（多架构 amd64 + arm64）
+        description: 基于已推送的 golang 基础镜像，构建并推送 golang/fyne（amd64 + arm64 多架构，含 OpenGL / X11 / Wayland 开发包与 fyne CLI）
+        event: web_trigger_build_fyne # 触发的 CI 事件名
+        permissions:
+          roles:
+            - owner
+            - master
+            - developer
+        inputs:
+          version:
+            description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
+            required: false
+            type: input
+            default: ''
+          fyne_version:
+            description: 选填。fyne CLI 版本：留空 = 解析上游最新稳定 tag（如 v1.7.4）；也可填 v1.7.4 / 1.7.4
             required: false
             type: input
             default: ''

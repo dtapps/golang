@@ -1,0 +1,86 @@
+# ===================================================================
+# Golang 构建环境镜像 + fyne
+#
+# 在 Dockerfile.golang 产出的镜像之上做两件事：
+#   1. 安装编译 Fyne 应用所需的系统依赖（gcc + GL / X11 / Wayland 开发包）
+#   2. go install fyne CLI
+#
+# 三个平台各留一份：本文件（GitLab 侧）、.github/docker/Dockerfile.fyne（GitHub 侧）与
+# .cnb/docker/Dockerfile.fyne（CNB 侧），各自维护、不互相引用。
+#
+# 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
+#   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
+# 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
+# APT / GOPROXY 继承基座镜像，本文件没有额外的镜像源开关。
+#
+# fyne：https://github.com/fyne-io/tools/releases
+# CLI 就是一条命令：go install fyne.io/tools/cmd/fyne（当前最新 v1.7.4）。
+# FYNE_VERSION 默认 latest；CI 会先解析成具体 tag 再传进来，裸 build 由 go install 解析。
+# 注意 fyne.io/tools 把 v1.26.0 / v1.26.1 标了 retract（误发），不要当成新版本。
+# ===================================================================
+
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+
+ARG GOLANG_IMAGE
+ARG FYNE_VERSION=latest
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+ARG BASE_DIGEST=unknown
+ARG IMAGE_SOURCE
+
+# 1. 安装编译 Fyne 应用所需的系统依赖
+# 照搬官方文档给 Debian / Ubuntu / Raspberry Pi OS 的那一条：
+#   sudo apt-get install golang gcc libgl1-mesa-dev xorg-dev \
+#        libwayland-dev libxkbcommon-dev
+# 这里不装 golang（基座已经是 Go 镜像），其余原样保留。
+# 编译 Fyne 应用要开 cgo 并链接 GL / X11 / Wayland，所以这些 -dev 包是必需的，
+# 不能像基座镜像那样在最后 purge 掉。
+# 装完用 pkg-config 验证一遍：缺 .pc 时这里就失败，不会推迟到使用者手里。
+RUN export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    gcc \
+    libgl1-mesa-dev \
+    xorg-dev \
+    libwayland-dev \
+    libxkbcommon-dev \
+    && rm -rf /var/lib/apt/lists/*; \
+    pkg-config --exists gl; \
+    pkg-config --exists x11; \
+    pkg-config --exists xrandr; \
+    pkg-config --exists xcursor; \
+    pkg-config --exists xinerama; \
+    pkg-config --exists xi; \
+    pkg-config --exists xxf86vm; \
+    pkg-config --exists wayland-client; \
+    pkg-config --exists xkbcommon
+
+# 2. 安装 fyne CLI
+# 模块缓存与编译缓存挂在构建节点上，不进入镜像层。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    echo "fyne 目标版本: ${FYNE_VERSION}"; \
+    go install -v "fyne.io/tools/cmd/fyne@${FYNE_VERSION}"; \
+    test -x "${GOPATH}/bin/fyne"; \
+    echo "--- fyne 安装的 ---"; \
+    fyne version || true
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# apt 与 go install 这两层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + fyne：在 golang 镜像基础上增加 OpenGL/X11/Wayland 开发包与 fyne CLI" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+CMD ["bash"]

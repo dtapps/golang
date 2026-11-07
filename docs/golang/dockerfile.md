@@ -8,6 +8,7 @@
 | fnpack | `.cnb/docker/Dockerfile.fnpack` | `.github/docker/Dockerfile.fnpack` | `.gitlab/docker/Dockerfile.fnpack` |
 | wails3 | `.cnb/docker/Dockerfile.wails3` | `.github/docker/Dockerfile.wails3` | `.gitlab/docker/Dockerfile.wails3` |
 | wails2 | `.cnb/docker/Dockerfile.wails2` | `.github/docker/Dockerfile.wails2` | `.gitlab/docker/Dockerfile.wails2` |
+| fyne   | `.cnb/docker/Dockerfile.fyne`   | `.github/docker/Dockerfile.fyne`   | `.gitlab/docker/Dockerfile.fyne`   |
 
 ## 1. golang 镜像
 
@@ -134,14 +135,59 @@ go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS3_VERSION}"
 - `wails3` 落在 `${GOPATH}/bin`（`/go/bin`，已在 `PATH` 中），`test -x` + `wails3 version` 做安装验证。
 - `--mount=type=cache` 挂模块与编译缓存：`go install` 要编译整个 CLI，冷缓存下这一层是耗时大头。
 
-## 4. 改哪个文件
+## 4. wails2 镜像
 
-| 要改的东西         | 改哪里                                                                                            |
-|--------------------|---------------------------------------------------------------------------------------------------|
-| Go 基座版本        | 三份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新）                               |
-| 某个工具版本       | 三份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）                                 |
-| fnpack 版本        | 三份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`（默认值，可被手动触发的 `fnpack_version` 覆盖）      |
-| wails3 版本        | 三份 `Dockerfile.wails3` 的 `WAILS3_VERSION`（默认 `latest`，可被 `wails3_version` 覆盖）         |
-| wails2 版本        | 三份 `Dockerfile.wails2` 的 `WAILS2_VERSION`（默认 `latest`，可被 `wails2_version` 覆盖）         |
-| 下载源             | 构建脚本的 `MIRROR` / 构建参数                                                                    |
-| 标签规则、冒烟断言 | 三份 `build-golang.sh` + 三份 `build-fnpack.sh` + 三份 `build-wails3.sh` + 三份 `build-wails2.sh` |
+与 wails3 同构，只换开发包与 CLI：apt 装 `libgtk-3-dev`、`libwebkit2gtk-4.1-dev`，装完 `pkg-config --exists gtk+-3.0` 与 `webkit2gtk-4.1` 断言；版本由 `ARG WAILS2_VERSION` 控制（默认 `latest`，CI 解析成 `v2.17.1` 这种具体 tag），安装命令：
+
+```dockerfile
+go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS2_VERSION}"
+```
+
+`wails` 落在 `${GOPATH}/bin`。注意 trixie 已移除 `libwebkit2gtk-4.0-dev`，所以用 Wails v2 编译应用时要带 `-tags webkit2_41`，细节见 [../wails2/README.md](../wails2/README.md)。
+
+## 5. fyne 镜像
+
+```dockerfile
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+```
+
+- 与 wails3 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，只多两层（apt 装 OpenGL/X11/Wayland 开发包 + `go install` fyne）。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已换成腾讯云源，所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- 安装的开发包照搬官方文档给 Debian / Ubuntu / Raspberry Pi OS 的那一条（`golang` 除外，基座已是 Go 镜像）：`gcc`、`libgl1-mesa-dev`、`xorg-dev`、`libwayland-dev`、`libxkbcommon-dev`。装完立刻断言以下 `.pc` 都能解析，避免问题以 cgo 报错的形式推迟到使用者手里：
+
+  ```sh
+  pkg-config --exists gl
+  pkg-config --exists x11
+  pkg-config --exists xrandr
+  pkg-config --exists xcursor
+  pkg-config --exists xinerama
+  pkg-config --exists xi
+  pkg-config --exists xxf86vm
+  pkg-config --exists wayland-client
+  pkg-config --exists xkbcommon
+  ```
+
+  这些包是镜像的用途本身，**不能**在最后 purge：编译 Fyne 应用要开 cgo 并链接 GL / X11 / Wayland。
+- fyne **CLI** 版本由 `ARG FYNE_VERSION` 控制，默认 `latest`（不再钉死某个 tag）；CI 会先解析成 `v1.7.4` 这种具体版本再传进来。安装命令：
+
+  ```dockerfile
+  go install -v "fyne.io/tools/cmd/fyne@${FYNE_VERSION}"
+  ```
+
+- 注意上游把 `fyne.io/tools` 的 `v1.26.0` / `v1.26.1` 标了 retract（误发），不要当成新版本。
+- `fyne` 落在 `${GOPATH}/bin`（`/go/bin`，已在 `PATH` 中），`test -x` + `fyne version` 做安装验证。
+- `--mount=type=cache` 挂模块与编译缓存：`go install` 要编译整个 CLI，冷缓存下这一层是耗时大头。
+
+## 6. 改哪个文件
+
+| 要改的东西         | 改哪里                                                                                                                   |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------|
+| Go 基座版本        | 三份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新）                                                      |
+| 某个工具版本       | 三份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）                                                        |
+| fnpack 版本        | 三份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`（默认值，可被手动触发的 `fnpack_version` 覆盖）                             |
+| wails3 版本        | 三份 `Dockerfile.wails3` 的 `WAILS3_VERSION`（默认 `latest`，可被 `wails3_version` 覆盖）                                |
+| wails2 版本        | 三份 `Dockerfile.wails2` 的 `WAILS2_VERSION`（默认 `latest`，可被 `wails2_version` 覆盖）                                |
+| fyne 版本          | 三份 `Dockerfile.fyne` 的 `FYNE_VERSION`（默认 `latest`，可被 `fyne_version` 覆盖）                                      |
+| 下载源             | 构建脚本的 `MIRROR` / 构建参数                                                                                           |
+| 标签规则、冒烟断言 | 三份 `build-golang.sh` + 三份 `build-fnpack.sh` + 三份 `build-wails3.sh` + 三份 `build-wails2.sh` + 三份 `build-fyne.sh` |
