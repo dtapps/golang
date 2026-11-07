@@ -44,6 +44,18 @@ docker build -f .github/docker/Dockerfile.fyne \
 
 不传 `GOLANG_IMAGE` 时默认 `golang:1-trixie`，只会得到「上游基座 + OpenGL/X11/Wayland 开发包 + fyne」，没有本仓库预装的工具链。
 
+### mygo 镜像
+
+mygo 镜像同样继承上一步的工具链，`GOLANG_IMAGE` 必须指向刚构建的 golang 镜像：
+
+```bash
+docker build -f .github/docker/Dockerfile.mygo \
+  --build-arg GOLANG_IMAGE=golang:local \
+  -t golang-mygo:local .
+```
+
+不传 `GOLANG_IMAGE` 时默认 `golang:1-trixie`，只会得到「上游基座 + GTK3/WebKitGTK 4.1 开发包 + 无头运行库 + mygo + bun」，没有本仓库预装的工具链。`MYGO_VERSION` / `BUN_VERSION` 同样默认 `latest`，需要钉版本时用 `--build-arg` 传入（如 `MYGO_VERSION=v0.8.1`、`BUN_VERSION=1.4.4`）。
+
 ### 快速验证
 
 ```bash
@@ -67,6 +79,14 @@ docker run --rm golang-fyne:local sh -c '
   pkg-config --exists gl && pkg-config --exists x11 && pkg-config --exists wayland-client
   fyne version
 '
+
+docker run --rm golang-mygo:local sh -c '
+  go version
+  pkg-config --exists gtk+-3.0 && pkg-config --exists webkit2gtk-4.1
+  mygo version
+  mygo doctor
+  bun --version
+'
 ```
 
 ## 多架构构建
@@ -83,7 +103,7 @@ arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-
 
 ## CI 构建流程
 
-五个镜像由五个脚本分别发布。基础镜像先跑，fnpack / wails3 / wails2 / fyne 再各自 `FROM` 它。
+六个镜像由六个脚本分别发布。基础镜像先跑，fnpack / wails3 / wails2 / fyne / mygo 再各自 `FROM` 它。
 
 基础镜像（`.cnb/scripts/build-golang.sh` / `.github/scripts/build-golang.sh` / `.gitlab/scripts/build-golang.sh`）：
 
@@ -136,6 +156,18 @@ fyne 镜像（`.cnb/scripts/build-fyne.sh` / `.github/scripts/build-fyne.sh` / `
 8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 fyne 的对应标签。
 9. 写 fyne 元数据（含 `fyne_version`）。
 
+mygo 镜像（`.cnb/scripts/build-mygo.sh` / `.github/scripts/build-mygo.sh` / `.gitlab/scripts/build-mygo.sh`）与 fyne 同构，只是多解析一个版本：
+
+1. 解析同一个 `<go 版本>` 标签。
+2. 确定 `MYGO_VERSION` 与 `BUN_VERSION`：输入优先；留空时先用 `go list -m github.com/egoist/mygo@latest` 解析 mygo 最新稳定 tag、用 `npm view bun version` 解析 bun 最新稳定版（都走基座镜像的 GOPROXY / npm 源），解析不到才各自回退 `latest`。
+3. 等 `golang:<go 版本>` 在 registry 出现，并读取它的 index digest。
+4. 构建并推送 `golang/mygo:<go 版本>`（`GOLANG_IMAGE` 指向基础镜像标签，`MYGO_VERSION` / `BUN_VERSION` 以 `--build-arg` 传入）。
+5. 派生 mygo 的单平台标签。
+6. amd64 冒烟（见下）。
+7. 校验 OCI `version` 标签。
+8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 mygo 的对应标签。
+9. 写 mygo 元数据（含 `mygo_version` / `bun_version`）。
+
 ### 冒烟断言
 
 golang 镜像：
@@ -176,6 +208,17 @@ fyne 镜像：
 - `fyne` 在 `PATH` 里，且 `go version -m` 读到的 `fyne.io/tools` 模块版本等于本次目标版本（回退 `latest` 时只验证可执行）
 - `fnpack` 与 `wails3` 都**不存在**（这是 golang + fyne，不是别的变体）
 
+mygo 镜像：
+
+- `go version` 与解析出的版本一致
+- `go node npm pnpm bun sqlc golangci-lint zip unzip pkg-config Xvfb` 都存在（证明继承成功，且编译/无头运行依赖齐全）
+- `pkg-config --exists` 对 `gtk+-3.0` / `webkit2gtk-4.1` / `gl` / `x11` / `xrandr` / `xcursor` / `xinerama` / `xi` / `xxf86vm` / `wayland-client` / `xkbcommon` 全部成立
+- `ldconfig -p` 能查到 `libgtk-3.so.0` / `libwebkit2gtk-4.1.so.0` / `libayatana-appindicator3.so.1` / `libglib-2.0.so.0`（运行期 `dlopen` 的库，编译期装了不等于运行期能加载）
+- `mygo` 在 `PATH` 里，且 `go version -m` 读到的 `github.com/egoist/mygo` 模块版本等于本次目标版本（回退 `latest` 时只验证可执行）
+- `mygo doctor` 能跑通，输出里能 grep 到 `gtk` 与 `webkit`
+- `bun --version` 等于本次目标版本（回退 `latest` 时只验证可执行）
+- `fnpack` / `wails3` / `wails` / `fyne` 都**不存在**（这是 golang + mygo，不是别的变体）
+
 ### 缓存
 
 三侧都启用 **buildx 层缓存**，写到 `<镜像>:buildcache`（CNB 制品库 / GHCR / GitLab Registry 各一份），`mode=min`：单阶段构建，每一层都在最终镜像里，min 已覆盖整条链，而且不会产生没人引用的孤儿 blob。
@@ -199,17 +242,20 @@ CACHE=off source .cnb/scripts/build-golang.sh
 
 ## 手动触发
 
-| 平台   | 镜像   | 入口                                                      | 输入                            |
-|--------|--------|-----------------------------------------------------------|---------------------------------|
-| CNB    | golang | 仓库页面按钮「打包 Golang 镜像」                          | `version`：留空 / 1.27 / 1.27.3 |
-| CNB    | fnpack | 仓库页面按钮「打包 Golang + fnpack 镜像」                 | 同上                            |
-| CNB    | fyne   | 仓库页面按钮「打包 Golang + fyne 镜像」                   | 同上 + `fyne_version`           |
-| GitHub | golang | Actions → build-golang → Run workflow                     | 同上                            |
-| GitHub | fnpack | Actions → build-fnpack → Run workflow（需基础镜像已存在） | 同上                            |
-| GitHub | fyne   | Actions → build-fyne → Run workflow（需基础镜像已存在）   | 同上 + `fyne_version`           |
-| GitLab | 任意   | CI/CD → Pipelines → Run pipeline                          | `TARGET` 选镜像；`VERSION` 同上 |
-| GitLab | golang | 定时 schedule，`TARGET=golang`                            | `VERSION`：留空 / 1.27 / 1.27.3 |
-| GitLab | fnpack | 定时 schedule，`TARGET=fnpack`（需基础镜像已存在）        | 同上 + `FNPACK_VERSION`         |
-| GitLab | fyne   | 定时 schedule，`TARGET=fyne`（需基础镜像已存在）          | 同上 + `FYNE_VERSION`           |
+| 平台   | 镜像   | 入口                                                      | 输入                                  |
+|--------|--------|-----------------------------------------------------------|---------------------------------------|
+| CNB    | golang | 仓库页面按钮「打包 Golang 镜像」                          | `version`：留空 / 1.27 / 1.27.3       |
+| CNB    | fnpack | 仓库页面按钮「打包 Golang + fnpack 镜像」                 | 同上                                  |
+| CNB    | fyne   | 仓库页面按钮「打包 Golang + fyne 镜像」                   | 同上 + `fyne_version`                 |
+| CNB    | mygo   | 仓库页面按钮「打包 Golang + mygo 镜像」                   | 同上 + `mygo_version` / `bun_version` |
+| GitHub | golang | Actions → build-golang → Run workflow                     | 同上                                  |
+| GitHub | fnpack | Actions → build-fnpack → Run workflow（需基础镜像已存在） | 同上                                  |
+| GitHub | fyne   | Actions → build-fyne → Run workflow（需基础镜像已存在）   | 同上 + `fyne_version`                 |
+| GitHub | mygo   | Actions → build-mygo → Run workflow（需基础镜像已存在）   | 同上 + `mygo_version` / `bun_version` |
+| GitLab | 任意   | CI/CD → Pipelines → Run pipeline                          | `TARGET` 选镜像；`VERSION` 同上       |
+| GitLab | golang | 定时 schedule，`TARGET=golang`                            | `VERSION`：留空 / 1.27 / 1.27.3       |
+| GitLab | fnpack | 定时 schedule，`TARGET=fnpack`（需基础镜像已存在）        | 同上 + `FNPACK_VERSION`               |
+| GitLab | fyne   | 定时 schedule，`TARGET=fyne`（需基础镜像已存在）          | 同上 + `FYNE_VERSION`                 |
+| GitLab | mygo   | 定时 schedule，`TARGET=mygo`（需基础镜像已存在）          | 同上 + `MYGO_VERSION` / `BUN_VERSION` |
 
 留空表示使用 Dockerfile 的默认值：`golang:1-trixie` 自动跟随最新稳定 Go。填 `1.27` 会跟随该 minor 的最新补丁，填 `1.27.3` 精确到补丁版本。标签里的版本始终是解析后的实际版本。

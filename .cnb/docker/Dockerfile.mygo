@@ -1,0 +1,126 @@
+# ===================================================================
+# Golang 构建环境镜像 + mygo
+#
+# 在 Dockerfile.golang 产出的镜像之上做三件事：
+#   1. 安装 MyGo 应用需要的系统依赖（GTK 3 / WebKitGTK 4.1 开发包 + 无头运行库）
+#   2. go install mygo CLI
+#   3. npm 装上前端模板要用的 bun
+#
+# 三个平台各留一份：本文件（CNB 侧）、.github/docker/Dockerfile.mygo（GitHub 侧）与
+# .gitlab/docker/Dockerfile.mygo（GitLab 侧），各自维护、不互相引用。
+#
+# 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
+#   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
+# 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
+# APT / GOPROXY 继承基座镜像（CNB 侧已换成腾讯云），本文件没有额外的镜像源开关。
+#
+# mygo：https://github.com/egoist/mygo
+# CLI 就是一条命令：go install github.com/egoist/mygo/cmd/mygo（当前最新 v0.8.1）。
+# MYGO_VERSION 默认 latest；CI 会先解析成具体 tag 再传进来，裸 build 由 go install 解析。
+# 注意 mygo 自己的 go.mod 要求较新的 Go（v0.8.1 是 go 1.27.3）：基座 golang:1-trixie
+# 跟随最新稳定 Go，两者要能对上；上游一旦把 go 指令提到比基座更高的版本，
+# 这里的 go install 会直接报 "requires go >= ..."，是预期内的失败，不会静默装错。
+# ===================================================================
+
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+
+ARG GOLANG_IMAGE
+ARG MYGO_VERSION=latest
+ARG BUN_VERSION=latest
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+ARG BASE_DIGEST=unknown
+ARG IMAGE_SOURCE
+
+# 1. 安装 MyGo 应用需要的系统依赖
+# MyGo 的 Linux 后端（internal/linux）用 purego 在运行期 dlopen GTK，编译 MyGo 应用
+# 本身不需要 cgo；但下面两件事都要求这些包必须在镜像里：
+#   a. 运行：libgtk-3.so.0 / libwebkit2gtk-4.1.so.0 / libayatana-appindicator3.so.1
+#      是 mygo 运行期要加载的库，缺了 `mygo doctor` 直接报错；
+#   b. 编译：用户应用可能自己带 cgo 绑定，-dev 包提供 .pc 文件与头文件，
+#      同时也把上面的运行库一并装上，一份包同时满足编译与运行。
+# 无头运行环境（Xvfb + mesa + 字体）一并装上：CI 里没有显示器也能跑 GUI 冒烟，
+# 与上游 mygo 的 CI 装的是同一组包。
+# 装完用 pkg-config / ldconfig 验证一遍：缺了这里就失败，不会推迟到使用者手里。
+# 用 set -e 串联，每条断言都生效（不要退回 `;` 串，那样只有最后一条算数）。
+RUN set -eux; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+    pkg-config \
+    gcc \
+    libgtk-3-dev \
+    libwebkit2gtk-4.1-dev \
+    libayatana-appindicator3-dev \
+    libgl1-mesa-dev \
+    xorg-dev \
+    libwayland-dev \
+    libxkbcommon-dev \
+    xvfb \
+    xauth \
+    dbus-x11 \
+    libgl1 \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
+    libegl-mesa0 \
+    fonts-dejavu-core; \
+    rm -rf /var/lib/apt/lists/*; \
+    pkg-config --exists gtk+-3.0; \
+    pkg-config --exists webkit2gtk-4.1; \
+    pkg-config --exists gl; \
+    pkg-config --exists x11; \
+    pkg-config --exists xrandr; \
+    pkg-config --exists xcursor; \
+    pkg-config --exists xinerama; \
+    pkg-config --exists xi; \
+    pkg-config --exists xxf86vm; \
+    pkg-config --exists wayland-client; \
+    pkg-config --exists xkbcommon; \
+    ldconfig -p | grep -q 'libgtk-3\.so\.0'; \
+    ldconfig -p | grep -q 'libwebkit2gtk-4\.1\.so'; \
+    ldconfig -p | grep -q 'libayatana-appindicator3\.so\.1'; \
+    command -v Xvfb
+
+# 2. 安装 mygo CLI
+# 模块缓存与编译缓存挂在构建节点上，不进入镜像层。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    echo "mygo 目标版本: ${MYGO_VERSION}"; \
+    go install -v "github.com/egoist/mygo/cmd/mygo@${MYGO_VERSION}"; \
+    test -x "${GOPATH}/bin/mygo"; \
+    echo "--- mygo 安装的 ---"; \
+    mygo version || true
+
+# 3. 安装 bun
+# mygo init 默认生成 Web 前端模板，模板的 dev / build 命令就是 bun run ...；
+# 不装 bun 时 mygo 只打印一行提示（对 mygo 自己来说是 optional），但默认模板跑不起来。
+# 基座镜像里已经有 node / npm（CNB 侧 npm 源已换成腾讯云），所以走 npm 装：
+# 基座把 wget 清掉了，GITHUB_MIRROR 也只对基座自身生效，下载 GitHub release 不可行。
+# npm 缓存目录挂在构建节点上，不进入镜像层。
+RUN --mount=type=cache,target=/root/.npm \
+    set -eux; \
+    echo "bun 目标版本: ${BUN_VERSION}"; \
+    npm install -g --no-fund --no-audit "bun@${BUN_VERSION}"; \
+    test -x "$(command -v bun)"; \
+    echo "--- bun 安装的 ---"; \
+    bun --version
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# apt、go install、npm 这三层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + mygo：在 golang 镜像基础上增加 GTK 3 / WebKitGTK 4.1 开发包、无头运行库、mygo CLI 与 bun" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+CMD ["bash"]

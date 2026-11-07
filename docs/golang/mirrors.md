@@ -2,18 +2,20 @@
 
 ## 一张表
 
-| 依赖                              | GitHub Actions / GitLab CI      | CNB                                                    |
-|-----------------------------------|---------------------------------|--------------------------------------------------------|
-| GitHub Release（UPX）             | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`           |
-| GitHub Release Atom（UPX 版本号） | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`（同域名） |
-| Node.js 官方 tar.xz 与版本索引    | 直连 `nodejs.org`               | `https://files.m.daocloud.io/nodejs.org/...`           |
-| nfpm 与各 Go 工具（`go install`） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
-| fnpack                            | 直连 `static2.fnnas.com`        | 直连 `static2.fnnas.com`                               |
-| wails3（`go install` 与版本解析） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
-| wails2（`go install` 与版本解析） | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
-| fyne（`go install` 与版本解析）   | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
-| Debian APT                        | 默认 `deb.debian.org`           | `mirrors.cloud.tencent.com`                            |
-| npm / pnpm registry               | 默认 `registry.npmjs.org`       | `mirrors.cloud.tencent.com/npm/`                       |
+| 依赖                               | GitHub Actions / GitLab CI      | CNB                                                    |
+|------------------------------------|---------------------------------|--------------------------------------------------------|
+| GitHub Release（UPX）              | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`           |
+| GitHub Release Atom（UPX 版本号）  | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`（同域名） |
+| Node.js 官方 tar.xz 与版本索引     | 直连 `nodejs.org`               | `https://files.m.daocloud.io/nodejs.org/...`           |
+| nfpm 与各 Go 工具（`go install`）  | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| fnpack                             | 直连 `static2.fnnas.com`        | 直连 `static2.fnnas.com`                               |
+| wails3（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| wails2（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| fyne（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| mygo（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | `mirrors.cloud.tencent.com/go/`                        |
+| bun（`npm install -g` 与版本解析） | npm 官方 `registry.npmjs.org`   | `mirrors.cloud.tencent.com/npm/`                       |
+| Debian APT                         | 默认 `deb.debian.org`           | `mirrors.cloud.tencent.com`                            |
+| npm / pnpm registry                | 默认 `registry.npmjs.org`       | `mirrors.cloud.tencent.com/npm/`                       |
 
 ## 开关
 
@@ -41,9 +43,11 @@ NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"  # nodejs.org
 
 fnpack 镜像只从 `https://static2.fnnas.com` 下载二进制，三个平台的 `build-fnpack.sh` 都不传镜像参数。
 
-wails3 / wails2 / fyne 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧因为 `Dockerfile.golang` 已设成腾讯云，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」走同一个源。
+wails3 / wails2 / fyne / mygo 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧因为 `Dockerfile.golang` 已设成腾讯云，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」走同一个源。
 
-fyne 的 apt 开发包（OpenGL/X11/Wayland）不单独配源：继承基座镜像的 APT 配置，CNB 侧即腾讯云，GitHub / GitLab 侧即 `deb.debian.org`。
+mygo 的 `bun` 走 npm：`npm install -g` 与版本解析（`npm view bun version`）都用基座镜像的 npm registry，CNB 侧即腾讯云、GitHub / GitLab 侧即官方默认，两边天然一致，`build-mygo.sh` 不需要额外传源参数。
+
+fyne 的 apt 开发包（OpenGL/X11/Wayland）与 mygo 的 apt 开发包（GTK3/WebKitGTK 4.1 与无头运行库）都不单独配源：继承基座镜像的 APT 配置，CNB 侧即腾讯云，GitHub / GitLab 侧即 `deb.debian.org`。
 
 ## 为什么 GitHub / GitLab 侧不传
 

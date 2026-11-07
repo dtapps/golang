@@ -1,0 +1,22 @@
+# 构建并推送 golang + mygo 变体镜像
+# 由根 .gitlab-ci.yml 的 include 引入；workflow / stages / variables / default 都在根文件里。
+# 基础镜像 ${CI_REGISTRY_IMAGE}:<go 版本> 必须已经由 build-golang 作业推好；
+# 脚本会最多等 5 分钟，仍然不存在就报错退出。
+build-mygo:
+  resource_group: build-mygo
+  stage: variants
+  timeout: 120m
+  script:
+    - |
+      set -eu
+      export version="${VERSION:-}"
+      export mygo_version="${MYGO_VERSION:-}"
+      export bun_version="${BUN_VERSION:-}"
+      . ./.gitlab/scripts/build-mygo.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - .gitlab/annotation-mygo.json
+  rules:
+    - if: '$TARGET == "" || $TARGET == "mygo"'

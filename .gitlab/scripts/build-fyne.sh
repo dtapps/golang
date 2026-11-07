@@ -7,7 +7,7 @@
 #
 # 本脚本不构建基础镜像：它要求 ${CI_REGISTRY_IMAGE}:<go 版本> 已经由
 # build-golang 作业推好，直接 FROM 那个 manifest list，只追加
-# OpenGL/X11/Wayland 开发包与 fyne CLI。这样五个镜像的 Go 工具链完全一致。
+# OpenGL/X11/Wayland 开发包与 fyne CLI。这样六个镜像的 Go 工具链完全一致。
 #
 # 触发方式（见 build-fyne.yml）：
 #   schedule → 每天固定时间跑（比 build-wails2 晚 3 小时）

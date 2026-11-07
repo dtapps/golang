@@ -1,0 +1,137 @@
+# ===================================================================
+# GitHub Actions：构建并推送 mygo 镜像到 GHCR
+#
+#   产物：ghcr.io/<owner>/<repo>/mygo  → golang + GTK3/WebKitGTK4.1 + 无头运行库
+#                                       + mygo CLI + bun
+#
+#   基础镜像由 build-golang.yml 产出。本工作流独立定时触发（比 build-fyne
+#   再晚 3 小时）或手动触发，都要求 <go 版本> 标签已经存在。
+#
+#   实现：GitHub 侧独立维护一份（与 CNB 各自维护，不共用）
+#         · Dockerfile  .github/docker/Dockerfile.mygo
+#         · 构建脚本    .github/scripts/build-mygo.sh
+#         · 对照实现    .cnb/docker/Dockerfile.mygo + .cnb/scripts/build-mygo.sh
+#
+#   版本：mygo 默认跟随上游最新稳定版（Dockerfile 的 MYGO_VERSION=latest，
+#         脚本构建前解析成具体 tag 再传进 build-arg，层缓存才跟得上版本）；
+#         bun 同理走 BUN_VERSION（从 npm 解析）。
+#         手动触发可以填 mygo_version / bun_version 钉住（如 v0.8.1 / 1.4.4）。
+# ===================================================================
+# https://github.com/actions/runner-images
+# https://github.com/actions/checkout
+# https://github.com/docker/setup-qemu-action
+# https://github.com/docker/setup-buildx-action
+# https://github.com/actions/upload-artifact
+name: build-mygo
+
+on:
+  schedule:
+    # 每天 15:05（Asia/Shanghai）= 07:05 UTC，与 CNB 的 crontab '5 15 * * *' 同刻。
+    # 比 build-fyne 的 04:05 UTC 晚 3 小时，给基础镜像留出构建时间。
+    - cron: '5 7 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        # 与 build-golang 的输入等价，用来选中对应的基础镜像标签
+        description: '选填：Go 版本。留空 = 跟随 Dockerfile 的 GO_VERSION（golang:1-trixie，最新稳定 Go）；也可填 1.27 / 1.27.3'
+        required: false
+        default: ''
+        type: string
+      mygo_version:
+        description: '选填：mygo CLI 版本。留空 = 解析上游最新稳定 tag（如 v0.8.1）；也可填 v0.8.1 / 0.8.1 / v0.8.1-rc1'
+        required: false
+        default: ''
+        type: string
+      bun_version:
+        description: '选填：bun 版本（前端模板用）。留空 = 解析 npm 上的最新稳定版（如 1.4.4）；也可填 1.4.4'
+        required: false
+        default: ''
+        type: string
+
+# contents: read   actions/checkout 检出源码。
+# packages: write  推镜像、写 buildcache 缓存清单、imagetools create 派生/提升标签；
+#                  write 含 read，各变体还要读基座 manifest。
+# 显式声明后未列出的权限一律不授予；降成 read 会在推送阶段被拒。
+permissions:
+  contents: read
+  packages: write
+
+# 并发策略：同一分支的多次触发串行排队，绝不取消「正在运行」的旧运行。
+# cancel-in-progress: false 表示新运行进入 pending 等待，而非抢占/取消 in-progress。
+# queue: max 让同一 group 最多保留 100 个 pending（默认 queue: single 只留 1 个，
+# 新的会顶掉旧的 pending），按进入等待的先后 FIFO 依次执行，仅队列满的溢出运行被取消。
+# 注意：queue: max 不能与 cancel-in-progress: true 组合，否则 workflow 校验失败。
+concurrency:
+  group: build-mygo-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    # go install 要按 amd64 + arm64 各编译一遍 mygo CLI（纯 Go，但依赖树不小），
+    # 另外还要在 arm64 下跑一遍 npm 装 bun，arm64 那趟走 QEMU。
+    timeout-minutes: 120
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v7
+
+      - name: 释放磁盘空间
+        # runner 临时盘约 14 GiB：删掉无关的预装 SDK，避免构建期 no space left on device。
+        # 并发删除预装 SDK：串行会把四个目录的 unlink 耗时相加，这里只等最慢的一个。
+        run: |
+          sudo rm -rf /usr/share/dotnet & p1=$!
+          sudo rm -rf /usr/local/lib/android & p2=$!
+          sudo rm -rf /opt/ghc & p3=$!
+          sudo rm -rf /opt/hostedtoolcache/CodeQL & p4=$!
+          rc=0
+          for pid in "$p1" "$p2" "$p3" "$p4"; do
+            wait "$pid" || rc=1
+          done
+          [ "$rc" -eq 0 ] || exit 1
+          df -h /
+
+      - name: 安装 QEMU（跨架构构建 arm64）
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - name: 初始化 buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 构建并推送多架构镜像
+        id: build
+        # 镜像名、revision、source 等由脚本从 Actions 内置变量派生；
+        # 基础镜像标签由脚本从 Dockerfile 的 GO_VERSION 解析后拼接。
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version: ${{ inputs.version }}
+          mygo_version: ${{ inputs.mygo_version }}
+          bun_version: ${{ inputs.bun_version }}
+        # 必须 source：脚本里的 export、trap 与退出码都留在当前 shell
+        run: |
+          source .github/scripts/build-mygo.sh
+
+      - name: 写入运行摘要
+        if: always()
+        run: |
+          {
+            echo '### Golang + mygo 镜像（GHCR）'
+            echo ''
+            if [ -f .github/annotation-mygo.json ]; then
+              echo '| 键 | 值 |'
+              echo '| --- | --- |'
+              jq -r 'to_entries[] | "| \(.key) | \(.value) |"' .github/annotation-mygo.json
+            else
+              echo '本次没有产出 .github/annotation-mygo.json（构建在元数据步骤之前就失败）。'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 上传构建元数据
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mygo-annotation
+          path: .github/annotation-mygo.json
+          if-no-files-found: warn
+          retention-days: 30

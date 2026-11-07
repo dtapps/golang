@@ -173,6 +173,9 @@ golang:1.27.3        = 基座 + 全部工具链
 golang/fnpack:1.27.3 = golang:1.27.3 + fnpack
 golang/wails2:1.27.3 = golang:1.27.3 + GTK3/WebKit2GTK 4.1 + wails
 golang/fyne:1.27.3   = golang:1.27.3 + OpenGL/X11/Wayland + fyne
+golang/mygo:1.27.3   = golang:1.27.3 + GTK3/WebKitGTK 4.1 + 无头运行库 + mygo + bun
 ```
 
-变体之间**平级**、互不包含：需要打包 `.fpk` 用 `fnpack`，需要编译 Wails v2 桌面应用用本镜像，编译 Fyne 桌面应用用 `fyne`；都要就在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个。
+变体之间**平级**、互不包含：需要打包 `.fpk` 用 `fnpack`，需要编译 Wails v2 桌面应用用本镜像，编译 Fyne 桌面应用用 `fyne`，编译 MyGo 桌面应用用 `mygo`；都要就在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个。
+
+mygo 与本镜像共用 GTK3 / WebKitGTK 4.1 运行库，但本镜像的 `wails` 编译要开 cgo 并加 `-tags webkit2_41`，mygo 是纯 Go、运行期 `dlopen`，两者不能互相替代。

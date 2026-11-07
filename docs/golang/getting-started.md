@@ -22,6 +22,12 @@ FROM ghcr.io/dtapps/golang/fnpack:latest
 FROM ghcr.io/dtapps/golang/fyne:latest
 ```
 
+需要编译 MyGo 桌面应用时换镜像：
+
+```dockerfile
+FROM ghcr.io/dtapps/golang/mygo:latest
+```
+
 ## 常见用法
 
 ### Go 构建 + 压缩
@@ -118,6 +124,20 @@ docker run --rm -v "$PWD":/src -w /src ghcr.io/dtapps/golang/fyne:latest sh -c '
 镜像已装 OpenGL / X11 / Wayland 开发包（`gl` / `x11` / `xrandr` / `xcursor` / `xinerama` / `xi` / `xxf86vm` / `wayland-client` / `xkbcommon` 都能被 `pkg-config` 解析），所以 cgo 阶段直接可用。`fyne.io/fyne/v2` 的版本由你自己的 `go.mod` 决定，镜像只提供 `fyne` CLI。
 
 运行带窗口的二进制需要真实显示环境（容器里要自己准备 X11/Wayland），这个镜像只保证**构建**可用。
+
+### 编译 MyGo 桌面应用
+
+```bash
+docker run --rm -v "$PWD":/src -w /src ghcr.io/dtapps/golang/mygo:latest sh -c '
+  mygo version
+  mygo doctor
+  mygo build
+'
+```
+
+镜像已装 GTK3 / WebKitGTK 4.1 开发包（`gtk+-3.0` / `webkit2gtk-4.1` / `gl` / `x11` / `xrandr` / `xcursor` / `xinerama` / `xi` / `xxf86vm` / `wayland-client` / `xkbcommon` 都能被 `pkg-config` 解析）与无头运行库（Xvfb + mesa + 字体），所以编译阶段直接可用，GUI 冒烟也能在没有显示器的 CI 里跑。`mygo init` 默认的 Web 前端模板要 `bun`，镜像里已经装好。
+
+mygo 的 Linux 后端是纯 Go、运行期 `dlopen` GTK3 / WebKitGTK，所以**不需要** cgo，也不需要 `-tags webkit2_41`（那是 wails2 的 build tag）。`mygo doctor` 是上游自检命令：硬性项查 `go`、GTK3 与 WebKitGTK（项目没声明 `linux.webview: false` 时查），`bun` 与 `makensis` / `osslsigncode` / `gh` / `codesign` 只列为可选。镜像只提供 Linux 下的编译环境，交叉编译到 Windows / macOS / 移动端请自行准备工具链。
 
 ## 在 GitHub Actions 里用
 

@@ -9,6 +9,7 @@
 | wails3 | `.cnb/docker/Dockerfile.wails3` | `.github/docker/Dockerfile.wails3` | `.gitlab/docker/Dockerfile.wails3` |
 | wails2 | `.cnb/docker/Dockerfile.wails2` | `.github/docker/Dockerfile.wails2` | `.gitlab/docker/Dockerfile.wails2` |
 | fyne   | `.cnb/docker/Dockerfile.fyne`   | `.github/docker/Dockerfile.fyne`   | `.gitlab/docker/Dockerfile.fyne`   |
+| mygo   | `.cnb/docker/Dockerfile.mygo`   | `.github/docker/Dockerfile.mygo`   | `.gitlab/docker/Dockerfile.mygo`   |
 
 ## 1. golang 镜像
 
@@ -179,15 +180,67 @@ FROM ${GOLANG_IMAGE}
 - `fyne` 落在 `${GOPATH}/bin`（`/go/bin`，已在 `PATH` 中），`test -x` + `fyne version` 做安装验证。
 - `--mount=type=cache` 挂模块与编译缓存：`go install` 要编译整个 CLI，冷缓存下这一层是耗时大头。
 
-## 6. 改哪个文件
+## 6. mygo 镜像
 
-| 要改的东西         | 改哪里                                                                                                                   |
-|--------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Go 基座版本        | 三份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新）                                                      |
-| 某个工具版本       | 三份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）                                                        |
-| fnpack 版本        | 三份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`（默认值，可被手动触发的 `fnpack_version` 覆盖）                             |
-| wails3 版本        | 三份 `Dockerfile.wails3` 的 `WAILS3_VERSION`（默认 `latest`，可被 `wails3_version` 覆盖）                                |
-| wails2 版本        | 三份 `Dockerfile.wails2` 的 `WAILS2_VERSION`（默认 `latest`，可被 `wails2_version` 覆盖）                                |
-| fyne 版本          | 三份 `Dockerfile.fyne` 的 `FYNE_VERSION`（默认 `latest`，可被 `fyne_version` 覆盖）                                      |
-| 下载源             | 构建脚本的 `MIRROR` / 构建参数                                                                                           |
-| 标签规则、冒烟断言 | 三份 `build-golang.sh` + 三份 `build-fnpack.sh` + 三份 `build-wails3.sh` + 三份 `build-wails2.sh` + 三份 `build-fyne.sh` |
+```dockerfile
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+```
+
+- 与 fyne 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，多三层（apt 装 GTK3/WebKitGTK 4.1 开发包与无头运行库 → `go install` mygo → npm 装 bun）。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已换成腾讯云源，所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- 安装的包分两组：
+  - 编译 / 运行库：`pkg-config`、`gcc`、`libgtk-3-dev`、`libwebkit2gtk-4.1-dev`、`libayatana-appindicator3-dev`、`libgl1-mesa-dev`、`xorg-dev`、`libwayland-dev`、`libxkbcommon-dev`
+  - 无头运行环境：`xvfb`、`xauth`、`dbus-x11`、`libgl1`、`libgl1-mesa-dri`、`libglx-mesa0`、`libegl-mesa0`、`fonts-dejavu-core`（与上游 mygo 的 CI 同一组包）
+
+  装完立刻断言 `.pc` 与运行库都在：
+
+  ```sh
+  pkg-config --exists gtk+-3.0
+  pkg-config --exists webkit2gtk-4.1
+  pkg-config --exists gl
+  pkg-config --exists x11
+  pkg-config --exists xrandr
+  pkg-config --exists xcursor
+  pkg-config --exists xinerama
+  pkg-config --exists xi
+  pkg-config --exists xxf86vm
+  pkg-config --exists wayland-client
+  pkg-config --exists xkbcommon
+  ldconfig -p | grep -q 'libgtk-3\.so\.0'
+  ldconfig -p | grep -q 'libwebkit2gtk-4\.1\.so'
+  ldconfig -p | grep -q 'libayatana-appindicator3\.so\.1'
+  ```
+
+  与 fyne / wails 的区别在于：mygo 的 Linux 后端是**纯 Go、不带 cgo**，它用 `github.com/ebitengine/purego` 在运行期 `dlopen` GTK3 / WebKitGTK。所以 `-dev` 包在这里有两个作用——(a) 顺带装上运行期要加载的 `.so`，(b) 用户应用若自带 cgo 绑定，编译期能解析 `.pc` 与头文件。这些包是镜像的用途本身，**不能**在最后 purge。
+- mygo **CLI** 版本由 `ARG MYGO_VERSION` 控制，默认 `latest`；CI 会先解析成 `v0.8.1` 这种具体版本再传进来。安装命令：
+
+  ```dockerfile
+  go install -v "github.com/egoist/mygo/cmd/mygo@${MYGO_VERSION}"
+  ```
+
+- `bun` 版本由 `ARG BUN_VERSION` 控制，默认 `latest`；CI 会先从 npm 解析成 `1.4.4` 这种具体版本再传进来。安装命令：
+
+  ```dockerfile
+  npm install -g --no-fund --no-audit "bun@${BUN_VERSION}"
+  ```
+
+  bun 对 mygo 自己是可选的，但 `mygo init` 默认 Web 前端模板的 `DevCommand` / `BuildCommand` 就是 `bun run ...`，装它是为了让默认模板开箱即用。走 npm 装是因为基座把 `wget` 清掉了、`GITHUB_MIRROR` 也只对基座自身生效，下载 GitHub Release 不可行。
+- `mygo` 落在 `${GOPATH}/bin`（`/go/bin`，已在 `PATH` 中），`test -x` + `mygo version` 做安装验证。
+- 两个 `--mount=type=cache` 分别挂 Go 模块 / 编译缓存与 npm 缓存：冷缓存下这两层是耗时大头。
+- OCI 元数据标签放在最后：`BUILD_DATE` / `VCS_REF` / `IMAGE_VERSION` 每次构建都变，放前面会让 apt、`go install`、npm 三层的缓存键跟着每次提交一起失效。
+
+## 7. 改哪个文件
+
+| 要改的东西         | 改哪里                                                                                                                                          |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| Go 基座版本        | 三份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新）                                                                             |
+| 某个工具版本       | 三份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）                                                                               |
+| fnpack 版本        | 三份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`（默认值，可被手动触发的 `fnpack_version` 覆盖）                                                    |
+| wails3 版本        | 三份 `Dockerfile.wails3` 的 `WAILS3_VERSION`（默认 `latest`，可被 `wails3_version` 覆盖）                                                       |
+| wails2 版本        | 三份 `Dockerfile.wails2` 的 `WAILS2_VERSION`（默认 `latest`，可被 `wails2_version` 覆盖）                                                       |
+| fyne 版本          | 三份 `Dockerfile.fyne` 的 `FYNE_VERSION`（默认 `latest`，可被 `fyne_version` 覆盖）                                                             |
+| mygo 版本          | 三份 `Dockerfile.mygo` 的 `MYGO_VERSION`（默认 `latest`，可被 `mygo_version` 覆盖）                                                             |
+| bun 版本           | 三份 `Dockerfile.mygo` 的 `BUN_VERSION`（默认 `latest`，可被 `bun_version` 覆盖）                                                               |
+| 下载源             | 构建脚本的 `MIRROR` / 构建参数                                                                                                                  |
+| 标签规则、冒烟断言 | 三份 `build-golang.sh` + 三份 `build-fnpack.sh` + 三份 `build-wails3.sh` + 三份 `build-wails2.sh` + 三份 `build-fyne.sh` + 三份 `build-mygo.sh` |
