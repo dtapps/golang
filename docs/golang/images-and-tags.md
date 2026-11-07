@@ -4,11 +4,11 @@
 
 脚本不写死地址，全部从平台内置变量派生：
 
-| 平台   | golang                                              | golang/fnpack      | golang/wails3      | golang/wails2      | golang/fyne      | golang/mygo      |
-|--------|-----------------------------------------------------|--------------------|--------------------|--------------------|------------------|------------------|
-| CNB    | `${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}` | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` | 上一列 + `/fyne` | 上一列 + `/mygo` |
-| GitHub | `ghcr.io/${GITHUB_REPOSITORY}`（小写）              | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` | 上一列 + `/fyne` | 上一列 + `/mygo` |
-| GitLab | `${CI_REGISTRY_IMAGE}`                              | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` | 上一列 + `/fyne` | 上一列 + `/mygo` |
+| 平台   | golang                                              | golang/fnpack      | golang/wails3      | golang/wails2      | golang/fyne      | golang/mygo      | golang/gio      |
+|--------|-----------------------------------------------------|--------------------|--------------------|--------------------|------------------|------------------|-----------------|
+| CNB    | `${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}` | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` | 上一列 + `/fyne` | 上一列 + `/mygo` | 上一列 + `/gio` |
+| GitHub | `ghcr.io/${GITHUB_REPOSITORY}`（小写）              | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` | 上一列 + `/fyne` | 上一列 + `/mygo` | 上一列 + `/gio` |
+| GitLab | `${CI_REGISTRY_IMAGE}`                              | 上一列 + `/fnpack` | 上一列 + `/wails3` | 上一列 + `/wails2` | 上一列 + `/fyne` | 上一列 + `/mygo` | 上一列 + `/gio` |
 
 本仓库当前的实际值：
 
@@ -19,25 +19,28 @@ docker.cnb.cool/dtapp/golang/wails3
 docker.cnb.cool/dtapp/golang/wails2
 docker.cnb.cool/dtapp/golang/fyne
 docker.cnb.cool/dtapp/golang/mygo
+docker.cnb.cool/dtapp/golang/gio
 ghcr.io/dtapps/golang
 ghcr.io/dtapps/golang/fnpack
 ghcr.io/dtapps/golang/wails3
 ghcr.io/dtapps/golang/wails2
 ghcr.io/dtapps/golang/fyne
 ghcr.io/dtapps/golang/mygo
+ghcr.io/dtapps/golang/gio
 registry.gitlab.com/dtapps/golang
 registry.gitlab.com/dtapps/golang/fnpack
 registry.gitlab.com/dtapps/golang/wails3
 registry.gitlab.com/dtapps/golang/wails2
 registry.gitlab.com/dtapps/golang/fyne
 registry.gitlab.com/dtapps/golang/mygo
+registry.gitlab.com/dtapps/golang/gio
 ```
 
 fork 或改名后自动跟着变，不需要改脚本。
 
 ## 标签契约
 
-六个镜像使用同一组标签，标签里的版本是**解析出来的实际 Go 版本**（不是 Dockerfile 里写的引用）。fnpack / wails3 / wails2 / fyne / mygo 自身的 CLI 版本不占标签，只记录在元数据里（mygo 镜像里的 `bun` 版本同样只记在 `bun_version`）。
+七个镜像使用同一组标签，标签里的版本是**解析出来的实际 Go 版本**（不是 Dockerfile 里写的引用）。fnpack / wails3 / wails2 / fyne / mygo / gio 自身的 CLI 版本不占标签，只记录在元数据里（mygo 镜像里的 `bun` 版本同样只记在 `bun_version`；gio 的 `gogio` CLI 版本记在 `gio_version`）。
 
 | 标签                       | 含义                                    | 是否移动 |
 |----------------------------|-----------------------------------------|----------|
@@ -70,11 +73,15 @@ ghcr.io/dtapps/golang/mygo:1.27.3
 ghcr.io/dtapps/golang/mygo:1.27
 ghcr.io/dtapps/golang/mygo:latest
 ghcr.io/dtapps/golang/mygo:1.27.3-linux-arm64
+ghcr.io/dtapps/golang/gio:1.27.3
+ghcr.io/dtapps/golang/gio:1.27
+ghcr.io/dtapps/golang/gio:latest
+ghcr.io/dtapps/golang/gio:1.27.3-linux-arm64
 ```
 
 ## 发布顺序
 
-六个镜像由六条流水线分别发布：
+七个镜像由七条流水线分别发布：
 
 1. golang：构建并推送 `golang:<go 版本>` → 派生单平台标签 → 冒烟 → 提升 `golang:<major.minor>` / `golang:latest`。
 2. fnpack：等 `golang:<go 版本>` 存在 → 从它构建并推送 `golang/fnpack:<go 版本>` → 派生单平台标签 → 冒烟 → 提升 fnpack 的移动标签。
@@ -82,10 +89,11 @@ ghcr.io/dtapps/golang/mygo:1.27.3-linux-arm64
 4. wails2：同上，但产物是 `golang/wails2:<go 版本>`（多装 GTK3/WebKit2GTK 4.1 与 wails CLI）。
 5. fyne：同上，但产物是 `golang/fyne:<go 版本>`（多装 OpenGL/X11/Wayland 开发包与 fyne CLI）。
 6. mygo：同上，但产物是 `golang/mygo:<go 版本>`（多装 GTK3/WebKitGTK 4.1 开发包、无头运行库、mygo CLI 与 bun）。
+7. gio：同上，但产物是 `golang/gio:<go 版本>`（多装 EGL/GLES、X11、Wayland、Vulkan 开发包、无头运行库与 gogio CLI）。
 
-fnpack / wails3 / wails2 / fyne / mygo 的 `<major.minor>` / `latest` 只在基础镜像的对应标签也已指向本次版本时才提升。所以它们的 `latest` 不会跑到基础镜像前面，也不会出现「只有变体成功」的错位。失败时 `<go 版本>` 标签可能已经指向坏产物，但它不是移动标签，下游按 `latest` / `<major.minor>` 拉取不受影响。
+fnpack / wails3 / wails2 / fyne / mygo / gio 的 `<major.minor>` / `latest` 只在基础镜像的对应标签也已指向本次版本时才提升。所以它们的 `latest` 不会跑到基础镜像前面，也不会出现「只有变体成功」的错位。失败时 `<go 版本>` 标签可能已经指向坏产物，但它不是移动标签，下游按 `latest` / `<major.minor>` 拉取不受影响。
 
-调度上，CNB 依次跑 00:05 的 golang、03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2、12:05 的 fyne、15:05 的 mygo；GitHub 依次跑 16:05 UTC 的 golang、19:05 UTC 的 fnpack、22:05 UTC 的 wails3、01:05 UTC 的 wails2、04:05 UTC 的 fyne、07:05 UTC 的 mygo；GitLab 用 Pipeline schedules 配同样的时间，变量 `TARGET` 分别指向六个镜像，也可以一条 schedule 不填 `TARGET` 一次构建全部。
+调度上，CNB 依次跑 00:05 的 golang、03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2、12:05 的 fyne、15:05 的 mygo、18:05 的 gio；GitHub 依次跑 16:05 UTC 的 golang、19:05 UTC 的 fnpack、22:05 UTC 的 wails3、01:05 UTC 的 wails2、04:05 UTC 的 fyne、07:05 UTC 的 mygo、10:05 UTC 的 gio；GitLab 用 Pipeline schedules 配同样的时间，变量 `TARGET` 分别指向七个镜像，也可以一条 schedule 不填 `TARGET` 一次构建全部。
 
 ## 固定某一份产物
 
@@ -98,9 +106,10 @@ docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
 docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 docker pull ghcr.io/dtapps/golang/fyne@sha256:<fyne_digest>
 docker pull ghcr.io/dtapps/golang/mygo@sha256:<mygo_digest>
+docker pull ghcr.io/dtapps/golang/gio@sha256:<gio_digest>
 ```
 
-构建元数据由六条流水线分别写入：
+构建元数据由七条流水线分别写入：
 
 - golang：`.cnb/annotation.json` / `.github/annotation.json` / `.gitlab/annotation.json`
 - fnpack：`.cnb/annotation-fnpack.json` / `.github/annotation-fnpack.json` / `.gitlab/annotation-fnpack.json`
@@ -108,6 +117,7 @@ docker pull ghcr.io/dtapps/golang/mygo@sha256:<mygo_digest>
 - wails2：`.cnb/annotation-wails2.json` / `.github/annotation-wails2.json` / `.gitlab/annotation-wails2.json`
 - fyne：`.cnb/annotation-fyne.json` / `.github/annotation-fyne.json` / `.gitlab/annotation-fyne.json`
 - mygo：`.cnb/annotation-mygo.json` / `.github/annotation-mygo.json` / `.gitlab/annotation-mygo.json`
+- gio：`.cnb/annotation-gio.json` / `.github/annotation-gio.json` / `.gitlab/annotation-gio.json`
 
 | 键                   | 含义                                        |
 |----------------------|---------------------------------------------|
@@ -138,6 +148,12 @@ docker pull ghcr.io/dtapps/golang/mygo@sha256:<mygo_digest>
 | `mygo_size_arm64`    | arm64 压缩体积                              |
 | `mygo_version`       | 本次安装的 mygo CLI 版本（如 `v0.8.1`）     |
 | `bun_version`        | 本次安装的 bun 版本（如 `1.4.4`）           |
+| `gio_image`          | gio 镜像全名                                |
+| `gio_digest`         | gio manifest list digest                    |
+| `gio_digest_short`   | gio digest 前 12 位（徽章用）               |
+| `gio_size`           | amd64 压缩体积                              |
+| `gio_size_arm64`     | arm64 压缩体积                              |
+| `gio_version`        | 本次安装的 gogio CLI 版本（如 `v0.10.3`）   |
 | `image_version`      | 解析出的 Go 版本（与 `<go 版本>` 标签一致） |
 | `golang_version`     | 同上                                        |
 | `base_image`         | golang 元数据：上游 `golang:<版本>-<代号>`  |
@@ -150,15 +166,17 @@ docker pull ghcr.io/dtapps/golang/mygo@sha256:<mygo_digest>
 | `fyne_base_digest`   | fyne 元数据：基础镜像 digest                |
 | `mygo_base_image`    | mygo 元数据：本次使用的基础镜像引用         |
 | `mygo_base_digest`   | mygo 元数据：基础镜像 digest                |
+| `gio_base_image`     | gio 元数据：本次使用的基础镜像引用          |
+| `gio_base_digest`    | gio 元数据：基础镜像 digest                 |
 | `built_at`           | 本次构建时间                                |
 | `source_date`        | 最后一次提交时间                            |
 | `revision`           | 提交 SHA                                    |
 
-wails2 的元数据键与上表同构，前缀换成 `wails2_`：`wails2_image` / `wails2_digest` / `wails2_digest_short` / `wails2_size` / `wails2_size_arm64` / `wails2_version` / `wails2_base_image` / `wails2_base_digest`。完整说明见 [../wails2/README.md](../wails2/README.md#元数据与徽章)。fyne 的键已列在上表（前缀 `fyne_`），完整说明见 [../fyne/README.md](../fyne/README.md#元数据与徽章)；mygo 的键已列在上表（前缀 `mygo_`，另有 `bun_version`），完整说明见 [../mygo/README.md](../mygo/README.md#元数据与徽章)。
+wails2 的元数据键与上表同构，前缀换成 `wails2_`：`wails2_image` / `wails2_digest` / `wails2_digest_short` / `wails2_size` / `wails2_size_arm64` / `wails2_version` / `wails2_base_image` / `wails2_base_digest`。完整说明见 [../wails2/README.md](../wails2/README.md#元数据与徽章)。fyne 的键已列在上表（前缀 `fyne_`），完整说明见 [../fyne/README.md](../fyne/README.md#元数据与徽章)；mygo 的键已列在上表（前缀 `mygo_`，另有 `bun_version`），完整说明见 [../mygo/README.md](../mygo/README.md#元数据与徽章)；gio 的键已列在上表（前缀 `gio_`），完整说明见 [../gio/README.md](../gio/README.md#元数据与徽章)。
 
-CNB 侧从 `/-/badge/annotation/commit/latest/{key}` 读取；GitHub 侧写进 Step Summary 并上传 artifact（`golang-annotation` / `fnpack-annotation` / `wails3-annotation` / `wails2-annotation` / `fyne-annotation` / `mygo-annotation`）；GitLab 侧写进 `.gitlab/annotation*.json`，随 job artifacts 保留 30 天。
+CNB 侧从 `/-/badge/annotation/commit/latest/{key}` 读取；GitHub 侧写进 Step Summary 并上传 artifact（`golang-annotation` / `fnpack-annotation` / `wails3-annotation` / `wails2-annotation` / `fyne-annotation` / `mygo-annotation` / `gio-annotation`）；GitLab 侧写进 `.gitlab/annotation*.json`，随 job artifacts 保留 30 天。
 
-## 六个镜像的对应关系
+## 七个镜像的对应关系
 
 同一 `<go 版本>` 下：
 
@@ -169,6 +187,7 @@ golang/wails3:1.27.3 = golang:1.27.3 + GTK4/WebKitGTK + wails3
 golang/wails2:1.27.3 = golang:1.27.3 + GTK3/WebKit2GTK 4.1 + wails
 golang/fyne:1.27.3   = golang:1.27.3 + OpenGL/X11/Wayland + fyne
 golang/mygo:1.27.3   = golang:1.27.3 + GTK3/WebKitGTK 4.1 + 无头运行库 + mygo + bun
+golang/gio:1.27.3    = golang:1.27.3 + EGL/GLES + X11 + Wayland + Vulkan + 无头运行库 + gogio
 ```
 
-五个变体镜像的 `image_version` 与基础镜像相同；各自 CLI 的版本只记录在 `fnpack_version` / `wails3_version` / `wails2_version` / `fyne_version` / `mygo_version` / `bun_version`，不单独占标签。fnpack、wails3、wails2、fyne 与 mygo 是平级变体，互不包含。
+六个变体镜像的 `image_version` 与基础镜像相同；各自 CLI 的版本只记录在 `fnpack_version` / `wails3_version` / `wails2_version` / `fyne_version` / `mygo_version` / `bun_version` / `gio_version`，不单独占标签。fnpack、wails3、wails2、fyne、mygo 与 gio 是平级变体，互不包含。

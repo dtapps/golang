@@ -2,9 +2,9 @@
 
 ## 日常构建
 
-- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像，06:05 构建 wails3，09:05 构建 wails2，12:05 构建 fyne，15:05 构建 mygo。
-- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack 镜像，22:05 UTC（北京 06:05）构建 wails3，01:05 UTC（北京 09:05）构建 wails2，04:05 UTC（北京 12:05）构建 fyne，07:05 UTC（北京 15:05）构建 mygo。
-- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:05 UTC golang、19:05 UTC fnpack、22:05 UTC wails3、01:05 UTC wails2、04:05 UTC fyne、07:05 UTC mygo，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)。
+- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像，06:05 构建 wails3，09:05 构建 wails2，12:05 构建 fyne，15:05 构建 mygo，18:05 构建 gio。
+- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack 镜像，22:05 UTC（北京 06:05）构建 wails3，01:05 UTC（北京 09:05）构建 wails2，04:05 UTC（北京 12:05）构建 fyne，07:05 UTC（北京 15:05）构建 mygo，10:05 UTC（北京 18:05）构建 gio。
+- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:05 UTC golang、19:05 UTC fnpack、22:05 UTC wails3、01:05 UTC wails2、04:05 UTC fyne、07:05 UTC mygo、10:05 UTC gio，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)。
 
 `GO_VERSION` 默认是 `1`（`golang:1-trixie` 浮动标签），上游发布新 Go 后下一次构建会自动跟随；想钉版本时手动填 `version`，或直接改三份 Dockerfile 的 `GO_VERSION`。定时构建还会重新解析上游各工具的最新版本：版本变了才重建对应那一层，没变就全命中缓存（只拉基座、跑冒烟）。上游重新推送同一 tag 的基座（安全修复）时，digest 一变，apt 之后的层会全部重建，同样能吃到更新。
 
@@ -112,6 +112,21 @@ mygo 镜像里有两条独立的版本线，升级方式与 fyne 相同：手动
 - 上游 mygo 换 Linux 后端（例如从 GTK3 换到 GTK4）时，apt 列表、`.pc` 断言、冒烟里 `mygo doctor` 的 grep 关键字都要一起改，并同步 [../mygo/README.md](../mygo/README.md) 里「镜像里有什么」的说明。
 - `bun` 是可选依赖：只有 `mygo init` 默认 Web 前端模板需要它。上游若改了默认模板的命令（不再用 `bun`），可以评估是否还装 `bun`。
 
+## 升级 gio
+
+gio 镜像里只有一条版本线，升级方式与 mygo 相同：手动触发 `build-gio` 并填 `gio_version`（gogio CLI，模块 `gioui.org/cmd`，`v0.10.3` / `0.10.3` 都接受），或把三份 `Dockerfile.gio` 的 `GIO_VERSION` 改成具体版本。它不占标签，复现某次产物请用元数据里的 `gio_digest`。
+
+- 看上游发了什么版本：
+
+  ```bash
+  go list -m -f '{{.Version}}' gioui.org/cmd@latest   # gogio CLI
+  go list -m -f '{{.Version}}' gioui.org@latest       # gioui.org 库
+  ```
+
+- 升级 cgo 依赖（EGL/GLES、X11、Wayland、Vulkan）或无头运行库时改三份 `Dockerfile.gio` 的 apt 列表，并同步 `pkg-config --exists` 断言（`egl` / `glesv2` / `wayland-client` / `wayland-cursor` / `wayland-egl` / `x11` / `x11-xcb` / `xkbcommon` / `xkbcommon-x11` / `xcursor` / `xfixes` / `xrandr` / `xinerama` / `xi` / `xxf86vm` / `libffi` / `vulkan`）与 `ldconfig -p` 断言（`libEGL.so.1` / `libGL.so.1` / `libvulkan.so.1` / `libwayland-client.so.0` / `libxkbcommon.so.0` / `libX11.so.6`），三份 `build-gio.sh` 的冒烟段也要跟着改。
+- 上游 `gioui.org` 增删后端（例如新增/移除某个 `.pc` 依赖）时，apt 列表与 `.pc` 断言都要一起改，并同步 [../gio/README.md](../gio/README.md) 里「镜像里有什么」的说明。
+- 注意变体名与 CLI 名不一致：变体叫 gio，CLI 叫 `gogio`。`gogio` 没有 `version` 子命令，验证版本只能用 `go version -m "$(command -v gogio)"` 读 `gioui.org/cmd` 模块版本；它也没有 linux 打包目标。
+
 ## 新增工具
 
 1. 在三份 `Dockerfile.golang` 里加 `ARG` 与安装命令。
@@ -125,12 +140,12 @@ mygo 镜像里有两条独立的版本线，升级方式与 fyne 相同：手动
 
 改镜像内容后：
 
-- [ ] `.cnb/docker/`、`.github/docker/`、`.gitlab/docker/` 下的六个 Dockerfile 内容一致（镜像源差异除外）
+- [ ] `.cnb/docker/`、`.github/docker/`、`.gitlab/docker/` 下的七个 Dockerfile 内容一致（镜像源差异除外）
 - [ ] 三份 `build-golang.sh` 的标签规则、冒烟断言一致
 - [ ] 三份 `build-golang.sh` 的 `GO_TOOL_MODULES` 覆盖 Dockerfile 里所有 `go install` 版本变量（脚本会自检）
 - [ ] 三份 `build-fnpack.sh` 的标签规则、基础镜像检查、冒烟断言一致
-- [ ] 三份 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` 的标签规则、基础镜像检查、冒烟断言一致
-- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向六个镜像
+- [ ] 三份 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` 的标签规则、基础镜像检查、冒烟断言一致
+- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向七个镜像
 - [ ] `make format` 通过
 - [ ] `make lint-shell` 通过
 
@@ -138,6 +153,6 @@ mygo 镜像里有两条独立的版本线，升级方式与 fyne 相同：手动
 
 - `<go 版本>` 每天可能被同名覆盖，不是固定点。
 - golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升。
-- fnpack / wails3 / wails2 / fyne / mygo 的 `latest` / `<major.minor>` 只在基础镜像对应标签也指向本次版本时提升。
+- fnpack / wails3 / wails2 / fyne / mygo / gio 的 `latest` / `<major.minor>` 只在基础镜像对应标签也指向本次版本时提升。
 - 固定产物请用 annotation 里的 digest。
 - GHCR / CNB / GitLab Container Registry 可能有保留策略，长期归档请自行保存 digest 或复制到别处。

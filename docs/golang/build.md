@@ -56,6 +56,20 @@ docker build -f .github/docker/Dockerfile.mygo \
 
 不传 `GOLANG_IMAGE` 时默认 `golang:1-trixie`，只会得到「上游基座 + GTK3/WebKitGTK 4.1 开发包 + 无头运行库 + mygo + bun」，没有本仓库预装的工具链。`MYGO_VERSION` / `BUN_VERSION` 同样默认 `latest`，需要钉版本时用 `--build-arg` 传入（如 `MYGO_VERSION=v0.8.1`、`BUN_VERSION=1.4.4`）。
 
+### gio 镜像
+
+gio 镜像同样继承上一步的工具链，`GOLANG_IMAGE` 必须指向刚构建的 golang 镜像：
+
+```bash
+docker build -f .github/docker/Dockerfile.gio \
+  --build-arg GOLANG_IMAGE=golang:local \
+  -t golang-gio:local .
+```
+
+不传 `GOLANG_IMAGE` 时默认 `golang:1-trixie`，只会得到「上游基座 + EGL/GLES、X11、Wayland、Vulkan 开发包 + 无头运行库 + gogio」，没有本仓库预装的工具链。`GIO_VERSION` 同样默认 `latest`，需要钉版本时用 `--build-arg` 传入（如 `GIO_VERSION=v0.10.3`）。
+
+> 变体名叫 gio，CLI 却叫 `gogio`（模块 `gioui.org/cmd`），镜像里没有 `gio` 二进制。`gogio` 是打包工具（android / ios / tvos / js / windows / macos），没有 linux 目标，也没有 `version` 子命令；Linux 桌面程序就是普通 `go build` + cgo。这个镜像的重点是把 cgo 需要的 EGL/GLES、X11、Wayland、Vulkan 开发包装齐（Dockerfile 第 1 层用 `pkg-config` 逐个断言 `.pc` 存在）。
+
 ### 快速验证
 
 ```bash
@@ -87,6 +101,13 @@ docker run --rm golang-mygo:local sh -c '
   mygo doctor
   bun --version
 '
+
+docker run --rm golang-gio:local sh -c '
+  go version
+  pkg-config --exists egl && pkg-config --exists x11 && pkg-config --exists vulkan
+  gcc --version | head -1
+  gogio 2>&1 | head -5   # 没有 version 子命令，无参数会打 usage 到 stderr
+'
 ```
 
 ## 多架构构建
@@ -103,7 +124,7 @@ arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-
 
 ## CI 构建流程
 
-六个镜像由六个脚本分别发布。基础镜像先跑，fnpack / wails3 / wails2 / fyne / mygo 再各自 `FROM` 它。
+七个镜像由七个脚本分别发布。基础镜像先跑，fnpack / wails3 / wails2 / fyne / mygo / gio 再各自 `FROM` 它。
 
 基础镜像（`.cnb/scripts/build-golang.sh` / `.github/scripts/build-golang.sh` / `.gitlab/scripts/build-golang.sh`）：
 
@@ -168,6 +189,18 @@ mygo 镜像（`.cnb/scripts/build-mygo.sh` / `.github/scripts/build-mygo.sh` / `
 8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 mygo 的对应标签。
 9. 写 mygo 元数据（含 `mygo_version` / `bun_version`）。
 
+gio 镜像（`.cnb/scripts/build-gio.sh` / `.github/scripts/build-gio.sh` / `.gitlab/scripts/build-gio.sh`）与 mygo 同构，同样在构建前解析版本：
+
+1. 解析同一个 `<go 版本>` 标签。
+2. 确定 `GIO_VERSION`：输入优先；留空时先用 `go list -m gioui.org/cmd@latest` 解析 gogio CLI 最新稳定 tag（走基座镜像的 GOPROXY），解析不到才回退 `latest`。
+3. 等 `golang:<go 版本>` 在 registry 出现，并读取它的 index digest。
+4. 构建并推送 `golang/gio:<go 版本>`（`GOLANG_IMAGE` 指向基础镜像标签，`GIO_VERSION` 以 `--build-arg` 传入）。
+5. 派生 gio 的单平台标签。
+6. amd64 冒烟（见下）。
+7. 校验 OCI `version` 标签。
+8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 gio 的对应标签。
+9. 写 gio 元数据（含 `gio_version`）。
+
 ### 冒烟断言
 
 golang 镜像：
@@ -219,6 +252,15 @@ mygo 镜像：
 - `bun --version` 等于本次目标版本（回退 `latest` 时只验证可执行）
 - `fnpack` / `wails3` / `wails` / `fyne` 都**不存在**（这是 golang + mygo，不是别的变体）
 
+gio 镜像：
+
+- `go version` 与解析出的版本一致
+- `go node npm pnpm sqlc golangci-lint gogio gcc pkg-config Xvfb` 都存在（证明继承成功，且 cgo 编译/无头运行依赖齐全）
+- `pkg-config --exists` 对 `egl` / `glesv2` / `wayland-client` / `wayland-cursor` / `wayland-egl` / `x11` / `x11-xcb` / `xkbcommon` / `xkbcommon-x11` / `xcursor` / `xfixes` / `xrandr` / `xinerama` / `xi` / `xxf86vm` / `libffi` / `vulkan` 全部成立
+- `ldconfig -p` 能查到 `libEGL.so.1` / `libGL.so.1` / `libvulkan.so.1` / `libwayland-client.so.0` / `libxkbcommon.so.0` / `libX11.so.6`
+- `gogio` 在 `PATH` 里，且 `go version -m "$(command -v gogio)"` 读到的 `gioui.org/cmd` 模块版本等于本次目标版本（回退 `latest` 时只验证可执行）；`gogio` **没有 `version` 子命令**，无参数运行会打 usage 到 stderr 且非零退出，脚本里必须 `|| true`
+- `fnpack` / `wails3` / `wails` / `fyne` / `mygo` / `bun` 都**不存在**（这是 golang + gio，不是别的变体）
+
 ### 缓存
 
 三侧都启用 **buildx 层缓存**，写到 `<镜像>:buildcache`（CNB 制品库 / GHCR / GitLab Registry 各一份），`mode=min`：单阶段构建，每一层都在最终镜像里，min 已覆盖整条链，而且不会产生没人引用的孤儿 blob。
@@ -248,14 +290,17 @@ CACHE=off source .cnb/scripts/build-golang.sh
 | CNB    | fnpack | 仓库页面按钮「打包 Golang + fnpack 镜像」                 | 同上                                  |
 | CNB    | fyne   | 仓库页面按钮「打包 Golang + fyne 镜像」                   | 同上 + `fyne_version`                 |
 | CNB    | mygo   | 仓库页面按钮「打包 Golang + mygo 镜像」                   | 同上 + `mygo_version` / `bun_version` |
+| CNB    | gio    | 仓库页面按钮「打包 Golang + gio 镜像」                    | 同上 + `gio_version`                  |
 | GitHub | golang | Actions → build-golang → Run workflow                     | 同上                                  |
 | GitHub | fnpack | Actions → build-fnpack → Run workflow（需基础镜像已存在） | 同上                                  |
 | GitHub | fyne   | Actions → build-fyne → Run workflow（需基础镜像已存在）   | 同上 + `fyne_version`                 |
 | GitHub | mygo   | Actions → build-mygo → Run workflow（需基础镜像已存在）   | 同上 + `mygo_version` / `bun_version` |
+| GitHub | gio    | Actions → build-gio → Run workflow（需基础镜像已存在）    | 同上 + `gio_version`                  |
 | GitLab | 任意   | CI/CD → Pipelines → Run pipeline                          | `TARGET` 选镜像；`VERSION` 同上       |
 | GitLab | golang | 定时 schedule，`TARGET=golang`                            | `VERSION`：留空 / 1.27 / 1.27.3       |
 | GitLab | fnpack | 定时 schedule，`TARGET=fnpack`（需基础镜像已存在）        | 同上 + `FNPACK_VERSION`               |
 | GitLab | fyne   | 定时 schedule，`TARGET=fyne`（需基础镜像已存在）          | 同上 + `FYNE_VERSION`                 |
 | GitLab | mygo   | 定时 schedule，`TARGET=mygo`（需基础镜像已存在）          | 同上 + `MYGO_VERSION` / `BUN_VERSION` |
+| GitLab | gio    | 定时 schedule，`TARGET=gio`（需基础镜像已存在）           | 同上 + `GIO_VERSION`                  |
 
 留空表示使用 Dockerfile 的默认值：`golang:1-trixie` 自动跟随最新稳定 Go。填 `1.27` 会跟随该 minor 的最新补丁，填 `1.27.3` 精确到补丁版本。标签里的版本始终是解析后的实际版本。

@@ -5,6 +5,7 @@ include:
   - .cnb/workflows/build-wails2.yml
   - .cnb/workflows/build-fyne.yml
   - .cnb/workflows/build-mygo.yml
+  - .cnb/workflows/build-gio.yml
   - .cnb/workflows/cnb-sechook.yml
   - .cnb/workflows/code-review.yml
   - .cnb/workflows/code-security-config.yml
@@ -157,3 +158,27 @@ main:
           settings:
             type: ADD
             fromJsonFile: .cnb/annotation-mygo.json
+
+  # 每天 18:05（Asia/Shanghai）构建 gio 镜像：
+  #   <registry>/<repo>/gio → golang + EGL/GLES/X11/Wayland/Vulkan 开发包
+  #                           + 无头运行库 + gogio CLI
+  # 接在 mygo（15:05）之后，与前面的多架构构建错开三小时，避免抢同一个 runner；
+  # 此时距基础镜像产出（00:05）已过十八小时，基座一定就绪。
+  'crontab: 5 18 * * *':
+    - name: build-gio
+      runner:
+        tags: cnb:arch:amd64
+      services:
+        - docker
+      imports:
+        - https://cnb.cool/dtapp/envs/-/blob/main/docker.yml
+        # 不要把 .cnb/scripts/build-gio.sh 放进 imports（${...} 会被改写）
+      stages:
+        - name: 构建并推送多架构镜像
+          script: |
+            source .cnb/scripts/build-gio.sh
+        - name: 写入镜像元数据
+          image: cnbcool/annotations:latest
+          settings:
+            type: ADD
+            fromJsonFile: .cnb/annotation-gio.json

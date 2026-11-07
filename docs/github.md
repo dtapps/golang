@@ -6,12 +6,12 @@
 
 GitHub 侧不 `source` CNB / GitLab 的脚本，也不与它们共用 Dockerfile：
 
-| 职责       | CNB 侧                                                                                                                               | GitHub 侧                                                                                                                               |
-|------------|--------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| Dockerfile | `.cnb/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo` | `.github/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo` |
-| 构建脚本   | `.cnb/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`            | `.github/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`            |
-| 流水线     | `.cnb.yml` + `.cnb/workflows/`                                                                                                       | `.github/workflows/`                                                                                                                    |
-| 元数据     | `.cnb/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo}.json`                                                                         | `.github/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo}.json`                                                                         |
+| 职责       | CNB 侧                                                                                                                                                 | GitHub 侧                                                                                                                                                 |
+|------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Dockerfile | `.cnb/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio` | `.github/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio` |
+| 构建脚本   | `.cnb/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`              | `.github/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`              |
+| 流水线     | `.cnb.yml` + `.cnb/workflows/`                                                                                                                         | `.github/workflows/`                                                                                                                                      |
+| 元数据     | `.cnb/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio}.json`                                                                                      | `.github/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio}.json`                                                                                      |
 
 GitLab 侧的同构清单（以及三侧完整对照表）见 [gitlab.md](gitlab.md)，本页不再重复。
 
@@ -29,6 +29,7 @@ GitLab 侧的同构清单（以及三侧完整对照表）见 [gitlab.md](gitlab
 | Golang 构建环境 + wails2 | `ghcr.io/dtapps/golang/wails2` | `docker.cnb.cool/dtapp/golang/wails2` |
 | Golang 构建环境 + fyne   | `ghcr.io/dtapps/golang/fyne`   | `docker.cnb.cool/dtapp/golang/fyne`   |
 | Golang 构建环境 + mygo   | `ghcr.io/dtapps/golang/mygo`   | `docker.cnb.cool/dtapp/golang/mygo`   |
+| Golang 构建环境 + gio    | `ghcr.io/dtapps/golang/gio`    | `docker.cnb.cool/dtapp/golang/gio`    |
 
 脚本从 Actions 内置变量派生，不写死：
 
@@ -40,6 +41,7 @@ GitLab 侧的同构清单（以及三侧完整对照表）见 [gitlab.md](gitlab
 | `WAILS2_IMAGE`  | `IMAGE` + `/wails2`                       | wails2 镜像全名       |
 | `FYNE_IMAGE`    | `IMAGE` + `/fyne`                         | fyne 镜像全名         |
 | `MYGO_IMAGE`    | `IMAGE` + `/mygo`                         | mygo 镜像全名         |
+| `GIO_IMAGE`     | `IMAGE` + `/gio`                          | gio 镜像全名          |
 | `REGISTRY_USER` | `GITHUB_ACTOR`                            | `docker login` 用户名 |
 | `REVISION`      | `GITHUB_SHA`                              | OCI `revision`        |
 | `IMAGE_SOURCE`  | `https://github.com/<GITHUB_REPOSITORY>`  | OCI `source` / `url`  |
@@ -74,7 +76,7 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 
 `wails3_version` 留空时脚本先 `go list -m github.com/wailsapp/wails/v3@latest` 解析最新稳定 tag（如 `v3.1.0`）再传进 `--build-arg`；解析失败回退 `latest`，由 Dockerfile 在构建时解析（层缓存随之失效）。策略细节见 [wails3/README.md](wails3/README.md#wails3-版本策略)。
 
-`build-fnpack` / `build-wails3` / `build-wails2` / `build-fyne` / `build-mygo` 启动后都会最多等 5 分钟，让 `<go 版本>` 标签在 registry 里可读；仍然不存在就报错退出，不会自己重复安装一遍工具链。
+`build-fnpack` / `build-wails3` / `build-wails2` / `build-fyne` / `build-mygo` / `build-gio` 启动后都会最多等 5 分钟，让 `<go 版本>` 标签在 registry 里可读；仍然不存在就报错退出，不会自己重复安装一遍工具链。
 
 ### `build-wails2.yml`
 
@@ -106,6 +108,16 @@ fork 后自动推到 `ghcr.io/<你的账号>/golang`，rename 仓库也不需要
 
 `mygo_version` 留空时脚本先 `go list -m github.com/egoist/mygo@latest` 解析最新稳定 tag（如 `v0.8.1`）再传进 `--build-arg`，`bun_version` 留空时用 `npm view bun version` 解析（如 `1.4.4`）；解析失败都回退 `latest`，由 Dockerfile 在构建时解析。镜像装 GTK3 / WebKitGTK 4.1 开发包与无头运行库，mygo 的 Linux 后端纯 Go、运行期 `dlopen`，编译应用不需要额外 build tag。
 
+### `build-gio.yml`
+
+- 触发：
+  - `schedule`：每天 10:05 UTC（北京 18:05），比 `build-mygo` 再晚 3 小时
+  - `workflow_dispatch`：手动，要求对应版本的基础镜像已存在；可填 `version` / `gio_version`
+- `build` 作业：检出 → 释放磁盘 → QEMU → buildx → `source .github/scripts/build-gio.sh` → Step Summary → artifact
+- 超时：120 分钟（`go install` 要按 amd64 + arm64 各编译一遍 `gogio`，arm64 那趟走 QEMU；还要在构建期真实编译一个最小 Gio 程序校验 cgo 依赖）
+
+`gio_version` 留空时脚本先 `go list -m gioui.org/cmd@latest` 解析最新稳定 tag（如 `v0.10.3`）再传进 `--build-arg`；解析失败回退 `latest`，由 Dockerfile 在构建时解析。变体叫 gio，CLI 叫 `gogio`（模块 `gioui.org/cmd`），不是 `gio`；`gogio` 是打包工具（android / ios / tvos / js / windows / macos），没有 linux 目标也没有 `version` 子命令，所以冒烟测试不跑 `gogio version`，而是用 `go version -m "$(command -v gogio)"` 取 `gioui.org/cmd` 的模块版本比对。镜像装 EGL/GLES、X11、Wayland、Vulkan 开发包与无头运行库，Linux 桌面程序就是普通 `go build` + cgo，构建时不需要额外 build tag。
+
 ## 并发与排队
 
 各 workflow 的 `concurrency` 同构（以 `build-golang` 为例）：
@@ -124,7 +136,7 @@ concurrency:
 `queue` 默认是 `single`（只留 1 个 pending，后来的 run 顶掉早先的 pending），这正是「连续触发时旧运行被取消」的来源；`max` 是 GitHub 2026-05 起支持的值。两条约束：
 
 - `queue: max` 不能与 `cancel-in-progress: true` 组合，否则 workflow 校验失败。
-- 排队只发生在「同一个 workflow、同一个分支」的多次触发之间。各变体镜像的先后顺序仍只靠定时任务错开 3 小时保证；手动同时触发各 workflow 时会并行，fnpack / wails3 / wails2 / fyne / mygo 依旧靠脚本里那 5 分钟等基础镜像标签。
+- 排队只发生在「同一个 workflow、同一个分支」的多次触发之间。各变体镜像的先后顺序仍只靠定时任务错开 3 小时保证；手动同时触发各 workflow 时会并行，fnpack / wails3 / wails2 / fyne / mygo / gio 依旧靠脚本里那 5 分钟等基础镜像标签。
 
 参考：[GitHub Docs — Control the concurrency of workflows and jobs](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/control-the-concurrency-of-workflows-and-jobs)。
 
@@ -163,9 +175,15 @@ env:
   version: ${{ inputs.version }}
   mygo_version: ${{ inputs.mygo_version }}
   bun_version: ${{ inputs.bun_version }}
+
+# build-gio.yml
+env:
+  REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  version: ${{ inputs.version }}
+  gio_version: ${{ inputs.gio_version }}
 ```
 
-其余由脚本从 Actions 内置变量派生。`GITHUB_TOKEN` 不会自动进环境变量，所以必须显式从 secrets 传。`fnpack_version` 留空时，脚本回退到 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）；`wails3_version` 留空时脚本解析上游最新稳定 tag，解析不到才回退 Dockerfile 的 `WAILS3_VERSION`（默认 `latest`）。`wails2_version` 同理，解析的是 `github.com/wailsapp/wails/v2@latest`，回退 Dockerfile 的 `WAILS2_VERSION`；`fyne_version` 解析的是 `fyne.io/tools@latest`，回退 Dockerfile 的 `FYNE_VERSION`（默认 `latest`）；`mygo_version` 解析的是 `github.com/egoist/mygo@latest`，`bun_version` 解析的是 npm 上的 `bun@latest`，回退 Dockerfile 的 `MYGO_VERSION` / `BUN_VERSION`（默认都是 `latest`）。
+其余由脚本从 Actions 内置变量派生。`GITHUB_TOKEN` 不会自动进环境变量，所以必须显式从 secrets 传。`fnpack_version` 留空时，脚本回退到 Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 查询接口，暂作为最新版本）；`wails3_version` 留空时脚本解析上游最新稳定 tag，解析不到才回退 Dockerfile 的 `WAILS3_VERSION`（默认 `latest`）。`wails2_version` 同理，解析的是 `github.com/wailsapp/wails/v2@latest`，回退 Dockerfile 的 `WAILS2_VERSION`；`fyne_version` 解析的是 `fyne.io/tools@latest`，回退 Dockerfile 的 `FYNE_VERSION`（默认 `latest`）；`mygo_version` 解析的是 `github.com/egoist/mygo@latest`，`bun_version` 解析的是 npm 上的 `bun@latest`，回退 Dockerfile 的 `MYGO_VERSION` / `BUN_VERSION`（默认都是 `latest`）；`gio_version` 解析的是 `gioui.org/cmd@latest`（`gogio`），回退 Dockerfile 的 `GIO_VERSION`（默认 `latest`）。
 
 权限：
 
@@ -185,7 +203,7 @@ permissions:
   2. `--cache-to type=registry` 写 `<镜像>:buildcache` 缓存清单；
   3. `docker buildx imagetools create` 派生 `<版本>-linux-{amd64,arm64}`，冒烟通过后提升 `<major.minor>` / `latest`。
 
-  `write` 隐含 `read`：fnpack / wails3 / wails2 / fyne / mygo 还要 `imagetools inspect` 读基座 manifest digest。
+  `write` 隐含 `read`：fnpack / wails3 / wails2 / fyne / mygo / gio 还要 `imagetools inspect` 读基座 manifest digest。
 
 不需要 `id-token: write` / `attestations: write`（`--provenance=mode=min` 由 buildx 本地生成），也不需要 `actions: read`（`queue: max` 是平台层能力，`upload-artifact` 走 `ACTIONS_RUNTIME_TOKEN`）。
 
@@ -193,15 +211,15 @@ permissions:
 
 ## 与 CNB 的差异
 
-| 维度          | CNB                                                                                          | GitHub                                                                             |
-|---------------|----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE`                                            | `ghcr.io` + `GITHUB_REPOSITORY`                                                    |
-| 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`                                                          | `GITHUB_ACTOR` / `GITHUB_TOKEN`                                                    |
-| 定时任务      | golang 00:05、fnpack 03:05、wails3 06:05、wails2 09:05、fyne 12:05、mygo 15:05 Asia/Shanghai | golang 16:05、fnpack 19:05、wails3 22:05、wails2 01:05、fyne 04:05、mygo 07:05 UTC |
-| 多架构        | docker 服务自带                                                                              | `setup-qemu-action` + `setup-buildx-action`                                        |
-| GitHub 下载源 | `https://files.m.daocloud.io`                                                                | 直连 `github.com` / `nodejs.org`                                                   |
-| 元数据        | commit annotation                                                                            | Step Summary + artifact                                                            |
-| 磁盘准备      | 无                                                                                           | 删除预装 SDK，释放空间                                                             |
+| 维度          | CNB                                                                                                     | GitHub                                                                                        |
+|---------------|---------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE`                                                       | `ghcr.io` + `GITHUB_REPOSITORY`                                                               |
+| 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`                                                                     | `GITHUB_ACTOR` / `GITHUB_TOKEN`                                                               |
+| 定时任务      | golang 00:05、fnpack 03:05、wails3 06:05、wails2 09:05、fyne 12:05、mygo 15:05、gio 18:05 Asia/Shanghai | golang 16:05、fnpack 19:05、wails3 22:05、wails2 01:05、fyne 04:05、mygo 07:05、gio 10:05 UTC |
+| 多架构        | docker 服务自带                                                                                         | `setup-qemu-action` + `setup-buildx-action`                                                   |
+| GitHub 下载源 | `https://files.m.daocloud.io`                                                                           | 直连 `github.com` / `nodejs.org`                                                              |
+| 元数据        | commit annotation                                                                                       | Step Summary + artifact                                                                       |
+| 磁盘准备      | 无                                                                                                      | 删除预装 SDK，释放空间                                                                        |
 
 GitLab 与 GitHub 的差异（镜像名来源、登录、定时任务、并发、元数据）见 [gitlab.md](gitlab.md#与-github-的差异)。
 
@@ -217,7 +235,7 @@ latest                    latest
 <go 版本>-linux-arm64     1.27.3-linux-arm64
 ```
 
-各变体镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack / wails3 / wails2 / fyne / mygo 只在基础镜像对应标签也指向本次版本时才提升。
+各变体镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack / wails3 / wails2 / fyne / mygo / gio 只在基础镜像对应标签也指向本次版本时才提升。
 
 ## 缓存
 
@@ -243,9 +261,10 @@ docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
 docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 docker pull ghcr.io/dtapps/golang/fyne@sha256:<fyne_digest>
 docker pull ghcr.io/dtapps/golang/mygo@sha256:<mygo_digest>
+docker pull ghcr.io/dtapps/golang/gio@sha256:<gio_digest>
 ```
 
-golang 的 digest 在 `golang-annotation` artifact / Step Summary 里；fnpack / wails3 / wails2 / fyne / mygo 分别在 `fnpack-annotation` / `wails3-annotation` / `wails2-annotation` / `fyne-annotation` / `mygo-annotation` 里。
+golang 的 digest 在 `golang-annotation` artifact / Step Summary 里；fnpack / wails3 / wails2 / fyne / mygo / gio 分别在 `fnpack-annotation` / `wails3-annotation` / `wails2-annotation` / `fyne-annotation` / `mygo-annotation` / `gio-annotation` 里。
 
 ## 常见问题
 

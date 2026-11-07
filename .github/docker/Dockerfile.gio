@@ -1,0 +1,143 @@
+# ===================================================================
+# Golang 构建环境镜像 + gio
+#
+# 在 Dockerfile.golang 产出的镜像之上做两件事：
+#   1. 安装编译 Gio 桌面程序所需的系统依赖（cgo 链接 EGL/GLES、X11、Wayland、
+#      Vulkan，外加无头运行库）
+#   2. go install gogio CLI（模块 gioui.org/cmd）
+#
+# 这里不做「真编一个 Gio 程序」的额外校验层。gogio 是纯 Go 程序，装成功确实
+# 证明不了 cgo 依赖齐全，但 fyne / wails3 / wails2 / mygo 四个变体同样是
+# 只断言 .pc 存在、不做编译校验。要保持七个变体的结构一致，gio 也不单独加。
+#
+# 三个平台各留一份：本文件（GitHub 侧）、.cnb/docker/Dockerfile.gio（CNB 侧）与
+# .gitlab/docker/Dockerfile.gio（GitLab 侧），各自维护、不互相引用。
+#
+# 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
+#   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
+# 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
+# APT / GOPROXY 继承基座镜像，本文件没有额外的镜像源开关。
+#
+# gio：https://gioui.org  ·  https://gioui.org/doc/install/linux
+# 变体名叫 gio（镜像 <registry>/<repo>/gio），CLI 却叫 gogio，两者不要混：
+#   go install gioui.org/cmd/gogio   ← 装出来的二进制是 gogio
+# gogio 是「打包」工具（android / ios / tvos / js / windows / macos），没有 linux
+# 目标，也没有 version 子命令；Linux 桌面程序就是普通 go build + cgo。所以本镜像
+# 的重点不是 gogio 这个二进制，而是把 cgo 需要的 EGL/GLES、X11、Wayland、Vulkan
+# 开发包装齐（装齐与否由第 1 层的 pkg-config 断言负责）。
+# GIO_VERSION 是 gioui.org/cmd（gogio）的版本，默认 latest；CI 会先解析成具体
+# tag 再传进来，裸 build 由 go 解析。
+# ===================================================================
+
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+
+ARG GOLANG_IMAGE
+ARG GIO_VERSION=latest
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+ARG BASE_DIGEST=unknown
+ARG IMAGE_SOURCE
+
+# 1. 安装编译 Gio 桌面程序所需的系统依赖
+# 清单来源三处取并集，逐项都在 Debian trixie 的 amd64 与 arm64 索引里核对过：
+#   a. 官方安装文档 https://gioui.org/doc/install/linux 的 apt 列表
+#      （gcc pkg-config libwayland-dev libx11-dev libx11-xcb-dev
+#        libxkbcommon-x11-dev libgles2-mesa-dev libegl1-mesa-dev
+#        libffi-dev libxcursor-dev libvulkan-dev）；
+#   b. 上游 CI（.builds/linux.yml）额外装的 libxkbcommon-dev libxrandr-dev
+#      libxinerama-dev libxi-dev libxxf86vm-dev mesa-vulkan-drivers xvfb；
+#   c. gioui.org v0.10.3 源码里的 cgo 指令，正好对应下面断言的那些 .pc：
+#        #cgo linux pkg-config: egl wayland-egl
+#        #cgo linux pkg-config: wayland-client wayland-cursor
+#        #cgo linux pkg-config: x11 xkbcommon xkbcommon-x11 x11-xcb xcursor xfixes
+#        #cgo linux pkg-config: xkbcommon
+# 这些 -dev 包既是编译依赖也是运行依赖（-dev 会把运行库一起装上），
+# 不能像基座镜像那样在最后 purge 掉。
+# 无头运行环境（Xvfb + mesa + 字体）一并装上：CI 里没有显示器也能跑 GUI 冒烟。
+# 装完用 pkg-config / ldconfig 验证一遍：缺了这里就失败，不会推迟到使用者手里。
+# 用 set -e 串联，每条断言都生效（不要退回 `;` 串，那样只有最后一条算数）。
+RUN set -eux; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+    pkg-config \
+    gcc \
+    libwayland-dev \
+    libx11-dev \
+    libx11-xcb-dev \
+    libxkbcommon-dev \
+    libxkbcommon-x11-dev \
+    libgles2-mesa-dev \
+    libegl1-mesa-dev \
+    libffi-dev \
+    libvulkan-dev \
+    libxcursor-dev \
+    libxfixes-dev \
+    libxrandr-dev \
+    libxinerama-dev \
+    libxi-dev \
+    libxxf86vm-dev \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
+    libegl-mesa0 \
+    mesa-vulkan-drivers \
+    xvfb \
+    xauth \
+    dbus-x11 \
+    fonts-dejavu-core; \
+    rm -rf /var/lib/apt/lists/*; \
+    pkg-config --exists egl; \
+    pkg-config --exists glesv2; \
+    pkg-config --exists wayland-client; \
+    pkg-config --exists wayland-cursor; \
+    pkg-config --exists wayland-egl; \
+    pkg-config --exists x11; \
+    pkg-config --exists x11-xcb; \
+    pkg-config --exists xkbcommon; \
+    pkg-config --exists xkbcommon-x11; \
+    pkg-config --exists xcursor; \
+    pkg-config --exists xfixes; \
+    pkg-config --exists xrandr; \
+    pkg-config --exists xinerama; \
+    pkg-config --exists xi; \
+    pkg-config --exists xxf86vm; \
+    pkg-config --exists libffi; \
+    pkg-config --exists vulkan; \
+    ldconfig -p | grep -q 'libEGL\.so\.1'; \
+    ldconfig -p | grep -q 'libGL\.so\.1'; \
+    ldconfig -p | grep -q 'libvulkan\.so\.1'; \
+    ldconfig -p | grep -q 'libwayland-client\.so\.0'; \
+    ldconfig -p | grep -q 'libxkbcommon\.so\.0'; \
+    ldconfig -p | grep -q 'libX11\.so\.6'; \
+    command -v gcc; \
+    command -v Xvfb
+
+# 2. 安装 gogio CLI
+# 模块缓存与编译缓存挂在构建节点上，不进入镜像层。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    echo "gogio 目标版本: ${GIO_VERSION}"; \
+    go install -v "gioui.org/cmd/gogio@${GIO_VERSION}"; \
+    test -x "${GOPATH}/bin/gogio"; \
+    echo "--- gogio 安装的 ---"; \
+    gogio 2>&1 || true
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# apt 与 go install 这两层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + gio：在 golang 镜像基础上增加 cgo 所需的 EGL/GLES/X11/Wayland/Vulkan 开发包、无头运行库与 gogio CLI" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+CMD ["bash"]

@@ -1,0 +1,132 @@
+# ===================================================================
+# GitHub Actions：构建并推送 gio 镜像到 GHCR
+#
+#   产物：ghcr.io/<owner>/<repo>/gio  → golang + EGL/GLES/X11/Wayland/Vulkan
+#                                      开发包 + 无头运行库 + gogio CLI
+#
+#   基础镜像由 build-golang.yml 产出。本工作流独立定时触发（比 build-mygo
+#   再晚 3 小时）或手动触发，都要求 <go 版本> 标签已经存在。
+#
+#   实现：GitHub 侧独立维护一份（与 CNB 各自维护，不共用）
+#         · Dockerfile  .github/docker/Dockerfile.gio
+#         · 构建脚本    .github/scripts/build-gio.sh
+#         · 对照实现    .cnb/docker/Dockerfile.gio + .cnb/scripts/build-gio.sh
+#
+#   版本：变体名叫 gio，CLI 却叫 gogio（模块 gioui.org/cmd），两者不要混；
+#         gogio 是打包工具，没有 version 子命令，镜像的重点是 EGL/GLES、X11、
+#         Wayland、Vulkan 开发包装齐（第 1 层用 pkg-config 逐个断言 .pc 存在）。
+#         gio_version（gioui.org/cmd，gogio CLI）默认 latest，脚本构建前解析成
+#         具体 tag 再传进 build-arg，层缓存才跟得上版本。手动触发可以填它钉住。
+# ===================================================================
+# https://github.com/actions/runner-images
+# https://github.com/actions/checkout
+# https://github.com/docker/setup-qemu-action
+# https://github.com/docker/setup-buildx-action
+# https://github.com/actions/upload-artifact
+name: build-gio
+
+on:
+  schedule:
+    # 每天 18:05（Asia/Shanghai）= 10:05 UTC，与 CNB 的 crontab '5 18 * * *' 同刻。
+    # 比 build-mygo 的 07:05 UTC 晚 3 小时，给基础镜像留出构建时间。
+    - cron: '5 10 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        # 与 build-golang 的输入等价，用来选中对应的基础镜像标签
+        description: '选填：Go 版本。留空 = 跟随 Dockerfile 的 GO_VERSION（golang:1-trixie，最新稳定 Go）；也可填 1.27 / 1.27.3'
+        required: false
+        default: ''
+        type: string
+      gio_version:
+        description: '选填：gogio CLI 版本（模块 gioui.org/cmd）。留空 = 解析上游最新稳定 tag（如 v0.10.3）；也可填 v0.10.3 / 0.10.3 / v0.10.4-rc1'
+        required: false
+        default: ''
+        type: string
+
+# contents: read   actions/checkout 检出源码。
+# packages: write  推镜像、写 buildcache 缓存清单、imagetools create 派生/提升标签；
+#                  write 含 read，各变体还要读基座 manifest。
+# 显式声明后未列出的权限一律不授予；降成 read 会在推送阶段被拒。
+permissions:
+  contents: read
+  packages: write
+
+# 并发策略：同一分支的多次触发串行排队，绝不取消「正在运行」的旧运行。
+# cancel-in-progress: false 表示新运行进入 pending 等待，而非抢占/取消 in-progress。
+# queue: max 让同一 group 最多保留 100 个 pending（默认 queue: single 只留 1 个，
+# 新的会顶掉旧的 pending），按进入等待的先后 FIFO 依次执行，仅队列满的溢出运行被取消。
+# 注意：queue: max 不能与 cancel-in-progress: true 组合，否则 workflow 校验失败。
+concurrency:
+  group: build-gio-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    # gio 的 cgo 依赖在 amd64 + arm64 上各装一遍（第 1 层逐个 pkg-config 断言），
+    # 另外 gogio CLI 也要按两个架构各 go install 一遍，arm64 那趟走 QEMU。
+    timeout-minutes: 120
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v7
+
+      - name: 释放磁盘空间
+        # runner 临时盘约 14 GiB：删掉无关的预装 SDK，避免构建期 no space left on device。
+        # 并发删除预装 SDK：串行会把四个目录的 unlink 耗时相加，这里只等最慢的一个。
+        run: |
+          sudo rm -rf /usr/share/dotnet & p1=$!
+          sudo rm -rf /usr/local/lib/android & p2=$!
+          sudo rm -rf /opt/ghc & p3=$!
+          sudo rm -rf /opt/hostedtoolcache/CodeQL & p4=$!
+          rc=0
+          for pid in "$p1" "$p2" "$p3" "$p4"; do
+            wait "$pid" || rc=1
+          done
+          [ "$rc" -eq 0 ] || exit 1
+          df -h /
+
+      - name: 安装 QEMU（跨架构构建 arm64）
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - name: 初始化 buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 构建并推送多架构镜像
+        id: build
+        # 镜像名、revision、source 等由脚本从 Actions 内置变量派生；
+        # 基础镜像标签由脚本从 Dockerfile 的 GO_VERSION 解析后拼接。
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version: ${{ inputs.version }}
+          gio_version: ${{ inputs.gio_version }}
+        # 必须 source：脚本里的 export、trap 与退出码都留在当前 shell
+        run: |
+          source .github/scripts/build-gio.sh
+
+      - name: 写入运行摘要
+        if: always()
+        run: |
+          {
+            echo '### Golang + gio 镜像（GHCR）'
+            echo ''
+            if [ -f .github/annotation-gio.json ]; then
+              echo '| 键 | 值 |'
+              echo '| --- | --- |'
+              jq -r 'to_entries[] | "| \(.key) | \(.value) |"' .github/annotation-gio.json
+            else
+              echo '本次没有产出 .github/annotation-gio.json（构建在元数据步骤之前就失败）。'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 上传构建元数据
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gio-annotation
+          path: .github/annotation-gio.json
+          if-no-files-found: warn
+          retention-days: 30
