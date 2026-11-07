@@ -23,9 +23,9 @@
 **镜像里有什么**
 
 - Go 工具链（基座 `golang:1-trixie`，自动跟随最新稳定 Go）
-- UPX、nfpm
+- UPX、nfpm、wixl（`wixl` + `wixl-data`，在 Linux 上编译 Windows MSI）
 - Node.js + npm + pnpm
-- sqlc、ent/entc、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt（都用 `go install -v`，CI 日志能看编译进度）
+- sqlc、ent/entc、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、gocover-cobertura（都用 `go install -v`，CI 日志能看编译进度）
 - 基础命令：git、curl、make、jq、zip/unzip、pkg-config
 - 时区与语言：`TZ=Asia/Shanghai`、`LANG`/`LC_ALL`=`C.UTF-8`，已装 `tzdata`
 - fnpack 镜像只多一个 `fnpack`；wails3 镜像多 GTK4/WebKitGTK 开发包与 `wails3` CLI；wails2 镜像多 GTK3/WebKit2GTK 4.1 开发包与 `wails` CLI；fyne 镜像多 OpenGL/X11/Wayland 开发包与 `fyne` CLI；mygo 镜像多 GTK3/WebKitGTK 4.1 开发包、无头运行库、`mygo` CLI 与 `bun`；gio 镜像多 EGL/GLES、X11、Wayland、Vulkan 开发包与无头运行库、`gogio` CLI（模块 `gioui.org/cmd`）。七个镜像的工具链完全一致

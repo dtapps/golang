@@ -8,7 +8,8 @@
 # 镜像内容：
 #   Go 工具链 + UPX + nfpm + Node.js/pnpm
 #   + sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt
-#   + gojq / sql-formatter / gotestsum / markdownfmt
+#   + gojq / sql-formatter / gotestsum / markdownfmt / gocover-cobertura
+#   + wixl（编译 Windows MSI 用）
 #
 # 下载源（GitHub Release）：
 #   GITHUB_MIRROR 为空（默认）        → 直接访问 github.com（GitHub Actions 用）
@@ -76,6 +77,7 @@ ARG NODE_MIRROR=""
 # https://github.com/wasilibs/go-sql-formatter/releases
 # https://github.com/gotestyourself/gotestsum/releases
 # https://github.com/Kunde21/markdownfmt/releases
+# https://github.com/boumenot/gocover-cobertura/releases
 # ==========================================
 ARG UPX_VERSION=latest
 ARG NFPM_VERSION=latest
@@ -92,6 +94,7 @@ ARG GOJQ_VERSION=latest
 ARG GOSQLFORMATTER_VERSION=latest
 ARG GOTESTSUM_VERSION=latest
 ARG MARKDOWNFMT_VERSION=latest
+ARG GOCOVER_COBERTURA_VERSION=latest
 
 # 1. 设置 Go 环境变量
 ENV GO111MODULE=on \
@@ -110,7 +113,9 @@ RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.
     || sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list
 
 # 3. 安装基础构建工具（含 tzdata，配合上面的 TZ）
-RUN export DEBIAN_FRONTEND=noninteractive; \
+# wixl / wixl-data：编译 Windows MSI 安装包（msitools，替代 Windows 上的 WiX）
+RUN set -eu; \
+    export DEBIAN_FRONTEND=noninteractive; \
     apt-get update && apt-get install -y --no-install-recommends \
     wget \
     xz-utils \
@@ -124,9 +129,13 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     unzip \
     pkg-config \
     tzdata \
+    wixl \
+    wixl-data \
     && rm -rf /var/lib/apt/lists/*; \
     ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime; \
     printf '%s\n' "${TZ}" > /etc/timezone; \
+    echo "--- wixl installed ---"; \
+    wixl --version; \
     date
 
 # 4. 安装 UPX 工具
@@ -236,6 +245,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     && echo "==> gotestsum 安装完成 (${GOTESTSUM_VERSION})" \
     && go install -v github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
     && echo "==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})" \
+    && go install -v github.com/boumenot/gocover-cobertura@${GOCOVER_COBERTURA_VERSION} \
+    && echo "==> gocover-cobertura 安装完成 (${GOCOVER_COBERTURA_VERSION})" \
     && echo "--- Go 工具链安装完成 ---" \
     && ls -l "$GOPATH/bin"
 
@@ -255,7 +266,7 @@ LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.version="${IMAGE_VERSION}" \
-    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt" \
+    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、wixl、gocover-cobertura" \
     org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.base.name="golang:${GO_VERSION}-${DEBIAN_VERSION}" \
     org.opencontainers.image.base.digest="${BASE_DIGEST}"

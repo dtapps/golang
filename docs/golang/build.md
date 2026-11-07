@@ -206,7 +206,7 @@ gio 镜像（`.cnb/scripts/build-gio.sh` / `.github/scripts/build-gio.sh` / `.gi
 golang 镜像：
 
 - `go version` 与解析出的版本一致
-- 以下命令都存在：`go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq sql-formatter gotestsum markdownfmt`
+- 以下命令都存在：`go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm wixl sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq sql-formatter gotestsum markdownfmt gocover-cobertura`
 - `date +%z` 为 `+0800`（`TZ=Asia/Shanghai` 生效、`tzdata` 到位）
 - 以下工具的版本命令能实际执行（`--version` / `version` / `-v` 任一成功，防 latest 升级装进坏二进制）：`node npm pnpm upx nfpm sqlc golangci-lint gojq shfmt gotestsum`
 - `fnpack` **不存在**

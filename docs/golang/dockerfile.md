@@ -57,10 +57,10 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 ### 安装顺序
 
 1. **环境变量**：Go 侧 CNB 的 `GOPROXY` 指向腾讯云、GitHub / GitLab 不设置（用默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。另有 `TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`：容器内统一北京时间与 UTF-8，构建日志、`go build` 产物里的时间戳才对得上。
-2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。
+2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
 4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；GitHub / GitLab 侧不配置 registry（npm / pnpm 用官方默认 `registry.npmjs.org`），CNB 侧才用腾讯云；三侧都设 `pnpm config set ignore-scripts false`。
-5. **Go 工具链（含 nfpm）**：按工具分成 5 层 `go install -v`（nfpm+sqlc / ent+entc / golangci-lint+govulncheck / shfmt+dockerfmt+yamlfmt+gojq / sql-formatter+gotestsum+markdownfmt），`-v` 会打印每个被编译的包，CI 日志里能直接看出卡在哪个工具、哪个包上；每层都挂 BuildKit 缓存目录：
+5. **Go 工具链（含 nfpm）**：按工具分成 5 层 `go install -v`（nfpm+sqlc / ent+entc / golangci-lint+govulncheck / shfmt+dockerfmt+yamlfmt+gojq / sql-formatter+gotestsum+markdownfmt+gocover-cobertura），`-v` 会打印每个被编译的包，CI 日志里能直接看出卡在哪个工具、哪个包上；每层都挂 BuildKit 缓存目录：
    - `--mount=type=cache,target=/go/pkg/mod`：模块缓存
    - `--mount=type=cache,target=/root/.cache/go-build`：编译缓存
 
@@ -80,23 +80,24 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 
 `latest` 默认值只用于不经过 CI 的裸 `docker build`，此时由 Dockerfile 在构建时自行解析（行为和以前一致，只是没有缓存收益）。出现问题时用 `--build-arg`（或改默认值）钉回具体版本：
 
-| ARG                      | 默认值   | 对应工具                  | latest 的解析渠道                           |
-|--------------------------|----------|---------------------------|---------------------------------------------|
-| `UPX_VERSION`            | `latest` | UPX                       | `releases.atom` 第一个稳定 tag              |
-| `NODE_VERSION`           | `latest` | Node.js                   | `dist/index.json` 第一个非预发布版本        |
-| `NFPM_VERSION`           | `latest` | nfpm                      | `go install @latest`（钉版本格式 `vX.Y.Z`） |
-| `PNPM_VERSION`           | `latest` | pnpm                      | npm registry 的 `pnpm@latest`               |
-| `SQLC_VERSION`           | `latest` | sqlc                      | `go install @latest`                        |
-| `ENT_VERSION`            | `latest` | ent / entc                | 同上                                        |
-| `GOLANGCI_LINT_VERSION`  | `latest` | golangci-lint             | 同上                                        |
-| `GOVULNCHECK_VERSION`    | `latest` | govulncheck               | 同上                                        |
-| `SHFMT_VERSION`          | `latest` | shfmt                     | 同上                                        |
-| `DOCKERFMT_VERSION`      | `latest` | dockerfmt                 | 同上                                        |
-| `YAMLFMT_VERSION`        | `latest` | yamlfmt                   | 同上                                        |
-| `GOJQ_VERSION`           | `latest` | gojq                      | 同上                                        |
-| `GOSQLFORMATTER_VERSION` | `latest` | wasilibs/go-sql-formatter | 同上                                        |
-| `GOTESTSUM_VERSION`      | `latest` | gotestsum                 | 同上                                        |
-| `MARKDOWNFMT_VERSION`    | `latest` | markdownfmt               | 同上                                        |
+| ARG                         | 默认值   | 对应工具                  | latest 的解析渠道                           |
+|-----------------------------|----------|---------------------------|---------------------------------------------|
+| `UPX_VERSION`               | `latest` | UPX                       | `releases.atom` 第一个稳定 tag              |
+| `NODE_VERSION`              | `latest` | Node.js                   | `dist/index.json` 第一个非预发布版本        |
+| `NFPM_VERSION`              | `latest` | nfpm                      | `go install @latest`（钉版本格式 `vX.Y.Z`） |
+| `PNPM_VERSION`              | `latest` | pnpm                      | npm registry 的 `pnpm@latest`               |
+| `SQLC_VERSION`              | `latest` | sqlc                      | `go install @latest`                        |
+| `ENT_VERSION`               | `latest` | ent / entc                | 同上                                        |
+| `GOLANGCI_LINT_VERSION`     | `latest` | golangci-lint             | 同上                                        |
+| `GOVULNCHECK_VERSION`       | `latest` | govulncheck               | 同上                                        |
+| `SHFMT_VERSION`             | `latest` | shfmt                     | 同上                                        |
+| `DOCKERFMT_VERSION`         | `latest` | dockerfmt                 | 同上                                        |
+| `YAMLFMT_VERSION`           | `latest` | yamlfmt                   | 同上                                        |
+| `GOJQ_VERSION`              | `latest` | gojq                      | 同上                                        |
+| `GOSQLFORMATTER_VERSION`    | `latest` | wasilibs/go-sql-formatter | 同上                                        |
+| `GOTESTSUM_VERSION`         | `latest` | gotestsum                 | 同上                                        |
+| `MARKDOWNFMT_VERSION`       | `latest` | markdownfmt               | 同上                                        |
+| `GOCOVER_COBERTURA_VERSION` | `latest` | gocover-cobertura         | `go install @latest`                        |
 
 `go install @latest` 走模块路径解析：各工具的模块路径带 `/v2`、`/v3` 等后缀，latest 不会自动跨 major；major 升级需要改 Dockerfile 里的模块路径。
 

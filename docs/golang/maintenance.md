@@ -32,23 +32,24 @@
 
 在**三份** `Dockerfile.golang` 里改对应的 `ARG`：
 
-| 工具          | ARG                      |
-|---------------|--------------------------|
-| UPX           | `UPX_VERSION`            |
-| nfpm          | `NFPM_VERSION`           |
-| Node.js       | `NODE_VERSION`           |
-| pnpm          | `PNPM_VERSION`           |
-| sqlc          | `SQLC_VERSION`           |
-| ent / entc    | `ENT_VERSION`            |
-| golangci-lint | `GOLANGCI_LINT_VERSION`  |
-| govulncheck   | `GOVULNCHECK_VERSION`    |
-| shfmt         | `SHFMT_VERSION`          |
-| dockerfmt     | `DOCKERFMT_VERSION`      |
-| yamlfmt       | `YAMLFMT_VERSION`        |
-| gojq          | `GOJQ_VERSION`           |
-| sql-formatter | `GOSQLFORMATTER_VERSION` |
-| gotestsum     | `GOTESTSUM_VERSION`      |
-| markdownfmt   | `MARKDOWNFMT_VERSION`    |
+| 工具              | ARG                         |
+|-------------------|-----------------------------|
+| UPX               | `UPX_VERSION`               |
+| nfpm              | `NFPM_VERSION`              |
+| Node.js           | `NODE_VERSION`              |
+| pnpm              | `PNPM_VERSION`              |
+| sqlc              | `SQLC_VERSION`              |
+| ent / entc        | `ENT_VERSION`               |
+| golangci-lint     | `GOLANGCI_LINT_VERSION`     |
+| govulncheck       | `GOVULNCHECK_VERSION`       |
+| shfmt             | `SHFMT_VERSION`             |
+| dockerfmt         | `DOCKERFMT_VERSION`         |
+| yamlfmt           | `YAMLFMT_VERSION`           |
+| gojq              | `GOJQ_VERSION`              |
+| sql-formatter     | `GOSQLFORMATTER_VERSION`    |
+| gotestsum         | `GOTESTSUM_VERSION`         |
+| markdownfmt       | `MARKDOWNFMT_VERSION`       |
+| gocover-cobertura | `GOCOVER_COBERTURA_VERSION` |
 
 升级后本地构建一次，确认对应二进制仍可执行；CI 冒烟只检查「命令存在」，不检查版本号。
 

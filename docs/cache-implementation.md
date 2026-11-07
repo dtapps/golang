@@ -72,7 +72,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go install github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
     && go install gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
-    && go install github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION}
+    && go install github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
+    && go install github.com/boumenot/gocover-cobertura@${GOCOVER_COBERTURA_VERSION}
 ```
 
 同时**删掉**原来的 `rm -rf /go/pkg/mod /root/.cache/go-build`：`--mount=type=cache` 的目录本来就不进镜像层，留着只会把缓存删掉，反而变慢。
@@ -97,6 +98,7 @@ GOJQ_VERSION=github.com/itchyny/gojq
 GOSQLFORMATTER_VERSION=github.com/wasilibs/go-sql-formatter/v15
 GOTESTSUM_VERSION=gotest.tools/gotestsum
 MARKDOWNFMT_VERSION=github.com/Kunde21/markdownfmt/v3
+GOCOVER_COBERTURA_VERSION=github.com/boumenot/gocover-cobertura
 "
 ```
 

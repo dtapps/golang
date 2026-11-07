@@ -9,7 +9,7 @@
 ## 镜像里有什么
 
 - 基座：本仓库构建的 Golang 构建环境镜像（CI 按 `<go 版本>` 钉住当天刚推好的那份；Dockerfile 的默认基座是官方 `golang:1-trixie`，只用于不依赖私有仓库的本地构建）
-- 继承基座全部内容：Go 工具链、UPX、nfpm、Node.js + npm + pnpm、sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt / gojq / sql-formatter / gotestsum / markdownfmt、git / curl / make / jq
+- 继承基座全部内容：Go 工具链、UPX、nfpm、Node.js + npm + pnpm、sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt / gojq / sql-formatter / gotestsum / markdownfmt / gocover-cobertura、wixl、git / curl / make / jq
 - 唯一新增：`/usr/local/bin/fnpack`——从 `static2.fnnas.com` 下载的 FnOS 官方打包 CLI，版本默认取 `FNPACK_VERSION`（当前 `1.2.3`，上游没有 latest 接口，暂作为最新版本），手动触发时可用 `fnpack_version` 覆盖
 
 ## 地址与标签
