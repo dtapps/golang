@@ -8,7 +8,8 @@
 # 镜像内容：
 #   Go 工具链 + UPX + nfpm + Node.js/pnpm
 #   + sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt
-#   + gojq / sql-formatter / gotestsum / markdownfmt / gocover-cobertura
+#   + gojq / sql-formatter / gotestsum / markdownfmt
+#   + gocover-cobertura / gcov2lcov（覆盖率报告转换）
 #   + wixl（编译 Windows MSI 用）
 #
 # 工具版本默认 latest，构建时自动解析最新版（详见下方版本变量注释块）。
@@ -68,6 +69,7 @@ ARG IMAGE_SOURCE
 # https://github.com/gotestyourself/gotestsum/releases
 # https://github.com/Kunde21/markdownfmt/releases
 # https://github.com/boumenot/gocover-cobertura/releases
+# https://github.com/jandelgado/gcov2lcov/releases
 # ==========================================
 ARG UPX_VERSION=latest
 ARG NFPM_VERSION=latest
@@ -85,6 +87,7 @@ ARG GOSQLFORMATTER_VERSION=latest
 ARG GOTESTSUM_VERSION=latest
 ARG MARKDOWNFMT_VERSION=latest
 ARG GOCOVER_COBERTURA_VERSION=latest
+ARG GCOV2LCOV_VERSION=latest
 
 # 1. 设置 Go 环境变量
 ENV GOPATH=/go \
@@ -182,7 +185,7 @@ RUN set -eux; \
 
 # 5. 预安装 Go 工具链（含 nfpm，走 GOPROXY）
 # 按工具分组拆层 + BuildKit 缓存挂载：
-#   · 拆层：某个工具发版时只重建它所在的那一层，不用 13 个全部重装；
+#   · 拆层：某个工具发版时只重建它所在的那一层，不用所有工具全部重装；
 #   · --mount=type=cache：模块缓存与编译缓存留在构建节点、不进入镜像层，
 #     所以不再需要「同一层内 rm -rf /go/pkg/mod /root/.cache/go-build」。
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -207,7 +210,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     && go install -v golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} \
     && echo "==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})"
 
-# 5.3 shfmt / dockerfmt / yamlfmt / gojq
+# 5.3 格式化与数据处理：shfmt / dockerfmt / yamlfmt / gojq / markdownfmt / sql-formatter
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go install -v mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
@@ -217,19 +220,23 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     && go install -v github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION} \
     && echo "==> yamlfmt 安装完成 (${YAMLFMT_VERSION})" \
     && go install -v github.com/itchyny/gojq/cmd/gojq@${GOJQ_VERSION} \
-    && echo "==> gojq 安装完成 (${GOJQ_VERSION})"
-
-# 5.4 sql-formatter / gotestsum / markdownfmt
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go install -v github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
-    && echo "==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})" \
-    && go install -v gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
-    && echo "==> gotestsum 安装完成 (${GOTESTSUM_VERSION})" \
+    && echo "==> gojq 安装完成 (${GOJQ_VERSION})" \
     && go install -v github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
     && echo "==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})" \
+    && go install -v github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
+    && echo "==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})"
+
+# 5.4 测试与覆盖率报告：gotestsum / gocover-cobertura / gcov2lcov
+# 三者是同一条链路：gotestsum 跑测试并出 JUnit，go test -coverprofile 出覆盖率，
+# gocover-cobertura / gcov2lcov 再转成 cobertura / lcov，所以放同一层。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install -v gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
+    && echo "==> gotestsum 安装完成 (${GOTESTSUM_VERSION})" \
     && go install -v github.com/boumenot/gocover-cobertura@${GOCOVER_COBERTURA_VERSION} \
     && echo "==> gocover-cobertura 安装完成 (${GOCOVER_COBERTURA_VERSION})" \
+    && go install -v github.com/jandelgado/gcov2lcov@${GCOV2LCOV_VERSION} \
+    && echo "==> gcov2lcov 安装完成 (${GCOV2LCOV_VERSION})" \
     && echo "--- Go 工具链安装完成 ---" \
     && ls -l "$GOPATH/bin"
 
@@ -249,7 +256,7 @@ LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.version="${IMAGE_VERSION}" \
-    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、wixl、gocover-cobertura" \
+    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、wixl、gocover-cobertura、gcov2lcov" \
     org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.base.name="golang:${GO_VERSION}-${DEBIAN_VERSION}" \
     org.opencontainers.image.base.digest="${BASE_DIGEST}"

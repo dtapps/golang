@@ -73,7 +73,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go install github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
     && go install gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
     && go install github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
-    && go install github.com/boumenot/gocover-cobertura@${GOCOVER_COBERTURA_VERSION}
+    && go install github.com/boumenot/gocover-cobertura@${GOCOVER_COBERTURA_VERSION} \
+    && go install github.com/jandelgado/gcov2lcov@${GCOV2LCOV_VERSION}
 ```
 
 同时**删掉**原来的 `rm -rf /go/pkg/mod /root/.cache/go-build`：`--mount=type=cache` 的目录本来就不进镜像层，留着只会把缓存删掉，反而变慢。
@@ -99,6 +100,7 @@ GOSQLFORMATTER_VERSION=github.com/wasilibs/go-sql-formatter/v15
 GOTESTSUM_VERSION=gotest.tools/gotestsum
 MARKDOWNFMT_VERSION=github.com/Kunde21/markdownfmt/v3
 GOCOVER_COBERTURA_VERSION=github.com/boumenot/gocover-cobertura
+GCOV2LCOV_VERSION=github.com/jandelgado/gcov2lcov
 "
 ```
 
@@ -321,7 +323,7 @@ done
 本仓库这次一共动了这些地方，三侧（CNB / GitHub / GitLab）各一份：
 
 - [X] Dockerfile：`LABEL` 整块移到文件末尾（`CMD` 之前）。
-- [X] Dockerfile：`go install` 按工具分组拆成 5 个 `RUN`。
+- [X] Dockerfile：`go install` 按职责分组拆成 5 个 `RUN`。
 - [X] Dockerfile：每个 `go install` 的 `RUN` 加两个 cache mount：`--mount=type=cache,target=/go/pkg/mod`、`--mount=type=cache,target=/root/.cache/go-build`。
 - [X] Dockerfile：删掉层内的 `rm -rf /go/pkg/mod /root/.cache/go-build`。
 - [X] 脚本：加 `GO_TOOL_MODULES` 表 + `dockerfile_tool_vars` 自检。

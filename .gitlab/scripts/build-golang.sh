@@ -186,6 +186,7 @@ GOSQLFORMATTER_VERSION=github.com/wasilibs/go-sql-formatter/v15
 GOTESTSUM_VERSION=gotest.tools/gotestsum
 MARKDOWNFMT_VERSION=github.com/Kunde21/markdownfmt/v3
 GOCOVER_COBERTURA_VERSION=github.com/boumenot/gocover-cobertura
+GCOV2LCOV_VERSION=github.com/jandelgado/gcov2lcov
 "
 
 # 从 Dockerfile 提取 go install 用到的版本变量（去重、排序）
@@ -533,7 +534,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     [ "$got" = "$EXPECT_GO" ] || fail="$fail go-version($got)"
     for b in go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm \
       sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
-      sql-formatter gotestsum markdownfmt gocover-cobertura wixl; do
+      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov wixl; do
       command -v "$b" >/dev/null 2>&1 || fail="$fail bin:$b"
     done
     # 时区生效：TZ=Asia/Shanghai 下偏移必须是 +0800（tzdata 已装且 zoneinfo 可用）
