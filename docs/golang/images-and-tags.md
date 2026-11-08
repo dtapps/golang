@@ -181,7 +181,7 @@ jq -r '.tools' .github/annotation.json                  # 全部（一行）
 
 CNB 侧也可以直接按工具名出徽章：`https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golangci_lint_version`。
 
-这些值是**镜像里实际装上的版本**，不是构建前解析出来的目标版本：冒烟容器里用 `go version -m <二进制>` 读模块版本（`node -v` / `pnpm -v` / `upx --version` 读 CLI），所以即使解析失败回退 `latest`、Dockerfile 装的是「构建当天最新」，元数据里写的仍是真实版本号。只有在镜像里也读不到时才会出现 `latest`。
+这些值是**镜像里实际装上的版本**，不是构建前解析出来的目标版本：冒烟容器里用 `go version -m <二进制>` 读模块版本（`node -v` / `pnpm -v` / `upx --version` 读 CLI），所以即使解析失败回退 `latest`、Dockerfile 装的是「构建当天最新」，元数据里写的仍是真实版本号。只有在镜像里也读不到时才会出现 `latest`。官方二进制的 `go version -m` 常常拿不到版本（报 `(devel)`）或带构建标记（`v1.13.0+dirty`），这类值会被剔除、退回解析出来的版本号，所以元数据里不会出现 `(devel)` / `+dirty`。
 
 七个镜像里凡是用 apt 装了系统包的（基座 + fyne / gio / mygo / wails2 / wails3），都会再写一个 `apt_versions`：`包=版本` 用空格串成一行，包清单**从该镜像对应的 Dockerfile 自动提取**（`apt-get install` 那段，改 Dockerfile 后自动跟上），版本取自镜像内的 `dpkg` 数据库。构建期装过、最后被 purge 的包（基座的 `wget` / `xz-utils`）写成 `absent`；完全没装 apt 包的镜像（fnpack）写成 `none`。传递依赖不记，只记 Dockerfile 里显式列出的那一份。
 

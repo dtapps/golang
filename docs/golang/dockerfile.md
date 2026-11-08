@@ -57,10 +57,10 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 ### 安装顺序
 
 1. **环境变量**：Go 侧 CNB 的 `GOPROXY` 指向腾讯云、GitHub / GitLab 不设置（用默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。另有 `TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`：容器内统一北京时间与 UTF-8，构建日志、`go build` 产物里的时间戳才对得上。
-2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。
+2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。包清单统一放在 `apt_packages` 变量里，装完再 `dpkg-query -W ${apt_packages}` 打印每个 deb 的实际版本（输出「包名<TAB>版本」）——各变体镜像的 apt 安装块同理，日志里就能直接核对版本，不用进容器查。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
 4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；GitHub / GitLab 侧不配置 registry（npm / pnpm 用官方默认 `registry.npmjs.org`），CNB 侧才用腾讯云；三侧都设 `pnpm config set ignore-scripts false`。
-5. **Go 工具链（含 nfpm）**：按职责分成 5 层 `go install -v`（打包与代码生成 nfpm+sqlc / 实体生成 ent+entc / 质量与安全 golangci-lint+govulncheck / 格式化与数据处理 shfmt+dockerfmt+yamlfmt+gojq+markdownfmt+sql-formatter / 测试与覆盖率报告 gotestsum+gocover-cobertura+gcov2lcov），`-v` 会打印每个被编译的包，CI 日志里能直接看出卡在哪个工具、哪个包上；每层都挂 BuildKit 缓存目录：
+5. **Go 工具链（含 nfpm）**：按职责分成 5 层（打包与代码生成 nfpm+sqlc / 实体生成 ent+entc / 质量与安全 golangci-lint+govulncheck / 格式化与数据处理 shfmt+dockerfmt+yamlfmt+gojq+markdownfmt+sql-formatter / 测试与覆盖率报告 gotestsum+gocover-cobertura+gcov2lcov）。**有官方二进制的先下载二进制**（`install-tool`），失败才回退 `go install -v`（见下一节）；每层都挂 BuildKit 缓存目录：
    - `--mount=type=cache,target=/go/pkg/mod`：模块缓存
    - `--mount=type=cache,target=/root/.cache/go-build`：编译缓存
 
@@ -73,6 +73,44 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 > CNB 侧会在安装基础包之前把 APT 源换成 `mirrors.cloud.tencent.com`；GitHub / GitLab 侧不换源。
 
 > 清理必须与安装同层：跨层 `rm` 只会产生 whiteout，旧层数据仍会随镜像分发。
+
+### 二进制优先，go install 兜底
+
+`go install` 每次都要编译，慢且吃 CPU。有官方 Release 二进制的工具改成**先下载**，拿不到再回退编译：
+
+```dockerfile
+COPY --chmod=0755 .cnb/docker/install-tool.sh /usr/local/bin/install-tool
+...
+    install-tool nfpm "${NFPM_VERSION}" \
+    || go install -v github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION};
+```
+
+`install-tool` 的行为：
+
+- 只认具体版本号：传 `latest`（解析失败时的兜底）直接返回非 0，交给 `go install @latest` 自己解析；
+- 按 `uname -m` 选 amd64 / arm64；
+- 下载顺序 **DaoCloud 镜像（`GITHUB_MIRROR`）→ `https://github.com`**，任一次成功即停；两次都失败才返回非 0。GitHub / GitLab 侧没有 `GITHUB_MIRROR`，直接走官方源；
+- 解包支持两种形态：`tar.gz`（含嵌套目录，如 golangci-lint 的 `golangci-lint-2.x-linux-amd64/`）和裸二进制（shfmt）；解压后按工具名在目录树里找可执行文件；
+- 装到 `/usr/local/bin`，`go install` 装到 `/go/bin`，两者都在 `PATH` 里，冒烟断言不用改。
+
+各仓库资产命名互不相同，`install-tool.sh` 里按工具列了一张表（升级版本不用改它，新增工具要加一行）：
+
+| 工具          | 仓库                      | 资产名（`<ver>` 不含前缀 v）                     |
+|---------------|---------------------------|--------------------------------------------------|
+| nfpm          | goreleaser/nfpm           | `nfpm_<ver>_Linux_{arm64,x86_64}.tar.gz`         |
+| sqlc          | sqlc-dev/sqlc             | `sqlc_<ver>_linux_{arm64,amd64}.tar.gz`          |
+| golangci-lint | golangci/golangci-lint    | `golangci-lint-<ver>-linux-{arm64,amd64}.tar.gz` |
+| shfmt         | mvdan/sh                  | `shfmt_v<ver>_linux_{arm64,amd64}`（裸二进制）   |
+| dockerfmt     | reteps/dockerfmt          | `dockerfmt-v<ver>-linux-{arm64,amd64}.tar.gz`    |
+| yamlfmt       | google/yamlfmt            | `yamlfmt_<ver>_Linux_{arm64,x86_64}.tar.gz`      |
+| gojq          | itchyny/gojq              | `gojq_v<ver>_linux_{arm64,amd64}.tar.gz`         |
+| sql-formatter | wasilibs/go-sql-formatter | `sql-formatter_<ver>_linux_{arm64,amd64}.tar.gz` |
+| gotestsum     | gotestyourself/gotestsum  | `gotestsum_<ver>_linux_{arm64,amd64}.tar.gz`     |
+| gcov2lcov     | jandelgado/gcov2lcov      | `gcov2lcov_<ver>_linux_{arm64,amd64}.tar.gz`     |
+
+没有官方二进制、只能 `go install` 的（都已核实 latest release 资产数为 0）：`ent` / `entc`、`govulncheck`、`markdownfmt`、`gocover-cobertura`，以及变体镜像里的 `wails`（wailsapp/wails v2）、`wails3`（v3）、`fyne`（fyne-io/tools）、`gogio`（gioui/gio）、`mygo`（egoist/mygo）。
+
+三份 `install-tool.sh`（`.cnb/`、`.github/`、`.gitlab/` 各一份）内容必须一致，由 `make format-shell` / `make lint-shell` 一并检查。
 
 ### 版本变量
 

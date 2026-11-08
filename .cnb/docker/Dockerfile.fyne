@@ -43,14 +43,16 @@ ARG IMAGE_SOURCE
 # 不能像基座镜像那样在最后 purge 掉。
 # 装完用 pkg-config 验证一遍：缺 .pc 时这里就失败，不会推迟到使用者手里。
 RUN export DEBIAN_FRONTEND=noninteractive; \
-    apt-get update && apt-get install -y --no-install-recommends \
+    apt_packages=" \
     pkg-config \
     gcc \
     libgl1-mesa-dev \
     xorg-dev \
     libwayland-dev \
-    libxkbcommon-dev \
-    && rm -rf /var/lib/apt/lists/*; \
+    libxkbcommon-dev"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ${apt_packages}; \
+    rm -rf /var/lib/apt/lists/*; \
     pkg-config --exists gl; \
     pkg-config --exists x11; \
     pkg-config --exists xrandr; \
@@ -59,7 +61,9 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     pkg-config --exists xi; \
     pkg-config --exists xxf86vm; \
     pkg-config --exists wayland-client; \
-    pkg-config --exists xkbcommon
+    pkg-config --exists xkbcommon; \
+    echo "[${TARGETPLATFORM:-unknown}] --- apt 包版本 ---"; \
+    dpkg-query -W ${apt_packages}
 
 # 2. 安装 fyne CLI
 # 模块缓存与编译缓存挂在构建节点上，不进入镜像层。

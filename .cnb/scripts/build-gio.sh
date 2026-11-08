@@ -518,10 +518,20 @@ esac
 # 系统包版本：包清单从本镜像对应的 Dockerfile 自动提取（改 Dockerfile 自动跟上），
 # 版本取自镜像内的 dpkg 数据库；构建期装过、最后被 purge 的包显示 absent。
 apt_pkgs_from_dockerfile() (
-  sed -n '/apt-get install/,/;/p' "$1" \
-    | sed 's/#.*//; s/\\//g; s/;//g' | tr '[:space:]' '\n' \
+  # Dockerfile 现在把包清单收在 apt_packages 变量里（含续行）；旧写法（包名直接
+  # 跟在 apt-get install 后面）作为兜底，两种布局都能取到。
+  pkgs="$(sed -n '/apt_packages="/,/";/p' "$1" \
+    | sed 's/apt_packages="//; s/[";]//g; s/\\//g' \
+    | tr '[:space:]' '\n' \
     | grep -E '^[a-z][a-z0-9+.-]*$' \
-    | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh' | sort -u
+    | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh|set' | sort -u)"
+  if [ -z "${pkgs}" ]; then
+    pkgs="$(sed -n '/apt-get install/,/;/p' "$1" \
+      | sed 's/#.*//; s/\\//g; s/;//g' | tr '[:space:]' '\n' \
+      | grep -E '^[a-z][a-z0-9+.-]*$' \
+      | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh|set' | sort -u)"
+  fi
+  if [ -n "${pkgs}" ]; then printf '%s\n' "${pkgs}"; fi
 )
 apt_versions_from_image() (
   img=$1

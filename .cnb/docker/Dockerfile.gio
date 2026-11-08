@@ -64,8 +64,7 @@ ARG IMAGE_SOURCE
 # 用 set -e 串联，每条断言都生效（不要退回 `;` 串，那样只有最后一条算数）。
 RUN set -eux; \
     export DEBIAN_FRONTEND=noninteractive; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
+    apt_packages=" \
     pkg-config \
     gcc \
     libwayland-dev \
@@ -90,7 +89,9 @@ RUN set -eux; \
     xvfb \
     xauth \
     dbus-x11 \
-    fonts-dejavu-core; \
+    fonts-dejavu-core"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ${apt_packages}; \
     rm -rf /var/lib/apt/lists/*; \
     pkg-config --exists egl; \
     pkg-config --exists glesv2; \
@@ -116,7 +117,9 @@ RUN set -eux; \
     ldconfig -p | grep -q 'libxkbcommon\.so\.0'; \
     ldconfig -p | grep -q 'libX11\.so\.6'; \
     command -v gcc; \
-    command -v Xvfb
+    command -v Xvfb; \
+    echo "[${TARGETPLATFORM:-unknown}] --- apt 包版本 ---"; \
+    dpkg-query -W ${apt_packages}
 
 # 2. 安装 gogio CLI
 # 模块缓存与编译缓存挂在构建节点上，不进入镜像层。

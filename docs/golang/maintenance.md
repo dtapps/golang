@@ -131,7 +131,7 @@ gio 镜像里只有一条版本线，升级方式与 mygo 相同：手动触发 
 
 ## 新增工具
 
-1. 在三份 `Dockerfile.golang` 里加 `ARG` 与安装命令。
+1. 在三份 `Dockerfile.golang` 里加 `ARG` 与安装命令。有官方 Release 二进制的，写成 `install-tool <名> "${VAR}" || go install -v <包路径>@${VAR}`，并在三份 `install-tool.sh` 的表里加一行（工具名 = 解压后的二进制名、仓库、资产命名）。
 2. 在三份 `build-golang.sh` 的冒烟命令列表里加上二进制名。
 3. 如果是 Go 工具：在三份 `build-golang.sh` 的 `GO_TOOL_MODULES` 里登记「版本变量 → 模块路径」。漏登记时脚本会在构建前直接报错（`go list -m` 要模块路径，Dockerfile 里写的是包路径）。
 4. 如果工具也应该在 fnpack 镜像里被检查，同步三份 `build-fnpack.sh` 的继承断言。
@@ -147,6 +147,7 @@ gio 镜像里只有一条版本线，升级方式与 mygo 相同：手动触发 
 - [ ] `.cnb/docker/`、`.github/docker/`、`.gitlab/docker/` 下的七个 Dockerfile 内容一致（镜像源差异除外）
 - [ ] 三份 `build-golang.sh` 的标签规则、冒烟断言一致
 - [ ] 三份 `build-golang.sh` 的 `GO_TOOL_MODULES` 覆盖 Dockerfile 里所有 `go install` 版本变量（脚本会自检）
+- [ ] 三份 `install-tool.sh` 内容一致，且表里的资产命名与各仓库实际 release 对得上（新增工具时用 `curl -I` 验证过 URL）
 - [ ] 三份 `build-fnpack.sh` 的标签规则、基础镜像检查、冒烟断言一致
 - [ ] 三份 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` 的标签规则、基础镜像检查、冒烟断言一致
 - [ ] GitLab 的定时任务与 `TARGET` 变量仍指向七个镜像

@@ -123,7 +123,7 @@ RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.
 # wixl / wixl-data：编译 Windows MSI 安装包（msitools，替代 Windows 上的 WiX）
 RUN set -eu; \
     export DEBIAN_FRONTEND=noninteractive; \
-    apt-get update && apt-get install -y --no-install-recommends \
+    apt_packages=" \
     wget \
     xz-utils \
     ca-certificates \
@@ -137,13 +137,15 @@ RUN set -eu; \
     pkg-config \
     tzdata \
     wixl \
-    wixl-data \
-    && rm -rf /var/lib/apt/lists/*; \
+    wixl-data"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ${apt_packages}; \
+    rm -rf /var/lib/apt/lists/*; \
     ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime; \
     printf '%s\n' "${TZ}" > /etc/timezone; \
-    echo "[${TARGETPLATFORM:-unknown}] --- wixl 安装的 ---"; \
-    wixl --version; \
-    date
+    date; \
+    echo "[${TARGETPLATFORM:-unknown}] --- apt 包版本 ---"; \
+    dpkg-query -W ${apt_packages}
 
 # 4. 安装 UPX 工具
 RUN set -eux; \
@@ -204,62 +206,86 @@ RUN set -eux; \
     echo "[${TARGETPLATFORM:-unknown}] --- Node.js 安装的 (v${NODE_VER}) ---"; \
     node -v && npm -v && pnpm -v
 
-# 6. 预安装 Go 工具链（含 nfpm，走 GOPROXY）
+# 6.0 二进制安装助手
+# 官方 Release 二进制优先：下载即用、不用编译，比 go install 快很多；脚本内部按
+# 「镜像 → 官方源」两次尝试，都失败返回非 0，由下面的层回退 go install。
+# 变体镜像（FROM 本镜像）自动继承这个脚本，wails2/wails3 等也能直接用。
+COPY --chmod=0755 .cnb/docker/install-tool.sh /usr/local/bin/install-tool
+
+# 6. 安装 Go 工具链（含 nfpm）
+# 每个工具先试官方二进制 install-tool <名> <版本>，失败再 go install（走 GOPROXY 编译）。
 # 按工具分组拆层 + BuildKit 缓存挂载：
 #   · 拆层：某个工具发版时只重建它所在的那一层，不用所有工具全部重装；
 #   · --mount=type=cache：模块缓存与编译缓存留在构建节点、不进入镜像层，
 #     所以不再需要「同一层内 rm -rf /go/pkg/mod /root/.cache/go-build」。
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install -v github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> nfpm 安装完成 (${NFPM_VERSION})" \
-    && go install -v github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> sqlc 安装完成 (${SQLC_VERSION})"
+    set -eux; \
+    install-tool nfpm "${NFPM_VERSION}" \
+    || go install -v github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> nfpm 安装完成 (${NFPM_VERSION})"; \
+    install-tool sqlc "${SQLC_VERSION}" \
+    || go install -v github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> sqlc 安装完成 (${SQLC_VERSION})"
 
-# 6.1 ent / entc
+# 6.1 ent / entc（官方不发二进制，只能 go install）
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install -v entgo.io/ent/cmd/ent@${ENT_VERSION} \
-    && go install -v entgo.io/ent/cmd/entc@${ENT_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> ent / entc 安装完成 (${ENT_VERSION})"
+    set -eux; \
+    go install -v entgo.io/ent/cmd/ent@${ENT_VERSION}; \
+    go install -v entgo.io/ent/cmd/entc@${ENT_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> ent / entc 安装完成 (${ENT_VERSION})"
 
-# 6.2 golangci-lint / govulncheck
+# 6.2 golangci-lint / govulncheck（golangci-lint 有二进制，govulncheck 没有）
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> golangci-lint 安装完成 (${GOLANGCI_LINT_VERSION})" \
-    && go install -v golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})"
+    set -eux; \
+    install-tool golangci-lint "${GOLANGCI_LINT_VERSION}" \
+    || go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> golangci-lint 安装完成 (${GOLANGCI_LINT_VERSION})"; \
+    go install -v golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})"
 
 # 6.3 格式化与数据处理：shfmt / dockerfmt / yamlfmt / gojq / markdownfmt / sql-formatter
+# markdownfmt 没有官方二进制，其余五个优先下载。
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install -v mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> shfmt 安装完成 (${SHFMT_VERSION})" \
-    && go install -v github.com/reteps/dockerfmt@${DOCKERFMT_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> dockerfmt 安装完成 (${DOCKERFMT_VERSION})" \
-    && go install -v github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> yamlfmt 安装完成 (${YAMLFMT_VERSION})" \
-    && go install -v github.com/itchyny/gojq/cmd/gojq@${GOJQ_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> gojq 安装完成 (${GOJQ_VERSION})" \
-    && go install -v github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})" \
-    && go install -v github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})"
+    set -eux; \
+    install-tool shfmt "${SHFMT_VERSION}" \
+    || go install -v mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> shfmt 安装完成 (${SHFMT_VERSION})"; \
+    install-tool dockerfmt "${DOCKERFMT_VERSION}" \
+    || go install -v github.com/reteps/dockerfmt@${DOCKERFMT_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> dockerfmt 安装完成 (${DOCKERFMT_VERSION})"; \
+    install-tool yamlfmt "${YAMLFMT_VERSION}" \
+    || go install -v github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> yamlfmt 安装完成 (${YAMLFMT_VERSION})"; \
+    install-tool gojq "${GOJQ_VERSION}" \
+    || go install -v github.com/itchyny/gojq/cmd/gojq@${GOJQ_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> gojq 安装完成 (${GOJQ_VERSION})"; \
+    go install -v github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})"; \
+    install-tool sql-formatter "${GOSQLFORMATTER_VERSION}" \
+    || go install -v github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})"
 
 # 6.4 测试与覆盖率报告：gotestsum / gocover-cobertura / gcov2lcov
 # 三者是同一条链路：gotestsum 跑测试并出 JUnit，go test -coverprofile 出覆盖率，
-# gocover-cobertura / gcov2lcov 再转成 cobertura / lcov，所以放同一层。
+# gocover-cobertura / gcov2lcov 再转成 cobertura / lcov。前两者有二进制、
+# gocover-cobertura 没有。
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install -v gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> gotestsum 安装完成 (${GOTESTSUM_VERSION})" \
-    && go install -v github.com/boumenot/gocover-cobertura@${GOCOVER_COBERTURA_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> gocover-cobertura 安装完成 (${GOCOVER_COBERTURA_VERSION})" \
-    && go install -v github.com/jandelgado/gcov2lcov@${GCOV2LCOV_VERSION} \
-    && echo "[${TARGETPLATFORM:-unknown}] ==> gcov2lcov 安装完成 (${GCOV2LCOV_VERSION})" \
-    && echo "[${TARGETPLATFORM:-unknown}] --- Go 工具链安装完成 ---" \
-    && ls -l "$GOPATH/bin"
+    set -eux; \
+    install-tool gotestsum "${GOTESTSUM_VERSION}" \
+    || go install -v gotest.tools/gotestsum@${GOTESTSUM_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> gotestsum 安装完成 (${GOTESTSUM_VERSION})"; \
+    go install -v github.com/boumenot/gocover-cobertura@${GOCOVER_COBERTURA_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> gocover-cobertura 安装完成 (${GOCOVER_COBERTURA_VERSION})"; \
+    install-tool gcov2lcov "${GCOV2LCOV_VERSION}" \
+    || go install -v github.com/jandelgado/gcov2lcov@${GCOV2LCOV_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> gcov2lcov 安装完成 (${GCOV2LCOV_VERSION})"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- Go 工具链安装完成 ---"; \
+    ls -l "$GOPATH/bin" /usr/local/bin
 
 # 7. 卸载不需要的工具，并清空所有 apt 缓存
 RUN apt-get purge -y wget xz-utils \

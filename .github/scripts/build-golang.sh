@@ -531,7 +531,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     # 版本命令实际跑一遍：工具默认 @latest 自动追新后，只查 presence
     # 挡不住装坏的二进制。--version / version / -v 逐个兜底，
     # 输出丢弃，仅以退出码计 fail。
-    for b in node npm pnpm upx nfpm sqlc golangci-lint gojq shfmt gotestsum; do
+    for b in node npm pnpm upx nfpm sqlc golangci-lint gojq shfmt gotestsum wixl; do
       command -v "$b" >/dev/null 2>&1 || continue
       "$b" --version >/dev/null 2>&1 \
         || "$b" version >/dev/null 2>&1 \
@@ -575,10 +575,20 @@ actual_bin_version() (printf '%s\n' "${TOOL_VERSIONS_ACTUAL}" | sed -n "s/^$1=//
 # 系统包版本：包清单从本镜像对应的 Dockerfile 自动提取（改 Dockerfile 自动跟上），
 # 版本取自镜像内的 dpkg 数据库；构建期装过、最后被 purge 的包显示 absent。
 apt_pkgs_from_dockerfile() (
-  sed -n '/apt-get install/,/;/p' "$1" \
-    | sed 's/#.*//; s/\\//g; s/;//g' | tr '[:space:]' '\n' \
+  # Dockerfile 现在把包清单收在 apt_packages 变量里（含续行）；旧写法（包名直接
+  # 跟在 apt-get install 后面）作为兜底，两种布局都能取到。
+  pkgs="$(sed -n '/apt_packages="/,/";/p' "$1" \
+    | sed 's/apt_packages="//; s/[";]//g; s/\\//g' \
+    | tr '[:space:]' '\n' \
     | grep -E '^[a-z][a-z0-9+.-]*$' \
-    | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh' | sort -u
+    | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh|set' | sort -u)"
+  if [ -z "${pkgs}" ]; then
+    pkgs="$(sed -n '/apt-get install/,/;/p' "$1" \
+      | sed 's/#.*//; s/\\//g; s/;//g' | tr '[:space:]' '\n' \
+      | grep -E '^[a-z][a-z0-9+.-]*$' \
+      | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh|set' | sort -u)"
+  fi
+  if [ -n "${pkgs}" ]; then printf '%s\n' "${pkgs}"; fi
 )
 apt_versions_from_image() (
   img=$1
@@ -628,8 +638,11 @@ for var in ${TOOL_VARS}; do
   bin="$(printf '%s\n' "${TOOL_BINS}" | sed -n "s/^${var}=//p" | head -n 1)"
   if [ -n "${bin}" ]; then
     actual="$(actual_bin_version "${bin}")"
+    # 官方二进制的 go version -m 常常没有版本信息（(devel)）或带构建标记（+dirty），
+    # 这类值不能当版本号，继续用解析出来的值。
+    actual="${actual%+dirty}"
     case "${actual}" in
-      '' | unknown) : ;;
+      '' | unknown | '(devel)' | devel) : ;;
       *) val="${actual}" ;;
     esac
   fi

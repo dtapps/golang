@@ -41,13 +41,17 @@ ARG IMAGE_SOURCE
 # 装完立刻用 pkg-config 验证两个 .pc 真的可解析：否则问题会以 cgo 报错的形式
 # 推迟到使用镜像的人身上。
 RUN export DEBIAN_FRONTEND=noninteractive; \
-    apt-get update && apt-get install -y --no-install-recommends \
+    apt_packages=" \
     pkg-config \
     libgtk-4-dev \
-    libwebkitgtk-6.0-dev \
-    && rm -rf /var/lib/apt/lists/*; \
+    libwebkitgtk-6.0-dev"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ${apt_packages}; \
+    rm -rf /var/lib/apt/lists/*; \
     pkg-config --exists gtk4; \
-    pkg-config --exists webkitgtk-6.0
+    pkg-config --exists webkitgtk-6.0; \
+    echo "[${TARGETPLATFORM:-unknown}] --- apt 包版本 ---"; \
+    dpkg-query -W ${apt_packages}
 
 # 2. 安装 wails3 CLI
 # 模块缓存与编译缓存挂在构建节点上，不进入镜像层。
