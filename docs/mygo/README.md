@@ -128,21 +128,22 @@ docker pull ghcr.io/dtapps/golang/mygo@sha256:<mygo_digest>
 
 CNB 侧写 `.cnb/annotation-mygo.json`，GitHub 侧写 `.github/annotation-mygo.json`，GitLab 侧写 `.gitlab/annotation-mygo.json`（都不入库）。
 
-| 键                  | 含义                                        |
-|---------------------|---------------------------------------------|
-| `mygo_image`        | mygo 镜像全名                               |
-| `mygo_digest`       | mygo manifest list digest                   |
-| `mygo_digest_short` | 前 12 位 digest（只用于核对）               |
-| `mygo_size`         | amd64 压缩体积                              |
-| `mygo_size_arm64`   | arm64 压缩体积                              |
-| `mygo_version`      | 本次安装的 mygo CLI 版本（如 `v0.8.1`）     |
-| `bun_version`       | 本次安装的 bun 版本（如 `1.4.4`）           |
-| `image_version`     | 解析出的 Go 版本（与 `<go 版本>` 标签一致） |
-| `golang_version`    | 同上                                        |
-| `mygo_base_image`   | 本次使用的基础镜像引用                      |
-| `mygo_base_digest`  | 基础镜像 digest                             |
-| `built_at`          | 本次构建时间                                |
-| `source_date`       | 最后一次提交时间                            |
+| 键                  | 含义                                                                  |
+|---------------------|-----------------------------------------------------------------------|
+| `mygo_image`        | mygo 镜像全名                                                         |
+| `mygo_digest`       | mygo manifest list digest                                             |
+| `mygo_digest_short` | 前 12 位 digest（只用于核对）                                         |
+| `mygo_size`         | amd64 压缩体积                                                        |
+| `mygo_size_arm64`   | arm64 压缩体积                                                        |
+| `mygo_version`      | 本次安装的 mygo CLI 版本（如 `v0.8.1`）                               |
+| `bun_version`       | 本次安装的 bun 版本（如 `1.4.4`）                                     |
+| `image_version`     | 解析出的 Go 版本（与 `<go 版本>` 标签一致）                           |
+| `golang_version`    | 同上                                                                  |
+| `mygo_base_image`   | 本次使用的基础镜像引用                                                |
+| `mygo_base_digest`  | 基础镜像 digest                                                       |
+| `apt_versions`      | apt 装的系统包版本（`包=版本`，缺包标 `absent`；清单取自 Dockerfile） |
+| `built_at`          | 本次构建时间                                                          |
+| `source_date`       | 最后一次提交时间                                                      |
 
 徽章全部从 CNB commit annotation 取值，地址模板：
 

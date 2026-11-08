@@ -117,20 +117,21 @@ docker pull ghcr.io/dtapps/golang/fyne@sha256:<fyne_digest>
 
 CNB 侧写 `.cnb/annotation-fyne.json`，GitHub 侧写 `.github/annotation-fyne.json`，GitLab 侧写 `.gitlab/annotation-fyne.json`（都不入库）。
 
-| 键                  | 含义                                        |
-|---------------------|---------------------------------------------|
-| `fyne_image`        | fyne 镜像全名                               |
-| `fyne_digest`       | fyne manifest list digest                   |
-| `fyne_digest_short` | 前 12 位 digest（只用于核对）               |
-| `fyne_size`         | amd64 压缩体积                              |
-| `fyne_size_arm64`   | arm64 压缩体积                              |
-| `fyne_version`      | 本次安装的 fyne CLI 版本（如 `v1.7.4`）     |
-| `image_version`     | 解析出的 Go 版本（与 `<go 版本>` 标签一致） |
-| `golang_version`    | 同上                                        |
-| `fyne_base_image`   | 本次使用的基础镜像引用                      |
-| `fyne_base_digest`  | 基础镜像 digest                             |
-| `built_at`          | 本次构建时间                                |
-| `source_date`       | 最后一次提交时间                            |
+| 键                  | 含义                                                                  |
+|---------------------|-----------------------------------------------------------------------|
+| `fyne_image`        | fyne 镜像全名                                                         |
+| `fyne_digest`       | fyne manifest list digest                                             |
+| `fyne_digest_short` | 前 12 位 digest（只用于核对）                                         |
+| `fyne_size`         | amd64 压缩体积                                                        |
+| `fyne_size_arm64`   | arm64 压缩体积                                                        |
+| `fyne_version`      | 本次安装的 fyne CLI 版本（如 `v1.7.4`）                               |
+| `image_version`     | 解析出的 Go 版本（与 `<go 版本>` 标签一致）                           |
+| `golang_version`    | 同上                                                                  |
+| `fyne_base_image`   | 本次使用的基础镜像引用                                                |
+| `fyne_base_digest`  | 基础镜像 digest                                                       |
+| `apt_versions`      | apt 装的系统包版本（`包=版本`，缺包标 `absent`；清单取自 Dockerfile） |
+| `built_at`          | 本次构建时间                                                          |
+| `source_date`       | 最后一次提交时间                                                      |
 
 徽章全部从 CNB commit annotation 取值，地址模板：
 

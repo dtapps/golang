@@ -22,6 +22,10 @@
 ARG GOLANG_IMAGE=golang:1-trixie
 FROM ${GOLANG_IMAGE}
 
+# BuildKit 自动提供的目标平台（linux/amd64、linux/arm64 …）。多架构构建时同一个
+# RUN 会按架构各跑一遍，echo 带上它才能分清当前是哪个架构、不会误以为重复安装。
+ARG TARGETPLATFORM
+
 ARG GOLANG_IMAGE
 ARG FYNE_VERSION=latest
 ARG IMAGE_VERSION=dev
@@ -62,10 +66,10 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     set -eux; \
-    echo "fyne 目标版本: ${FYNE_VERSION}"; \
+    echo "[${TARGETPLATFORM:-unknown}] fyne 目标版本: ${FYNE_VERSION}"; \
     go install -v "fyne.io/tools/cmd/fyne@${FYNE_VERSION}"; \
     test -x "${GOPATH}/bin/fyne"; \
-    echo "--- fyne 安装的 ---"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- fyne 安装的 ---"; \
     fyne version || true
 
 # -------------------------------------------------------------------

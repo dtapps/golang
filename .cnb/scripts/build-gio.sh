@@ -515,6 +515,30 @@ case "${smoke_output}" in
   *) die "gio 镜像冒烟测试输出异常，latest 未提升：${smoke_output}" ;;
 esac
 
+# 系统包版本：包清单从本镜像对应的 Dockerfile 自动提取（改 Dockerfile 自动跟上），
+# 版本取自镜像内的 dpkg 数据库；构建期装过、最后被 purge 的包显示 absent。
+apt_pkgs_from_dockerfile() (
+  sed -n '/apt-get install/,/;/p' "$1" \
+    | sed 's/#.*//; s/\\//g; s/;//g' | tr '[:space:]' '\n' \
+    | grep -E '^[a-z][a-z0-9+.-]*$' \
+    | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh' | sort -u
+)
+apt_versions_from_image() (
+  img=$1
+  pkgs=$2
+  [ -n "${pkgs}" ] || {
+    printf 'none'
+    return 0
+  }
+  # shellcheck disable=SC2086  # 包名按空白拆成多个位置参数
+  docker run --rm --platform linux/amd64 "${img}" \
+    sh -c 'for p in "$@"; do v="$(dpkg-query -W -f="\${Version}" "$p" 2>/dev/null || true)"; printf "%s=%s " "$p" "${v:-absent}"; done' \
+    sh ${pkgs} 2>/dev/null | sed 's/[[:space:]]*$//' || true
+)
+APT_VERSIONS="$(apt_versions_from_image "${GIO_IMAGE}:${STAMP}" \
+  "$(apt_pkgs_from_dockerfile "${DOCKERFILE_GIO}")")"
+[ -n "${APT_VERSIONS}" ] || APT_VERSIONS="unknown"
+
 label_version="$(docker image inspect \
   --format '{{index .Config.Labels "org.opencontainers.image.version"}}' \
   "${GIO_IMAGE}:${STAMP}" 2>/dev/null || true)"
@@ -574,6 +598,7 @@ cat >"${ANNOTATION_FILE}" <<EOF
   "golang_version": "${GO_REAL}",
   "gio_base_image": "${IMAGE}:${STAMP}",
   "gio_base_digest": "${BASE_INDEX_DIGEST}",
+  "apt_versions": "${APT_VERSIONS}",
   "built_at": "${BUILT_AT}",
   "source_date": "${BUILD_DATE}"
 }

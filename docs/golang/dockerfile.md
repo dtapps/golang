@@ -68,6 +68,8 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 6. **清理**：purge wget / xz-utils，清 APT 缓存与 `/tmp`。
 7. **OCI 元数据标签**：放在文件最后。`BUILD_DATE` / `VCS_REF` / `IMAGE_VERSION` 每次都变，放前面会让 apt、Node、`go install` 这些层的缓存键跟着每次提交一起变。
 
+> 所有 `echo` 都带 `[${TARGETPLATFORM:-unknown}]` 前缀（BuildKit 自动提供的目标平台，需要在 stage 里 `ARG TARGETPLATFORM` 声明才能进 `RUN` 的环境）：`buildx` 多架构构建时同一个 `RUN` 会按 `linux/amd64`、`linux/arm64` 各跑一遍，日志里连着出现两遍「--- UPX 安装的 ---」是正常的，前缀能直接看出当前是哪一架构、不是重复安装。用旧版非 BuildKit 的 `docker build` 时显示 `unknown`。
+
 > CNB 侧会在安装基础包之前把 APT 源换成 `mirrors.cloud.tencent.com`；GitHub / GitLab 侧不换源。
 
 > 清理必须与安装同层：跨层 `rm` 只会产生 whiteout，旧层数据仍会随镜像分发。

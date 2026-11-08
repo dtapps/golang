@@ -146,20 +146,21 @@ GUI 需要显示环境：容器里没有显示器时用镜像自带的 `Xvfb`（
 
 CNB 侧写 `.cnb/annotation-gio.json`，GitHub 侧写 `.github/annotation-gio.json`，GitLab 侧写 `.gitlab/annotation-gio.json`（都不入库）。
 
-| 键                 | 含义                                                            |
-|--------------------|-----------------------------------------------------------------|
-| `gio_image`        | gio 镜像全名                                                    |
-| `gio_digest`       | gio manifest list digest                                        |
-| `gio_digest_short` | 前 12 位 digest（只用于核对）                                   |
-| `gio_size`         | amd64 压缩体积                                                  |
-| `gio_size_arm64`   | arm64 压缩体积                                                  |
-| `gio_version`      | 本次安装的 gogio CLI 版本（模块 `gioui.org/cmd`，如 `v0.10.3`） |
-| `image_version`    | 解析出的 Go 版本（与 `<go 版本>` 标签一致）                     |
-| `golang_version`   | 同上                                                            |
-| `gio_base_image`   | 本次使用的基础镜像引用                                          |
-| `gio_base_digest`  | 基础镜像 digest                                                 |
-| `built_at`         | 本次构建时间                                                    |
-| `source_date`      | 最后一次提交时间                                                |
+| 键                 | 含义                                                                  |
+|--------------------|-----------------------------------------------------------------------|
+| `gio_image`        | gio 镜像全名                                                          |
+| `gio_digest`       | gio manifest list digest                                              |
+| `gio_digest_short` | 前 12 位 digest（只用于核对）                                         |
+| `gio_size`         | amd64 压缩体积                                                        |
+| `gio_size_arm64`   | arm64 压缩体积                                                        |
+| `gio_version`      | 本次安装的 gogio CLI 版本（模块 `gioui.org/cmd`，如 `v0.10.3`）       |
+| `image_version`    | 解析出的 Go 版本（与 `<go 版本>` 标签一致）                           |
+| `golang_version`   | 同上                                                                  |
+| `gio_base_image`   | 本次使用的基础镜像引用                                                |
+| `gio_base_digest`  | 基础镜像 digest                                                       |
+| `apt_versions`     | apt 装的系统包版本（`包=版本`，缺包标 `absent`；清单取自 Dockerfile） |
+| `built_at`         | 本次构建时间                                                          |
+| `source_date`      | 最后一次提交时间                                                      |
 
 徽章全部从 CNB commit annotation 取值，地址模板：
 

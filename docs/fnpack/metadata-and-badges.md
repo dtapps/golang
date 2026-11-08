@@ -18,6 +18,7 @@
   "golang_version": "1.27.3",
   "fnpack_base_image": "docker.cnb.cool/dtapp/golang:1.27.3",
   "fnpack_base_digest": "sha256:...",
+  "apt_versions": "none",
   "built_at": "2026-11-01T01:12:00Z",
   "source_date": "2026-10-31T16:12:00+08:00"
 }
@@ -32,6 +33,7 @@
 | `fnpack_version`                           | 本次实际安装的 fnpack 版本：默认取 Dockerfile 的 `ARG FNPACK_VERSION`，手动触发填了 `fnpack_version` 时以入参为准 |
 | `image_version` / `golang_version`         | 解析出的 Go 版本，与 `<go 版本>` 标签一致（与基座元数据同名同值）                                                 |
 | `fnpack_base_image` / `fnpack_base_digest` | 本次实际使用的基础镜像引用与 digest                                                                               |
+| `apt_versions`                             | fnpack 镜像不额外装 apt 包，恒为 `none`（与基座/其它变体同名同结构）                                              |
 | `built_at`                                 | 本次实际构建时刻（UTC），只进元数据、不进镜像                                                                     |
 | `source_date`                              | 最后一次提交时间，同时落成镜像的 OCI `created` 标签                                                               |
 

@@ -138,6 +138,8 @@ gio 镜像里只有一条版本线，升级方式与 mygo 相同：手动触发 
 5. 更新 [dockerfile.md](dockerfile.md) 的版本表。
 6. 如果工具是 GitHub Release 下载，CNB 侧必须支持 `GITHUB_MIRROR`（走 DaoCloud）；GitHub / GitLab 侧直接写死官方地址。走 `curl` 自己解析版本的，记得同时改三份脚本里的解析逻辑（`resolve_versions`）。
 
+用 apt 装系统包（`-dev` 库、无头运行库等）时**不用**改脚本：`apt_versions` 会从该镜像对应的 Dockerfile 自动提取 `apt-get install` 那段，版本在镜像里用 `dpkg-query` 取；只需把包名写进 Dockerfile 的 apt 列表（以及必要的 `pkg-config --exists` 断言）。
+
 ## 同步检查清单
 
 改镜像内容后：

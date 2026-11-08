@@ -25,6 +25,10 @@
 ARG GOLANG_IMAGE=golang:1-trixie
 FROM ${GOLANG_IMAGE}
 
+# BuildKit 自动提供的目标平台（linux/amd64、linux/arm64 …）。多架构构建时同一个
+# RUN 会按架构各跑一遍，echo 带上它才能分清当前是哪个架构、不会误以为重复安装。
+ARG TARGETPLATFORM
+
 ARG GOLANG_IMAGE
 ARG MYGO_VERSION=latest
 ARG BUN_VERSION=latest
@@ -88,10 +92,10 @@ RUN set -eux; \
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     set -eux; \
-    echo "mygo 目标版本: ${MYGO_VERSION}"; \
+    echo "[${TARGETPLATFORM:-unknown}] mygo 目标版本: ${MYGO_VERSION}"; \
     go install -v "github.com/egoist/mygo/cmd/mygo@${MYGO_VERSION}"; \
     test -x "${GOPATH}/bin/mygo"; \
-    echo "--- mygo 安装的 ---"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- mygo 安装的 ---"; \
     mygo version || true
 
 # 3. 安装 bun
@@ -102,10 +106,10 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # npm 缓存目录挂在构建节点上，不进入镜像层。
 RUN --mount=type=cache,target=/root/.npm \
     set -eux; \
-    echo "bun 目标版本: ${BUN_VERSION}"; \
+    echo "[${TARGETPLATFORM:-unknown}] bun 目标版本: ${BUN_VERSION}"; \
     npm install -g --no-fund --no-audit "bun@${BUN_VERSION}"; \
     test -x "$(command -v bun)"; \
-    echo "--- bun 安装的 ---"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- bun 安装的 ---"; \
     bun --version
 
 # -------------------------------------------------------------------

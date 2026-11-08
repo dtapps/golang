@@ -131,13 +131,13 @@ arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-
 1. 解析 Dockerfile 的 `GO_VERSION` / `DEBIAN_VERSION`，可选被 `version` 输入覆盖。
 2. 起一次性容器执行 `go version`，得到实际版本（如 `1.27.3`）。
 3. 读取上游 `golang:<版本>-<代号>` 的 index digest。
-4. 再起一次性容器解析工具版本：Go 工具走 `go list -m`（模块路径见脚本里的 `GO_TOOL_MODULES`），UPX / Node.js / pnpm 走各自的上游索引，得到 `v1.31.1` 这种具体版本号。解析失败会回退 `latest` 并打警告，不阻断构建。
+4. 再起一次性容器解析工具版本：Go 工具走 `go list -m`（模块路径见脚本里的 `GO_TOOL_MODULES`），UPX / Node.js / pnpm 走各自的上游索引，得到 `v1.31.1` 这种具体版本号。**按来源逐个解析**：某一项失败只跳过它自己（回退 `latest` 并打警告），不会让整段解析崩掉——否则所有工具会一起退化成 `latest`，层缓存键永远不变、工具再也升不上去。解析脚本以 base64 随 `sh -c` 传给容器（不走 `sh -s` 的 stdin）：CNB 上 `docker run -i ... sh -s <<EOF` 可能拿到空 stdin，`sh` 读到空脚本静默退出 0，同样表现为「全部 latest」。解析结果为空时脚本会单独告警。
 5. 一次多架构构建并推送 `golang:<go 版本>`，工具版本以 `--build-arg` 传入。
 6. 派生 `<go 版本>-linux-{amd64,arm64}`。
-7. amd64 冒烟（工具链齐全、版本命令可执行、fnpack 不存在）。
+7. amd64 冒烟（工具链齐全、版本命令可执行、fnpack 不存在；顺带用 `dpkg-query` 取 `wixl` 版本带回来）。
 8. 校验 OCI `version` 标签。
 9. 提升 `<major.minor>` 与 `latest`。
-10. 写 golang 元数据（含 `tools`：本次各工具的实际版本）。
+10. 写 golang 元数据：`tools` 一行汇总各工具版本，另外每个工具再落一个扁平 key（`golangci_lint_version` 等），apt 装的系统包版本汇总成 `apt_versions`（清单取自 Dockerfile、版本取自镜像内 `dpkg`）。工具版本取**镜像里实际装上的**（冒烟容器里 `go version -m` / `node -v` 等），不是解析出的目标版本，见 [images-and-tags.md](images-and-tags.md#元数据)。
 
 fnpack 镜像（`.cnb/scripts/build-fnpack.sh` / `.github/scripts/build-fnpack.sh` / `.gitlab/scripts/build-fnpack.sh`）：
 

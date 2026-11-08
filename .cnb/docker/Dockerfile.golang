@@ -27,6 +27,10 @@ ARG GO_VERSION=1
 ARG DEBIAN_VERSION=trixie
 FROM golang:${GO_VERSION}-${DEBIAN_VERSION}
 
+# BuildKit 自动提供的目标平台（linux/amd64、linux/arm64 …）。多架构构建时同一个
+# RUN 会按架构各跑一遍，echo 带上它才能分清当前是哪个架构、不会误以为重复安装。
+ARG TARGETPLATFORM
+
 # FROM 之前声明的 ARG 在构建阶段不可见，必须在此重新声明才能用于 LABEL
 ARG GO_VERSION
 ARG DEBIAN_VERSION
@@ -137,7 +141,7 @@ RUN set -eu; \
     && rm -rf /var/lib/apt/lists/*; \
     ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime; \
     printf '%s\n' "${TZ}" > /etc/timezone; \
-    echo "--- wixl installed ---"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- wixl 安装的 ---"; \
     wixl --version; \
     date
 
@@ -147,7 +151,7 @@ RUN set -eux; \
     case "$ARCH" in \
     x86_64) UPX_ARCH="amd64" ;; \
     aarch64) UPX_ARCH="arm64" ;; \
-    *) echo "不支持的架构: $ARCH" >&2; exit 1 ;; \
+    *) echo "[${TARGETPLATFORM:-unknown}] 不支持的架构: $ARCH" >&2; exit 1 ;; \
     esac; \
     if [ -n "${GITHUB_MIRROR}" ]; then GH="${GITHUB_MIRROR%/}/github.com"; else GH="https://github.com"; fi; \
     if [ "${UPX_VERSION}" = "latest" ]; then \
@@ -157,7 +161,7 @@ RUN set -eux; \
     else UPX_TAG="v${UPX_VERSION}"; fi; \
     case "${UPX_TAG}" in \
     v[0-9]*) : ;; \
-    *) echo "无法解析 UPX 版本（UPX_VERSION=${UPX_VERSION}，得到：${UPX_TAG:-空}）" >&2; exit 1 ;; \
+    *) echo "[${TARGETPLATFORM:-unknown}] 无法解析 UPX 版本（UPX_VERSION=${UPX_VERSION}，得到：${UPX_TAG:-空}）" >&2; exit 1 ;; \
     esac; \
     UPX_VER="${UPX_TAG#v}"; \
     UPX_DIR="upx-${UPX_VER}-${UPX_ARCH}_linux"; \
@@ -167,7 +171,7 @@ RUN set -eux; \
     mv "/tmp/${UPX_DIR}/upx" /usr/local/bin/upx; \
     chmod +x /usr/local/bin/upx; \
     rm -rf /tmp/upx.tar.xz "/tmp/${UPX_DIR}"; \
-    echo "--- UPX 安装的 ---"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- UPX 安装的 ---"; \
     upx --version
 
 # 5. 安装 Node.js 工具
@@ -176,7 +180,7 @@ RUN set -eux; \
     case "$ARCH" in \
     x86_64) NODE_ARCH="x64" ;; \
     aarch64) NODE_ARCH="arm64" ;; \
-    *) echo "不支持的架构: $ARCH" >&2; exit 1 ;; \
+    *) echo "[${TARGETPLATFORM:-unknown}] 不支持的架构: $ARCH" >&2; exit 1 ;; \
     esac; \
     if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; else NODE_BASE="https://nodejs.org/dist"; fi; \
     if [ "${NODE_VERSION}" = "latest" ]; then \
@@ -184,10 +188,10 @@ RUN set -eux; \
     else NODE_TAG="v${NODE_VERSION}"; fi; \
     case "${NODE_TAG}" in \
     v[0-9]*) : ;; \
-    *) echo "无法解析 Node.js 版本（NODE_VERSION=${NODE_VERSION}，得到：${NODE_TAG:-空}）" >&2; exit 1 ;; \
+    *) echo "[${TARGETPLATFORM:-unknown}] 无法解析 Node.js 版本（NODE_VERSION=${NODE_VERSION}，得到：${NODE_TAG:-空}）" >&2; exit 1 ;; \
     esac; \
     NODE_VER="${NODE_TAG#v}"; \
-    echo "Node.js 版本解析为 ${NODE_TAG}"; \
+    echo "[${TARGETPLATFORM:-unknown}] Node.js 版本解析为 ${NODE_TAG}"; \
     NODE_DIR="node-${NODE_TAG}-linux-${NODE_ARCH}"; \
     NODE_URL="${NODE_BASE}/${NODE_TAG}/${NODE_DIR}.tar.xz"; \
     wget -q -O /tmp/node.tar.xz "${NODE_URL}"; \
@@ -197,7 +201,7 @@ RUN set -eux; \
     pnpm config set registry https://mirrors.cloud.tencent.com/npm/; \
     pnpm config set ignore-scripts false; \
     rm -rf /tmp/node.tar.xz /root/.npm /root/.cache/node; \
-    echo "--- Node.js 安装的 (v${NODE_VER}) ---"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- Node.js 安装的 (v${NODE_VER}) ---"; \
     node -v && npm -v && pnpm -v
 
 # 6. 预安装 Go 工具链（含 nfpm，走 GOPROXY）
@@ -208,40 +212,40 @@ RUN set -eux; \
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go install -v github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION} \
-    && echo "==> nfpm 安装完成 (${NFPM_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> nfpm 安装完成 (${NFPM_VERSION})" \
     && go install -v github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION} \
-    && echo "==> sqlc 安装完成 (${SQLC_VERSION})"
+    && echo "[${TARGETPLATFORM:-unknown}] ==> sqlc 安装完成 (${SQLC_VERSION})"
 
 # 6.1 ent / entc
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go install -v entgo.io/ent/cmd/ent@${ENT_VERSION} \
     && go install -v entgo.io/ent/cmd/entc@${ENT_VERSION} \
-    && echo "==> ent / entc 安装完成 (${ENT_VERSION})"
+    && echo "[${TARGETPLATFORM:-unknown}] ==> ent / entc 安装完成 (${ENT_VERSION})"
 
 # 6.2 golangci-lint / govulncheck
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION} \
-    && echo "==> golangci-lint 安装完成 (${GOLANGCI_LINT_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> golangci-lint 安装完成 (${GOLANGCI_LINT_VERSION})" \
     && go install -v golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} \
-    && echo "==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})"
+    && echo "[${TARGETPLATFORM:-unknown}] ==> govulncheck 安装完成 (${GOVULNCHECK_VERSION})"
 
 # 6.3 格式化与数据处理：shfmt / dockerfmt / yamlfmt / gojq / markdownfmt / sql-formatter
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go install -v mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
-    && echo "==> shfmt 安装完成 (${SHFMT_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> shfmt 安装完成 (${SHFMT_VERSION})" \
     && go install -v github.com/reteps/dockerfmt@${DOCKERFMT_VERSION} \
-    && echo "==> dockerfmt 安装完成 (${DOCKERFMT_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> dockerfmt 安装完成 (${DOCKERFMT_VERSION})" \
     && go install -v github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION} \
-    && echo "==> yamlfmt 安装完成 (${YAMLFMT_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> yamlfmt 安装完成 (${YAMLFMT_VERSION})" \
     && go install -v github.com/itchyny/gojq/cmd/gojq@${GOJQ_VERSION} \
-    && echo "==> gojq 安装完成 (${GOJQ_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> gojq 安装完成 (${GOJQ_VERSION})" \
     && go install -v github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@${MARKDOWNFMT_VERSION} \
-    && echo "==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> markdownfmt 安装完成 (${MARKDOWNFMT_VERSION})" \
     && go install -v github.com/wasilibs/go-sql-formatter/v15/cmd/sql-formatter@${GOSQLFORMATTER_VERSION} \
-    && echo "==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})"
+    && echo "[${TARGETPLATFORM:-unknown}] ==> go-sql-formatter 安装完成 (${GOSQLFORMATTER_VERSION})"
 
 # 6.4 测试与覆盖率报告：gotestsum / gocover-cobertura / gcov2lcov
 # 三者是同一条链路：gotestsum 跑测试并出 JUnit，go test -coverprofile 出覆盖率，
@@ -249,12 +253,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go install -v gotest.tools/gotestsum@${GOTESTSUM_VERSION} \
-    && echo "==> gotestsum 安装完成 (${GOTESTSUM_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> gotestsum 安装完成 (${GOTESTSUM_VERSION})" \
     && go install -v github.com/boumenot/gocover-cobertura@${GOCOVER_COBERTURA_VERSION} \
-    && echo "==> gocover-cobertura 安装完成 (${GOCOVER_COBERTURA_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> gocover-cobertura 安装完成 (${GOCOVER_COBERTURA_VERSION})" \
     && go install -v github.com/jandelgado/gcov2lcov@${GCOV2LCOV_VERSION} \
-    && echo "==> gcov2lcov 安装完成 (${GCOV2LCOV_VERSION})" \
-    && echo "--- Go 工具链安装完成 ---" \
+    && echo "[${TARGETPLATFORM:-unknown}] ==> gcov2lcov 安装完成 (${GCOV2LCOV_VERSION})" \
+    && echo "[${TARGETPLATFORM:-unknown}] --- Go 工具链安装完成 ---" \
     && ls -l "$GOPATH/bin"
 
 # 7. 卸载不需要的工具，并清空所有 apt 缓存

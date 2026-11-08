@@ -32,6 +32,10 @@
 ARG GOLANG_IMAGE=golang:1-trixie
 FROM ${GOLANG_IMAGE}
 
+# BuildKit 自动提供的目标平台（linux/amd64、linux/arm64 …）。多架构构建时同一个
+# RUN 会按架构各跑一遍，echo 带上它才能分清当前是哪个架构、不会误以为重复安装。
+ARG TARGETPLATFORM
+
 ARG GOLANG_IMAGE
 ARG GIO_VERSION=latest
 ARG IMAGE_VERSION=dev
@@ -119,10 +123,10 @@ RUN set -eux; \
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     set -eux; \
-    echo "gogio 目标版本: ${GIO_VERSION}"; \
+    echo "[${TARGETPLATFORM:-unknown}] gogio 目标版本: ${GIO_VERSION}"; \
     go install -v "gioui.org/cmd/gogio@${GIO_VERSION}"; \
     test -x "${GOPATH}/bin/gogio"; \
-    echo "--- gogio 安装的 ---"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- gogio 安装的 ---"; \
     gogio 2>&1 || true
 
 # -------------------------------------------------------------------

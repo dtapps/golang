@@ -118,20 +118,21 @@ docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 
 CNB 侧写 `.cnb/annotation-wails2.json`，GitHub 侧写 `.github/annotation-wails2.json`，GitLab 侧写 `.gitlab/annotation-wails2.json`（都不入库）。
 
-| 键                   | 含义                                        |
-|----------------------|---------------------------------------------|
-| `wails2_image`       | wails2 镜像全名                             |
-| `wails2_digest`      | wails2 manifest list digest                 |
-| `wails2_size`        | amd64 压缩体积                              |
-| `wails2_size_arm64`  | arm64 压缩体积                              |
-| `wails2_version`     | 本次安装的 CLI 版本（如 `v2.17.1`）         |
-| `image_version`      | 解析出的 Go 版本（与 `<go 版本>` 标签一致） |
-| `golang_version`     | 同上                                        |
-| `wails2_base_image`  | 本次使用的基础镜像引用                      |
-| `wails2_base_digest` | 基础镜像 digest                             |
-| `built_at`           | 本次构建时间                                |
-| `source_date`        | 最后一次提交时间                            |
-| `revision`           | 提交 SHA（GitHub 侧）                       |
+| 键                   | 含义                                                                  |
+|----------------------|-----------------------------------------------------------------------|
+| `wails2_image`       | wails2 镜像全名                                                       |
+| `wails2_digest`      | wails2 manifest list digest                                           |
+| `wails2_size`        | amd64 压缩体积                                                        |
+| `wails2_size_arm64`  | arm64 压缩体积                                                        |
+| `wails2_version`     | 本次安装的 CLI 版本（如 `v2.17.1`）                                   |
+| `image_version`      | 解析出的 Go 版本（与 `<go 版本>` 标签一致）                           |
+| `golang_version`     | 同上                                                                  |
+| `wails2_base_image`  | 本次使用的基础镜像引用                                                |
+| `wails2_base_digest` | 基础镜像 digest                                                       |
+| `apt_versions`       | apt 装的系统包版本（`包=版本`，缺包标 `absent`；清单取自 Dockerfile） |
+| `built_at`           | 本次构建时间                                                          |
+| `source_date`        | 最后一次提交时间                                                      |
+| `revision`           | 提交 SHA（GitHub 侧）                                                 |
 
 徽章全部从 CNB commit annotation 取值，地址模板：
 

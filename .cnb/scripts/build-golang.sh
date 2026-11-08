@@ -172,6 +172,27 @@ GOCOVER_COBERTURA_VERSION=github.com/boumenot/gocover-cobertura
 GCOV2LCOV_VERSION=github.com/jandelgado/gcov2lcov
 "
 
+# 版本变量 → 二进制名：元数据里的版本以镜像里实际装上的为准（读二进制而不是靠解析）
+TOOL_BINS="
+NFPM_VERSION=nfpm
+SQLC_VERSION=sqlc
+ENT_VERSION=ent
+GOLANGCI_LINT_VERSION=golangci-lint
+GOVULNCHECK_VERSION=govulncheck
+SHFMT_VERSION=shfmt
+DOCKERFMT_VERSION=dockerfmt
+YAMLFMT_VERSION=yamlfmt
+GOJQ_VERSION=gojq
+GOSQLFORMATTER_VERSION=sql-formatter
+GOTESTSUM_VERSION=gotestsum
+MARKDOWNFMT_VERSION=markdownfmt
+GOCOVER_COBERTURA_VERSION=gocover-cobertura
+GCOV2LCOV_VERSION=gcov2lcov
+UPX_VERSION=upx
+NODE_VERSION=node
+PNPM_VERSION=pnpm
+"
+
 # 从 Dockerfile 提取 go install 用到的版本变量（去重、排序）
 # 不假设 go install 后面直接跟包路径：中间可能有 -v 之类的 flag，也可能带引号
 dockerfile_tool_vars() (
@@ -186,8 +207,62 @@ version_value() (
 
 # 在基础镜像里解析最新版本，输出 KEY=VALUE。
 # 放在容器里跑：不依赖 runner 装了 go / curl / jq，模块路径转义也交给 go。
+# 脚本用 base64 随 `sh -c` 传给容器，不走 stdin：
+#   · CNB 上 `docker run -i ... sh -s <<EOF` 可能拿到空 stdin，sh 读到空脚本静默退出 0
+#     —— 不报错、没输出，结果是所有工具一起回退 latest（GitHub 正常、CNB 全 latest）；
+#   · 先用裸 heredoc 落成临时文件再编码：macOS 自带 bash 3.2 解析「命令替换里嵌套
+#     多字节 heredoc」有 bug，裸 heredoc 才稳。
 resolve_versions() {
-  set -- --rm -i --platform linux/amd64 \
+  resolve_tmp="$(mktemp)"
+  cat >"${resolve_tmp}" <<'RESOLVE_EOF'
+set -u
+
+# 每个来源单独解析，失败只影响自己（告警写到 stderr），不让整段解析崩掉。
+# 为什么：以前任何一项失败都 exit 1，导致所有工具一起回退 latest，层缓存键
+# 永远是 latest、工具再也升不上去；按项隔离后，坏一个源只丢它自己的版本。
+for pair in ${GO_TOOL_MODULES}; do
+  var="${pair%%=*}"
+  mod="${pair#*=}"
+  ver="$(go list -m -f '{{.Version}}' "${mod}@latest" 2>/dev/null || true)"
+  case "${ver}" in
+  v[0-9]*) printf '%s=%s\n' "${var}" "${ver}" ;;
+  *) echo "无法解析 ${var}（${mod}@latest → ${ver:-空}），该工具本次用 latest" >&2 ;;
+  esac
+done
+
+# UPX：releases.atom 第一个稳定 tag
+if [ -n "${GITHUB_MIRROR:-}" ]; then GH="${GITHUB_MIRROR%/}/github.com"; else GH="https://github.com"; fi
+upx_tag="$(curl -fsSL "${GH}/upx/upx/releases.atom" 2>/dev/null \
+  | grep -oE 'releases/tag/v[0-9]+\.[0-9]+\.[0-9]+"' | head -n 1 \
+  | sed 's|.*/tag/||; s|"||' || true)"
+case "${upx_tag}" in
+v[0-9]*) printf 'UPX_VERSION=%s\n' "${upx_tag#v}" ;;
+*) echo "无法解析 UPX 版本（得到：${upx_tag:-空}），本次用 latest" >&2 ;;
+esac
+
+# Node.js：dist/index.json 第一个非预发布版本
+if [ -n "${NODE_MIRROR:-}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; else NODE_BASE="https://nodejs.org/dist"; fi
+node_tag="$(curl -fsSL "${NODE_BASE}/index.json" 2>/dev/null \
+  | grep -oE '"version"[[:space:]]*:[[:space:]]*"v[0-9][^"]*"' \
+  | sed 's/.*"\(v[0-9][^"]*\)"$/\1/' \
+  | grep -v -- '-' | head -n 1 || true)"
+case "${node_tag}" in
+v[0-9]*) printf 'NODE_VERSION=%s\n' "${node_tag#v}" ;;
+*) echo "无法解析 Node.js 版本（得到：${node_tag:-空}），本次用 latest" >&2 ;;
+esac
+
+# pnpm：npm registry 的 pnpm@latest
+pnpm_ver="$(curl -fsSL "${NPM_REGISTRY%/}/pnpm/latest" 2>/dev/null \
+  | grep -oE '"version"[[:space:]]*:[[:space:]]*"[0-9][^"]*"' | head -n 1 \
+  | sed 's/.*"\([0-9][^"]*\)"$/\1/' || true)"
+case "${pnpm_ver}" in
+[0-9]*) printf 'PNPM_VERSION=%s\n' "${pnpm_ver}" ;;
+*) echo "无法解析 pnpm 版本（得到：${pnpm_ver:-空}），本次用 latest" >&2 ;;
+esac
+RESOLVE_EOF
+  resolve_b64="$(base64 <"${resolve_tmp}" | tr -d '\n')"
+  rm -f "${resolve_tmp}"
+  set -- --rm --platform linux/amd64 \
     -e "GO_TOOL_MODULES=${GO_TOOL_MODULES}" \
     -e "GITHUB_MIRROR=${MIRROR}" \
     -e "NODE_MIRROR=${MIRROR}" \
@@ -195,51 +270,8 @@ resolve_versions() {
   if [ -n "${DOCKERFILE_GOPROXY}" ]; then
     set -- "$@" -e "GOPROXY=${DOCKERFILE_GOPROXY}"
   fi
-  docker run "$@" "golang:${GO_REF}" sh -s <<'RESOLVE_EOF'
-set -eu
-
-# Go 工具：模块路径 → GOPROXY 上的最新 tag
-for pair in ${GO_TOOL_MODULES}; do
-  var="${pair%%=*}"
-  mod="${pair#*=}"
-  ver="$(go list -m -f '{{.Version}}' "${mod}@latest")"
-  case "${ver}" in
-  v[0-9]*) : ;;
-  *) echo "无法解析 ${var}（${mod}@latest → ${ver:-空}）" >&2; exit 1 ;;
-  esac
-  printf '%s=%s\n' "${var}" "${ver}"
-done
-
-# UPX：releases.atom 第一个稳定 tag
-if [ -n "${GITHUB_MIRROR:-}" ]; then GH="${GITHUB_MIRROR%/}/github.com"; else GH="https://github.com"; fi
-upx_tag="$(curl -fsSL "${GH}/upx/upx/releases.atom" \
-  | grep -oE 'releases/tag/v[0-9]+\.[0-9]+\.[0-9]+"' | head -n 1 \
-  | sed 's|.*/tag/||; s|"||')"
-case "${upx_tag}" in
-v[0-9]*) printf 'UPX_VERSION=%s\n' "${upx_tag#v}" ;;
-*) echo "无法解析 UPX 版本（得到：${upx_tag:-空}）" >&2; exit 1 ;;
-esac
-
-# Node.js：dist/index.json 第一个非预发布版本
-if [ -n "${NODE_MIRROR:-}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; else NODE_BASE="https://nodejs.org/dist"; fi
-node_tag="$(curl -fsSL "${NODE_BASE}/index.json" \
-  | grep -oE '"version"[[:space:]]*:[[:space:]]*"v[0-9][^"]*"' \
-  | sed 's/.*"\(v[0-9][^"]*\)"$/\1/' \
-  | grep -v -- '-' | head -n 1)"
-case "${node_tag}" in
-v[0-9]*) printf 'NODE_VERSION=%s\n' "${node_tag#v}" ;;
-*) echo "无法解析 Node.js 版本（得到：${node_tag:-空}）" >&2; exit 1 ;;
-esac
-
-# pnpm：npm registry 的 pnpm@latest
-pnpm_ver="$(curl -fsSL "${NPM_REGISTRY%/}/pnpm/latest" \
-  | grep -oE '"version"[[:space:]]*:[[:space:]]*"[0-9][^"]*"' | head -n 1 \
-  | sed 's/.*"\([0-9][^"]*\)"$/\1/')"
-case "${pnpm_ver}" in
-[0-9]*) printf 'PNPM_VERSION=%s\n' "${pnpm_ver}" ;;
-*) echo "无法解析 pnpm 版本（得到：${pnpm_ver:-空}）" >&2; exit 1 ;;
-esac
-RESOLVE_EOF
+  docker run "$@" "golang:${GO_REF}" \
+    sh -c "printf '%s' '${resolve_b64}' | base64 -d | sh"
 }
 
 # ---------- 0. 环境检查 ----------
@@ -327,6 +359,9 @@ else
   resolved_versions=""
   warn "工具版本解析失败，回退 latest：本次由 Dockerfile 在构建时解析，层缓存不生效"
 fi
+# 空结果是「静默失败」的典型表现（比如容器没拿到脚本），单独告警，别让它悄悄过去
+[ -n "${resolved_versions}" ] \
+  || warn "工具版本解析没有任何结果：本次全部走 Dockerfile 里的 @latest，元数据里的版本以镜像内实际安装为准"
 
 # ---------- 4. 时间戳与标签 ----------
 BUILD_DATE="$(git log -1 --format=%cI 2>/dev/null || true)"
@@ -526,7 +561,21 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     done
     if command -v fnpack >/dev/null 2>&1; then fail="$fail fnpack-present"; fi
     if [ -n "$fail" ]; then printf "FAIL%s" "$fail"; exit 1; fi
-    printf "SMOKE_OK"
+    # 真实版本：从二进制里的模块信息读（go version -m），比解析 --version 输出可靠。
+    # 供元数据使用：CI 解析失败回退 latest 时，这里仍能给出实际装上的版本号。
+    for b in nfpm sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
+      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov; do
+      v="$(go version -m "$(command -v "$b")" 2>/dev/null \
+        | sed -n "s/^[[:space:]]*mod[[:space:]][^[:space:]]*[[:space:]]\([^[:space:]]*\).*/\1/p" \
+        | head -n 1 || true)"
+      printf "TOOLVER %s=%s\n" "$b" "${v:-unknown}"
+    done
+    printf "TOOLVER node=%s\n" "$(node -v 2>/dev/null | sed "s/^v//" || true)"
+    printf "TOOLVER pnpm=%s\n" "$(pnpm -v 2>/dev/null || true)"
+    printf "TOOLVER upx=%s\n" "$(upx --version 2>/dev/null \
+      | sed -n "s/^upx \([0-9][0-9.]*\).*/\1/p" | head -n 1 || true)"
+    # wixl 是 apt 装的、没有 ARG 版本变量，版本只能从包信息里取，随冒烟一起带出来
+    printf "SMOKE_OK wixl=%s" "$(dpkg-query -W -f="\${Version}" wixl 2>/dev/null || echo unknown)"
   ' 2>&1)"; then
   die "golang 镜像冒烟测试失败，latest 未提升：${smoke_output:-docker run 无输出}"
 fi
@@ -534,6 +583,39 @@ case "${smoke_output}" in
   *SMOKE_OK*) : ;;
   *) die "golang 镜像冒烟测试输出异常，latest 未提升：${smoke_output}" ;;
 esac
+WIXL_VERSION="$(printf '%s' "${smoke_output}" \
+  | sed -n 's/.*SMOKE_OK wixl=\([^[:space:]]*\).*/\1/p' | head -n 1)"
+[ -n "${WIXL_VERSION}" ] || WIXL_VERSION="unknown"
+
+# 冒烟容器里顺手打印了每个二进制的真实版本（go version -m / 工具自身 --version），
+# 这里解析成 KEY=VALUE：元数据以镜像里实际装上的版本为准。
+TOOL_VERSIONS_ACTUAL="$(printf '%s\n' "${smoke_output}" \
+  | sed -n 's/^TOOLVER \([^=]*\)=\(..*\)$/\1=\2/p')"
+actual_bin_version() (printf '%s\n' "${TOOL_VERSIONS_ACTUAL}" | sed -n "s/^$1=//p" | head -n 1)
+
+# 系统包版本：包清单从本镜像对应的 Dockerfile 自动提取（改 Dockerfile 自动跟上），
+# 版本取自镜像内的 dpkg 数据库；构建期装过、最后被 purge 的包显示 absent。
+apt_pkgs_from_dockerfile() (
+  sed -n '/apt-get install/,/;/p' "$1" \
+    | sed 's/#.*//; s/\\//g; s/;//g' | tr '[:space:]' '\n' \
+    | grep -E '^[a-z][a-z0-9+.-]*$' \
+    | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh' | sort -u
+)
+apt_versions_from_image() (
+  img=$1
+  pkgs=$2
+  [ -n "${pkgs}" ] || {
+    printf 'none'
+    return 0
+  }
+  # shellcheck disable=SC2086  # 包名按空白拆成多个位置参数
+  docker run --rm --platform linux/amd64 "${img}" \
+    sh -c 'for p in "$@"; do v="$(dpkg-query -W -f="\${Version}" "$p" 2>/dev/null || true)"; printf "%s=%s " "$p" "${v:-absent}"; done' \
+    sh ${pkgs} 2>/dev/null | sed 's/[[:space:]]*$//' || true
+)
+APT_VERSIONS="$(apt_versions_from_image "${IMAGE}:${STAMP}" \
+  "$(apt_pkgs_from_dockerfile "${DOCKERFILE_GOLANG}")")"
+[ -n "${APT_VERSIONS}" ] || APT_VERSIONS="unknown"
 
 label_version="$(docker image inspect \
   --format '{{index .Config.Labels "org.opencontainers.image.version"}}' \
@@ -553,13 +635,32 @@ GOLANG_DIGEST_SHORT="$(printf '%s' "${GOLANG_INDEX_DIGEST#sha256:}" | cut -c1-12
 GOLANG_SIZE_AMD64="$(image_size_mb "${IMAGE}:${STAMP}" amd64)"
 GOLANG_SIZE_ARM64="$(image_size_mb "${IMAGE}:${STAMP}" arm64)"
 
-# 工具版本汇总成一行，方便回查「某天的镜像里到底是哪个版本」
+# 工具版本汇总：
+#   · tools       一行可读字符串（保留，兼容已有读法）
+#   · <arg 名小写> 每个工具一个扁平 key（如 golangci_lint_version），jq / badge 可直接取
+#   · wixl_version apt 装的 wixl 没有 ARG，版本从冒烟容器里带出来
 TOOLS_SUMMARY=""
+TOOLS_JSON=""
 for var in ${TOOL_VARS}; do
   val="$(version_value "${var}")"
+  # 优先用镜像里实际装上的版本：解析失败回退 latest 时，构建期装的是「当时最新」，
+  # 只有从二进制里读才知道真版本号。
+  bin="$(printf '%s\n' "${TOOL_BINS}" | sed -n "s/^${var}=//p" | head -n 1)"
+  if [ -n "${bin}" ]; then
+    actual="$(actual_bin_version "${bin}")"
+    case "${actual}" in
+      '' | unknown) : ;;
+      *) val="${actual}" ;;
+    esac
+  fi
   [ -n "${val}" ] || val="latest"
   TOOLS_SUMMARY="${TOOLS_SUMMARY}$(printf '%s' "${var%%_VERSION}" | tr '[:upper:]' '[:lower:]')=${val} "
+  TOOLS_JSON="${TOOLS_JSON}  \"$(printf '%s' "${var}" | tr '[:upper:]' '[:lower:]')\": \"${val}\",
+"
 done
+TOOLS_SUMMARY="${TOOLS_SUMMARY}wixl=${WIXL_VERSION} "
+TOOLS_JSON="${TOOLS_JSON}  \"wixl_version\": \"${WIXL_VERSION}\",
+"
 
 # 向 CNB Stage Result 输出变量（必须 source 才生效）
 printf '##[set-output image_version=%s]\n' "${STAMP}"
@@ -578,8 +679,9 @@ cat >"${ANNOTATION_FILE}" <<EOF
   "golang_version": "${GO_REAL}",
   "base_image": "golang:${GO_REF}",
   "base_digest": "${BASE_DIGEST}",
+  "apt_versions": "${APT_VERSIONS}",
   "tools": "${TOOLS_SUMMARY% }",
-  "built_at": "${BUILT_AT}",
+${TOOLS_JSON}  "built_at": "${BUILT_AT}",
   "source_date": "${BUILD_DATE}"
 }
 EOF

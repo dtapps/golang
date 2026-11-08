@@ -19,6 +19,10 @@
 ARG GOLANG_IMAGE=golang:1-trixie
 FROM ${GOLANG_IMAGE}
 
+# BuildKit 自动提供的目标平台（linux/amd64、linux/arm64 …）。多架构构建时同一个
+# RUN 会按架构各跑一遍，echo 带上它才能分清当前是哪个架构、不会误以为重复安装。
+ARG TARGETPLATFORM
+
 ARG GOLANG_IMAGE
 ARG FNPACK_VERSION=1.2.3
 ARG IMAGE_VERSION=dev
@@ -33,13 +37,13 @@ RUN set -eux; \
     case "$ARCH" in \
     x86_64) FNPACK_ARCH="amd64" ;; \
     aarch64) FNPACK_ARCH="arm" ;; \
-    *) echo "不支持的架构: $ARCH" >&2; exit 1 ;; \
+    *) echo "[${TARGETPLATFORM:-unknown}] 不支持的架构: $ARCH" >&2; exit 1 ;; \
     esac; \
     FNPACK_URL="https://static2.fnnas.com/fnpack/fnpack-${FNPACK_VERSION}-linux-${FNPACK_ARCH}"; \
     curl -fsSL -o /usr/local/bin/fnpack "${FNPACK_URL}"; \
     chmod +x /usr/local/bin/fnpack; \
     test -x /usr/local/bin/fnpack; \
-    echo "--- fnpack 安装的 ---"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- fnpack 安装的 ---"; \
     fnpack --help >/dev/null 2>&1 || true
 
 # -------------------------------------------------------------------

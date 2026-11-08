@@ -395,6 +395,31 @@ case "${smoke_output}" in
   *) die "fnpack 镜像冒烟测试输出异常，latest 未提升：${smoke_output}" ;;
 esac
 
+# 系统包版本：包清单从本镜像对应的 Dockerfile 自动提取（改 Dockerfile 自动跟上），
+# 版本取自镜像内的 dpkg 数据库；构建期装过、最后被 purge 的包显示 absent。
+# fnpack 镜像不额外装 apt 包，这里会得到 none，不会多起容器。
+apt_pkgs_from_dockerfile() (
+  sed -n '/apt-get install/,/;/p' "$1" \
+    | sed 's/#.*//; s/\\//g; s/;//g' | tr '[:space:]' '\n' \
+    | grep -E '^[a-z][a-z0-9+.-]*$' \
+    | grep -vxE 'export|apt-get|install|update|rm|rf|yes|no|sh' | sort -u
+)
+apt_versions_from_image() (
+  img=$1
+  pkgs=$2
+  [ -n "${pkgs}" ] || {
+    printf 'none'
+    return 0
+  }
+  # shellcheck disable=SC2086  # 包名按空白拆成多个位置参数
+  docker run --rm --platform linux/amd64 "${img}" \
+    sh -c 'for p in "$@"; do v="$(dpkg-query -W -f="\${Version}" "$p" 2>/dev/null || true)"; printf "%s=%s " "$p" "${v:-absent}"; done' \
+    sh ${pkgs} 2>/dev/null | sed 's/[[:space:]]*$//' || true
+)
+APT_VERSIONS="$(apt_versions_from_image "${FNPACK_IMAGE}:${STAMP}" \
+  "$(apt_pkgs_from_dockerfile "${DOCKERFILE_FNPACK}")")"
+[ -n "${APT_VERSIONS}" ] || APT_VERSIONS="unknown"
+
 # 镜像已 pull 到本地，直接读 config 里的 label
 label_version="$(docker image inspect \
   --format '{{index .Config.Labels "org.opencontainers.image.version"}}' \
@@ -450,6 +475,7 @@ cat >"${ANNOTATION_FILE}" <<EOF
   "golang_version": "${GO_REAL}",
   "fnpack_base_image": "${IMAGE}:${STAMP}",
   "fnpack_base_digest": "${BASE_INDEX_DIGEST}",
+  "apt_versions": "${APT_VERSIONS}",
   "built_at": "${BUILT_AT}",
   "source_date": "${BUILD_DATE}",
   "revision": "${VCS_REF}"
