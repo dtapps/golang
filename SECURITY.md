@@ -37,7 +37,7 @@ docker pull ghcr.io/dtapps/golang/gio@sha256:<gio_digest>
 
 ## 补丁节奏
 
-- 每天自动重建一次，分七段：`golang`（CNB 00:05、GitHub 16:05 UTC）、`golang/fnpack`（CNB 03:05、GitHub 19:05 UTC）、`golang/wails3`（CNB 06:05、GitHub 22:05 UTC）、`golang/wails2`（CNB 09:05、GitHub 01:05 UTC）、`golang/fyne`（CNB 12:05、GitHub 04:05 UTC）、`golang/mygo`（CNB 15:05、GitHub 07:05 UTC）与 `golang/gio`（CNB 18:05、GitHub 10:05 UTC）各自按错开的定时任务构建。
+- 每天自动重建一次，分六段：`golang`（CNB 00:05、GitHub 16:05 UTC）、`golang/fnpack`（CNB 03:05、GitHub 19:05 UTC）、`golang/wails3`（CNB 06:05、GitHub 22:05 UTC）、`golang/fyne`（CNB 12:05、GitHub 04:05 UTC）、`golang/mygo`（CNB 15:05、GitHub 07:05 UTC）与 `golang/gio`（CNB 18:05、GitHub 10:05 UTC）各自按错开的定时任务构建。`golang/wails2` 是旧版（已有新版 wails3），不每天跟踪上游，定时已停用、仅按需手动构建，见 [维护 — 日常构建](docs/golang/maintenance.md)。
 - 每次重建都会重新拉取上游基座、重新下载/重新编译依赖，因此上游重新推送同一 tag 时的安全修复能进入镜像。
 - Go 基座默认 `golang:1-trixie` 浮动标签，自动跟随最新稳定 Go（跨 minor 与大版本）；手动触发填 `version` 可钉住。
 - 工具版本（UPX、nfpm、Node、pnpm、各 Go 工具）默认 `latest`，构建时自动解析最新版：UPX 取 GitHub `releases.atom` 的首个稳定 tag，Node 查官方 dist 索引，nfpm 与各 Go 工具走 `go install @latest`。wails3 同理：`WAILS3_VERSION` 默认 `latest`，CI 先用 `go list -m` 解析最新稳定 tag 再 `go install`。fyne 也是同一套路：`FYNE_VERSION` 默认 `latest`，CI 先用 `go list -m fyne.io/tools@latest` 解析最新稳定 tag 再 `go install`。mygo 同样：`MYGO_VERSION` 默认 `latest`，CI 先用 `go list -m github.com/egoist/mygo@latest` 解析再 `go install`；镜像里的 `bun` 走 `BUN_VERSION`，CI 用 `npm view bun version` 解析最新稳定版再 `npm install -g`。gio 也是同一套路：`GIO_VERSION`（`gioui.org/cmd`，即 `gogio`）默认 `latest`，CI 先用 `go list -m gioui.org/cmd@latest` 解析成具体 tag 再 `go install`。出现问题时可用 `--build-arg`（或改 Dockerfile 默认值）钉回具体版本。

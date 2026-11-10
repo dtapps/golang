@@ -81,12 +81,14 @@ GitLab 的 cron 不在 YAML 里，定时任务要建在 **CI/CD → Schedules**�
 | golang | `5 0 * * *`  （00:05）     | `5 16 * * *`（16:05 UTC）    | `TARGET=golang` | 16:05 UTC   |
 | fnpack | `5 3 * * *`  （03:05）     | `5 19 * * *`（19:05 UTC）    | `TARGET=fnpack` | 19:05 UTC   |
 | wails3 | `5 6 * * *`  （06:05）     | `5 22 * * *`（22:05 UTC）    | `TARGET=wails3` | 22:05 UTC   |
-| wails2 | `5 9 * * *`  （09:05）     | `5 1 * * *`（01:05 UTC）     | `TARGET=wails2` | 01:05 UTC   |
+| wails2 | 已停用（仅手动）           | 已停用                       | `TARGET=wails2` | 已停用      |
 | fyne   | `5 12 * * *` （12:05）     | `5 4 * * *`（04:05 UTC）     | `TARGET=fyne`   | 04:05 UTC   |
 | mygo   | `5 15 * * *` （15:05）     | `5 7 * * *`（07:05 UTC）     | `TARGET=mygo`   | 07:05 UTC   |
 | gio    | `5 18 * * *` （18:05）     | `5 10 * * *`（10:05 UTC）    | `TARGET=gio`    | 10:05 UTC   |
 
-也可以只建一条每天一次的 schedule，不填 `TARGET`——七个镜像会按 `golang → variants` 的顺序在一条流水线里全部构建。这样总时长更长，但配置更少。
+> wails2 的定时已停用：旧版无需每天跟踪上游（已有新版 wails3），见 [维护 — 日常构建](golang/maintenance.md)。GitLab 的 cron 在 UI / API 里，需把 `TARGET=wails2` 那条 Pipeline schedule 设为 inactive（或删除）；只停定时任务本身不会影响已推送的镜像和手动 Run pipeline。
+
+也可以只建一条每天一次的 schedule，不填 `TARGET`——七个镜像会按 `golang → variants` 的顺序在一条流水线里全部构建。这样总时长更长，但配置更少。**注意**这种全量 schedule 下 wails2 仍会被构建（`build-wails2.yml` 的 rules 匹配空 `TARGET`），要彻底排除需收紧该 rules。
 
 手动发布：**CI/CD → Pipelines → Run pipeline**，在表单里填：
 

@@ -93,7 +93,7 @@ ghcr.io/dtapps/golang/gio:1.27.3-linux-arm64
 
 fnpack / wails3 / wails2 / fyne / mygo / gio 的 `<major.minor>` / `latest` 只在基础镜像的对应标签也已指向本次版本时才提升。所以它们的 `latest` 不会跑到基础镜像前面，也不会出现「只有变体成功」的错位。失败时 `<go 版本>` 标签可能已经指向坏产物，但它不是移动标签，下游按 `latest` / `<major.minor>` 拉取不受影响。
 
-调度上，CNB 依次跑 00:05 的 golang、03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2、12:05 的 fyne、15:05 的 mygo、18:05 的 gio；GitHub 依次跑 16:05 UTC 的 golang、19:05 UTC 的 fnpack、22:05 UTC 的 wails3、01:05 UTC 的 wails2、04:05 UTC 的 fyne、07:05 UTC 的 mygo、10:05 UTC 的 gio；GitLab 用 Pipeline schedules 配同样的时间，变量 `TARGET` 分别指向七个镜像，也可以一条 schedule 不填 `TARGET` 一次构建全部。
+调度上，CNB 依次跑 00:05 的 golang、03:05 的 fnpack、06:05 的 wails3、12:05 的 fyne、15:05 的 mygo、18:05 的 gio；GitHub 依次跑 16:05 UTC 的 golang、19:05 UTC 的 fnpack、22:05 UTC 的 wails3、04:05 UTC 的 fyne、07:05 UTC 的 mygo、10:05 UTC 的 gio；GitLab 用 Pipeline schedules 配同样的时间，变量 `TARGET` 分别指向这六个镜像，也可以一条 schedule 不填 `TARGET` 一次构建全部（含 wails2）。wails2 的 09:05 / 01:05 UTC 定时已停用：已有新版 wails3，旧版没必要每天跟踪上游，改为按需手动触发，见 [维护 — 日常构建](maintenance.md)。
 
 ## 固定某一份产物
 

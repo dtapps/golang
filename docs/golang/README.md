@@ -59,9 +59,9 @@ make format && make lint-shell   # 提交前
 
 CI 按平台和镜像拆开，每个镜像一条流水线：
 
-- CNB：`.cnb/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio}.yml`，每日由 `.cnb.yml` 的定时任务先后触发（00:05 / 03:05 / 06:05 / 09:05 / 12:05 / 15:05 / 18:05）。
-- GitHub：`.github/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio}.yml`，七者各自按定时任务触发（16:05 / 19:05 / 22:05 UTC / 01:05 UTC / 04:05 UTC / 07:05 UTC / 10:05 UTC）。
-- GitLab：`.gitlab/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio}.yml`，由 Pipeline schedules 触发（建议同样错开三小时），`TARGET` 选镜像。
+- CNB：`.cnb/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio}.yml`，每日由 `.cnb.yml` 的定时任务先后触发（00:05 / 03:05 / 06:05 / 12:05 / 15:05 / 18:05；wails2 的 09:05 已停用，仅手动）。
+- GitHub：`.github/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio}.yml`，六者各自按定时任务触发（16:05 / 19:05 / 22:05 UTC / 04:05 UTC / 07:05 UTC / 10:05 UTC；wails2 的 01:05 UTC 已停用，仅手动）。
+- GitLab：`.gitlab/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio}.yml`，由 Pipeline schedules 触发（建议同样错开三小时），`TARGET` 选镜像；wails2 那条已停用。
 
 本地构建见 [build.md](build.md)，事件矩阵见 [ci-pipeline.md](ci-pipeline.md)。
 

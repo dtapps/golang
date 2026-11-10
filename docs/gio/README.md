@@ -128,8 +128,8 @@ GUI 需要显示环境：容器里没有显示器时用镜像自带的 `Xvfb`（
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-gio.yml`，每天 18:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05、wails3 06:05、wails2 09:05、fyne 12:05、mygo 15:05 之后，给基座留了十八小时）；也可用「打包 Golang + gio 镜像（多架构）」按钮手动触发，可填 `version` / `gio_version`。
-- GitHub：`.github/workflows/build-gio.yml`，每天 10:05 UTC（北京 18:05）定时触发（基座 16:05 UTC、fnpack 19:05 UTC、wails3 22:05 UTC、wails2 01:05 UTC、fyne 04:05 UTC、mygo 07:05 UTC 之后）；手动触发同样可填 `version` / `gio_version`。
+- CNB：`.cnb/workflows/build-gio.yml`，每天 18:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05、wails3 06:05、fyne 12:05、mygo 15:05 之后，给基座留了十八小时）；也可用「打包 Golang + gio 镜像（多架构）」按钮手动触发，可填 `version` / `gio_version`。
+- GitHub：`.github/workflows/build-gio.yml`，每天 10:05 UTC（北京 18:05）定时触发（基座 16:05 UTC、fnpack 19:05 UTC、wails3 22:05 UTC、fyne 04:05 UTC、mygo 07:05 UTC 之后）；手动触发同样可填 `version` / `gio_version`。
 - GitLab：`.gitlab/workflows/build-gio.yml`，在 UI / API 建 `TARGET=gio` 的 schedule 定时触发（基座先构建）；手动 Run pipeline 时填 `TARGET=gio`，可再填 `VERSION` / `GIO_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 脚本先等 `golang:<go 版本>` 就绪（最多 20 × 15 秒，等不到直接失败），再从它构建、派生单平台标签、跑冒烟、提升移动标签。冒烟断言：

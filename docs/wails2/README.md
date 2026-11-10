@@ -4,6 +4,8 @@
 
 在 [Golang 构建环境镜像](../golang/README.md) 之上做两件事：装 GTK3 / WebKit2GTK 4.1 开发包，再 `go install` 一份 `wails` CLI。用于在 CI / 容器里编译 [Wails v2](https://github.com/wailsapp/wails) 桌面应用（Linux 侧 webview 走 GTK3 + WebKit2GTK 4.1）。
 
+> **定时构建已停用**：wails2 是旧版，仓库已有新版 wails3 镜像，新旧并存时没必要每天跟踪旧版上游；三侧均改为按需手动触发，已发布的镜像与 Dockerfile / 构建脚本都保留。原因与手动触发方式见 [维护 — 日常构建](../golang/maintenance.md)。
+
 > **本目录的分工**：wails2 镜像 = 基座镜像 + GTK3/WebKit2GTK 4.1 + `wails` 二进制，所以这里只收 wails2 专属的内容（版本策略、build tag、构建用法、元数据）。构建、CI、标签、镜像源、维护、排错等共用机制都在 [`docs/golang/`](../golang/index.md)，不在这里重复。文档与实现冲突时，以三份 `Dockerfile.wails2` 与三份 `build-wails2.sh` 为准。
 
 ## 镜像里有什么
@@ -101,9 +103,9 @@ docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-wails2.yml`，每天 09:05 由 `.cnb.yml` 定时触发；也可用「打包 Golang + wails2 镜像（多架构 amd64 + arm64）」按钮手动触发，可填 `version` / `wails2_version`。
-- GitHub：`.github/workflows/build-wails2.yml`，每天 01:05 UTC（北京 09:05）定时触发；手动触发同样可填 `version` / `wails2_version`。
-- GitLab：`.gitlab/workflows/build-wails2.yml`，在 UI / API 建 `TARGET=wails2` 的 schedule 定时触发；手动 Run pipeline 时填 `TARGET=wails2`，可再填 `VERSION` / `WAILS2_VERSION`，见 [../gitlab.md](../gitlab.md)。
+- CNB：`.cnb/workflows/build-wails2.yml`，定时已停用，仅用「打包 Golang + wails2 镜像（多架构 amd64 + arm64）」按钮手动触发，可填 `version` / `wails2_version`。
+- GitHub：`.github/workflows/build-wails2.yml`，定时已停用，仅 `workflow_dispatch` 手动触发，同样可填 `version` / `wails2_version`。
+- GitLab：`.gitlab/workflows/build-wails2.yml`，`TARGET=wails2` 的 schedule 已停用，仅在需要时手动 Run pipeline 填 `TARGET=wails2`，可再填 `VERSION` / `WAILS2_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 脚本先等 `golang:<go 版本>` 就绪（等不到直接失败），再从它构建、派生单平台标签、跑冒烟、提升移动标签。冒烟断言：
 

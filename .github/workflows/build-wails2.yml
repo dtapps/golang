@@ -23,10 +23,10 @@
 name: build-wails2
 
 on:
-  schedule:
-    # 每天 09:05（Asia/Shanghai）= 01:05 UTC，与 CNB 的 crontab '5 9 * * *' 同刻。
-    # 给基础镜像和其它变体构建留出时间。
-    - cron: '5 1 * * *'
+  # schedule:
+  # 每天 09:05（Asia/Shanghai）= 01:05 UTC，与 CNB 的 crontab '5 9 * * *' 同刻。
+  # 给基础镜像和其它变体构建留出时间。
+  # - cron: '5 1 * * *'
   workflow_dispatch:
     inputs:
       version:

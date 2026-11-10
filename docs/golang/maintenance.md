@@ -2,9 +2,11 @@
 
 ## 日常构建
 
-- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像，06:05 构建 wails3，09:05 构建 wails2，12:05 构建 fyne，15:05 构建 mygo，18:05 构建 gio。
-- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack 镜像，22:05 UTC（北京 06:05）构建 wails3，01:05 UTC（北京 09:05）构建 wails2，04:05 UTC（北京 12:05）构建 fyne，07:05 UTC（北京 15:05）构建 mygo，10:05 UTC（北京 18:05）构建 gio。
-- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:05 UTC golang、19:05 UTC fnpack、22:05 UTC wails3、01:05 UTC wails2、04:05 UTC fyne、07:05 UTC mygo、10:05 UTC gio，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)。
+- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像，06:05 构建 wails3，12:05 构建 fyne，15:05 构建 mygo，18:05 构建 gio（09:05 的 wails2 定时已停用，见下）。
+- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack 镜像，22:05 UTC（北京 06:05）构建 wails3，04:05 UTC（北京 12:05）构建 fyne，07:05 UTC（北京 15:05）构建 mygo，10:05 UTC（北京 18:05）构建 gio（01:05 UTC 的 wails2 定时已停用）。
+- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:05 UTC golang、19:05 UTC fnpack、22:05 UTC wails3、04:05 UTC fyne、07:05 UTC mygo、10:05 UTC gio，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)（wails2 那条已停用）。
+
+> **wails2 不再每天跟踪上游**：wails2 是旧版（Wails v2），仓库已有新版 wails3 镜像；旧版上游发版少、现有 v2 项目一般钉住版本，新旧两版并存时没必要每天跟踪旧版上游重建，因此三侧的 wails2 定时构建都停用，改为**按需手动触发**。CNB / GitHub 的 cron 已在 `.cnb.yml` 与 `.github/workflows/build-wails2.yml` 里注释停用；GitLab 的 cron 在 UI / API 里，需把 `TARGET=wails2` 那条 Pipeline schedule 设为 inactive（或删除）。已推送的 `.../wails2` 镜像、三份 `Dockerfile.wails2` 与三份 `build-wails2.sh` 全部保留，需要新版本时手动触发即可（CNB 自定义按钮 / GitHub `workflow_dispatch` / GitLab Run pipeline 填 `TARGET=wails2`）。 两个注意点：① 若 GitLab 只建了一条不带 `TARGET` 的全量 schedule，`.gitlab/workflows/build-wails2.yml` 的 rules 是 `$TARGET == "" || $TARGET == "wails2"`，wails2 仍会被构建，这种部署方式要排除它得收紧 rules；② wails3 用的是 GTK4/WebKitGTK 6.0 + `wails3` CLI，wails2 用的是 GTK3/WebKit2GTK 4.1 + `wails` CLI（构建还要 `-tags webkit2_41`），两者不通用，编译 Wails v2 项目仍需要 wails2 镜像，所以只停定时、不删镜像定义。
 
 `GO_VERSION` 默认是 `1`（`golang:1-trixie` 浮动标签），上游发布新 Go 后下一次构建会自动跟随；想钉版本时手动填 `version`，或直接改三份 Dockerfile 的 `GO_VERSION`。定时构建还会重新解析上游各工具的最新版本：版本变了才重建对应那一层，没变就全命中缓存（只拉基座、跑冒烟）。上游重新推送同一 tag 的基座（安全修复）时，digest 一变，apt 之后的层会全部重建，同样能吃到更新。
 
@@ -85,7 +87,7 @@ wails3 版本**不占标签**：`golang/wails3:<go 版本>` 永远是「该 Go �
 
 ## 升级 wails2
 
-**通常什么都不用做**：三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v2@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 09:05 / GitHub 01:05 UTC / GitLab 01:05 UTC）自动进镜像，版本号会写进元数据 `wails2_version` 与徽章。
+**通常什么都不用做**：三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 默认是 `latest`，每次手动构建都会先用 `go list -m github.com/wailsapp/wails/v2@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版不会自动进镜像（定时已停用，见「日常构建」）；需要时手动触发一次，解析出的版本号会写进元数据 `wails2_version` 与徽章。
 
 需要人工介入的两种情况与 wails3 相同：手动触发 `build-wails2` 并填 `wails2_version`（`v2.17.1` / `2.17.1` 都接受），或把三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 改成具体 tag。wails2 版本同样不占标签，复现某次产物请用元数据里的 `wails2_digest`。
 

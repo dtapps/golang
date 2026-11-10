@@ -82,7 +82,7 @@ gio：解析版本（含 gogio CLI 版本与 gioui.org 库版本）→ 登录 �
 
 之后的冒烟、`latest` / `<major.minor>` 提升都没执行。
 
-原因：CNB 制品库不支持把镜像清单当 blob 读；`imagetools create` 在同仓库打标签时仍要走 blob copy，`copy sha256:... unexpected EOF` 在 `0.000s` 稳定复现，与基座几点构建、七条定时任务错开多久都无关。**重试无效**（3 次全挂已实测）。
+原因：CNB 制品库不支持把镜像清单当 blob 读；`imagetools create` 在同仓库打标签时仍要走 blob copy，`copy sha256:... unexpected EOF` 在 `0.000s` 稳定复现，与基座几点构建、六条定时任务错开多久都无关。**重试无效**（3 次全挂已实测）。
 
 处置：
 
@@ -104,8 +104,8 @@ gio：解析版本（含 gogio CLI 版本与 gioui.org 库版本）→ 登录 �
 症状：`基础镜像 <registry>/<repo>:<go 版本> 不存在`。
 
 - 变体镜像必须 `FROM` 同版本的 golang 基础镜像，不会自己安装工具链。
-- CNB：确认 00:05 的 `build-golang` 定时任务成功；03:05 的 fnpack、06:05 的 wails3、09:05 的 wails2、12:05 的 fyne、15:05 的 mygo、18:05 的 gio 才有基础可用。
-- GitHub：确认 16:05 UTC 的 `build-golang` 定时任务成功；19:05 UTC 的 fnpack、22:05 UTC 的 wails3、01:05 UTC 的 wails2、04:05 UTC 的 fyne、07:05 UTC 的 mygo、10:05 UTC 的 gio 才有基础可用。手动触发前先跑一次 build-golang。
+- CNB：确认 00:05 的 `build-golang` 定时任务成功；03:05 的 fnpack、06:05 的 wails3、12:05 的 fyne、15:05 的 mygo、18:05 的 gio 才有基础可用（wails2 定时已停用，仅手动构建）。
+- GitHub：确认 16:05 UTC 的 `build-golang` 定时任务成功；19:05 UTC 的 fnpack、22:05 UTC 的 wails3、04:05 UTC 的 fyne、07:05 UTC 的 mygo、10:05 UTC 的 gio 才有基础可用。手动触发前先跑一次 build-golang。
 - GitLab：确认 `TARGET=golang` 的 schedule 或手动流水线成功；其余六个 `TARGET` 的 schedule 才有基础可用。手动触发变体前先跑一次 `TARGET=golang`。
 - 刚推完基础镜像就手动跑变体时，脚本会最多等 5 分钟，仍然失败说明基础镜像确实没推上去。
 

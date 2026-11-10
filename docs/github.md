@@ -211,15 +211,15 @@ permissions:
 
 ## 与 CNB 的差异
 
-| 维度          | CNB                                                                                                     | GitHub                                                                                        |
-|---------------|---------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE`                                                       | `ghcr.io` + `GITHUB_REPOSITORY`                                                               |
-| 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`                                                                     | `GITHUB_ACTOR` / `GITHUB_TOKEN`                                                               |
-| 定时任务      | golang 00:05、fnpack 03:05、wails3 06:05、wails2 09:05、fyne 12:05、mygo 15:05、gio 18:05 Asia/Shanghai | golang 16:05、fnpack 19:05、wails3 22:05、wails2 01:05、fyne 04:05、mygo 07:05、gio 10:05 UTC |
-| 多架构        | docker 服务自带                                                                                         | `setup-qemu-action` + `setup-buildx-action`                                                   |
-| GitHub 下载源 | `https://files.m.daocloud.io`                                                                           | 直连 `github.com` / `nodejs.org`                                                              |
-| 元数据        | commit annotation                                                                                       | Step Summary + artifact                                                                       |
-| 磁盘准备      | 无                                                                                                      | 删除预装 SDK，释放空间                                                                        |
+| 维度          | CNB                                                                                                        | GitHub                                                                                           |
+|---------------|------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE`                                                          | `ghcr.io` + `GITHUB_REPOSITORY`                                                                  |
+| 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`                                                                        | `GITHUB_ACTOR` / `GITHUB_TOKEN`                                                                  |
+| 定时任务      | golang 00:05、fnpack 03:05、wails3 06:05、fyne 12:05、mygo 15:05、gio 18:05 Asia/Shanghai（wails2 已停用） | golang 16:05、fnpack 19:05、wails3 22:05、fyne 04:05、mygo 07:05、gio 10:05 UTC（wails2 已停用） |
+| 多架构        | docker 服务自带                                                                                            | `setup-qemu-action` + `setup-buildx-action`                                                      |
+| GitHub 下载源 | `https://files.m.daocloud.io`                                                                              | 直连 `github.com` / `nodejs.org`                                                                 |
+| 元数据        | commit annotation                                                                                          | Step Summary + artifact                                                                          |
+| 磁盘准备      | 无                                                                                                         | 删除预装 SDK，释放空间                                                                           |
 
 GitLab 与 GitHub 的差异（镜像名来源、登录、定时任务、并发、元数据）见 [gitlab.md](gitlab.md#与-github-的差异)。
 
