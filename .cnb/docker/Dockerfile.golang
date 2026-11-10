@@ -3,7 +3,8 @@
 #
 # 三个平台各留一份：本文件（CNB 侧）、.github/docker/Dockerfile.golang（GitHub 侧）与
 # .gitlab/docker/Dockerfile.golang（GitLab 侧），各自维护、不互相引用。
-# 改镜像内容（换源、装包、升级工具版本）时三处都要改。
+# 改镜像内容（装包、升级工具版本）时三处都要改；换 Go module 源只改本文件——
+# 另两侧刻意不设 GOPROXY，用 Go 默认代理。
 #
 # 镜像内容：
 #   Go 工具链 + UPX + nfpm + Node.js/pnpm
@@ -104,8 +105,9 @@ ARG GOCOVER_COBERTURA_VERSION=latest
 ARG GCOV2LCOV_VERSION=latest
 
 # 1. 设置 Go 环境变量
+# GOPROXY 用 '|' 分隔：',' 仅在 404/410 时回退下一源，'|' 在 5xx / 超时等任意错误时都会回退
 ENV GO111MODULE=on \
-    GOPROXY=https://mirrors.cloud.tencent.com/go/,direct \
+    GOPROXY=https://mirrors.cloud.tencent.com/go/|https://goproxy.cn|https://goproxy.io|direct \
     GOPATH=/go \
     PATH="$GOPATH/bin:$PATH"
 

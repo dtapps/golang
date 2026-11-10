@@ -44,21 +44,22 @@ docker pull ghcr.io/dtapps/golang/gio@sha256:<gio_digest>
 
 ## 信任面
 
-| 来源                                        | 用途                                                                                                   |
-|---------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| Docker Hub `golang:1-trixie`                | 基础镜像                                                                                               |
-| `github.com` / `files.m.daocloud.io`        | 解析 UPX 最新版本号（`releases.atom`）与下载 GitHub Release                                            |
-| `nodejs.org` / `files.m.daocloud.io`        | Node.js 官方 tar.xz 与版本索引（index.json）                                                           |
-| `static2.fnnas.com`                         | fnpack 二进制                                                                                          |
-| `github.com/wailsapp/wails`（经 GOPROXY）   | wails3 CLI 源码（`go install`）                                                                        |
-| `fyne.io/tools`（经 GOPROXY）               | fyne CLI 源码（`go install fyne.io/tools/cmd/fyne`）                                                   |
-| `github.com/egoist/mygo`（经 GOPROXY）      | mygo CLI 源码（`go install github.com/egoist/mygo/cmd/mygo`）                                          |
-| `gioui.org/cmd` / `gioui.org`（经 GOPROXY） | gio 镜像的 `gogio` CLI 与 Gio 库源码（`go install gioui.org/cmd/gogio`、`go get gioui.org`）           |
-| npm `bun` 包（经 npm registry）             | mygo 镜像里的 `bun` 运行时（`npm install -g bun`）                                                     |
-| `mirrors.cloud.tencent.com`                 | npm registry、Go module proxy（nfpm 与各 Go 工具、wails3、fyne、mygo、gio、bun）；Debian APT 仅 CNB 侧 |
-| `cnbcool/annotations:latest`                | 写 commit 元数据的 CI 插件                                                                             |
+| 来源                                        | 用途                                                                                                        |
+|---------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| Docker Hub `golang:1-trixie`                | 基础镜像                                                                                                    |
+| `github.com` / `files.m.daocloud.io`        | 解析 UPX 最新版本号（`releases.atom`）与下载 GitHub Release                                                 |
+| `nodejs.org` / `files.m.daocloud.io`        | Node.js 官方 tar.xz 与版本索引（index.json）                                                                |
+| `static2.fnnas.com`                         | fnpack 二进制                                                                                               |
+| `github.com/wailsapp/wails`（经 GOPROXY）   | wails3 CLI 源码（`go install`）                                                                             |
+| `fyne.io/tools`（经 GOPROXY）               | fyne CLI 源码（`go install fyne.io/tools/cmd/fyne`）                                                        |
+| `github.com/egoist/mygo`（经 GOPROXY）      | mygo CLI 源码（`go install github.com/egoist/mygo/cmd/mygo`）                                               |
+| `gioui.org/cmd` / `gioui.org`（经 GOPROXY） | gio 镜像的 `gogio` CLI 与 Gio 库源码（`go install gioui.org/cmd/gogio`、`go get gioui.org`）                |
+| npm `bun` 包（经 npm registry）             | mygo 镜像里的 `bun` 运行时（`npm install -g bun`）                                                          |
+| `mirrors.cloud.tencent.com`                 | npm registry、Go module proxy 主源（nfpm 与各 Go 工具、wails3、fyne、mygo、gio、bun）；Debian APT 仅 CNB 侧 |
+| `goproxy.cn` / `goproxy.io`                 | CNB 侧 Go module proxy 备用源（主源 5xx / 超时时自动回退）                                                  |
+| `cnbcool/annotations:latest`                | 写 commit 元数据的 CI 插件                                                                                  |
 
-GitHub 侧直连官方站，APT 与 Go module 用默认源；CNB 侧的 GitHub Release / `releases.atom` 与 nodejs.org 走 DaoCloud 代理，APT 与 Go module 走腾讯云。代理站本身也是供应链的一部分。
+GitHub 侧直连官方站，APT 与 Go module 用默认源；CNB 侧的 GitHub Release / `releases.atom` 与 nodejs.org 走 DaoCloud 代理，APT 走腾讯云，Go module 依次走腾讯云 / `goproxy.cn` / `goproxy.io` / `direct`。代理站本身也是供应链的一部分，两个备用源同样在信任面内。
 
 ## 可复现性
 

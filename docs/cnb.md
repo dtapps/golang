@@ -136,7 +136,7 @@ docker buildx build \
   ...
 ```
 
-CNB 侧 APT / Go module / npm 使用腾讯云镜像；GitHub / GitLab 侧 APT 与 Go module 用默认源。详见 [golang/mirrors.md](golang/mirrors.md)。
+CNB 侧 APT / npm 使用腾讯云镜像，Go module 走「腾讯 → goproxy.cn → goproxy.io → direct」多源回退（5xx / 超时自动换源）；GitHub / GitLab 侧 APT 与 Go module 用默认源。详见 [golang/mirrors.md](golang/mirrors.md)。
 
 ## 缓存
 

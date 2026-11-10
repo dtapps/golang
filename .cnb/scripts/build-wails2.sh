@@ -13,7 +13,7 @@
 #
 # CNB 侧平台胶水：
 #   1. 镜像名从 CNB_DOCKER_REGISTRY + CNB_REPO_SLUG_LOWERCASE 派生；
-#   2. wails2 版本解析走基座 Dockerfile 里的 GOPROXY（腾讯云镜像）；
+#   2. wails2 版本解析走基座 Dockerfile 里的 GOPROXY（CNB 侧多源回退）；
 #   3. 元数据写 .cnb/annotation-wails2.json，并通过 ##[set-output] 输出变量；
 #   4. 多一层自检：脚本被 imports 改写时立刻停下。
 #
@@ -134,7 +134,7 @@ read_arg() (
 )
 
 # 从 Dockerfile 的 ENV 行读变量值：解析 wails2 版本和构建必须走同一个 GOPROXY
-# （CNB 侧基座是腾讯云镜像，解析也要走它，否则 proxy.golang.org 连不上）
+# （CNB 侧基座是 Go module 多源回退，解析也要走同一份 GOPROXY，否则 proxy.golang.org 连不上）
 read_env() (
   name=$1
   file=$2

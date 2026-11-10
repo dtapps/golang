@@ -11,7 +11,7 @@
 # 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
 #   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
 # 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
-# APT / GOPROXY 继承基座镜像（CNB 侧已换成腾讯云），本文件没有额外的镜像源开关。
+# APT / GOPROXY 继承基座镜像（CNB 侧 GOPROXY 为多源回退），本文件没有额外的镜像源开关。
 #
 # wails3：https://github.com/wailsapp/wails/releases
 # 模块根在仓库的 v3/ 子目录，go install 路径带 /v3。

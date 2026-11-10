@@ -1,6 +1,6 @@
 # Dockerfile 解析
 
-三个平台各有一份实现，安装步骤与工具版本一致；镜像源按平台不同（GitHub / GitLab 用默认/直连，CNB 用腾讯云与 DaoCloud），这是三份文件的主要差异：
+三个平台各有一份实现，安装步骤与工具版本一致；镜像源按平台不同（GitHub / GitLab 用默认/直连，CNB 用腾讯云与 DaoCloud，并额外给 Go module 配了多源回退），这是三份文件的主要差异：
 
 | 镜像   | CNB 侧                          | GitHub 侧                          | GitLab 侧                          |
 |--------|---------------------------------|------------------------------------|------------------------------------|
@@ -56,7 +56,7 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 
 ### 安装顺序
 
-1. **环境变量**：Go 侧 CNB 的 `GOPROXY` 指向腾讯云、GitHub / GitLab 不设置（用默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。另有 `TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`：容器内统一北京时间与 UTF-8，构建日志、`go build` 产物里的时间戳才对得上。
+1. **环境变量**：Go 侧 CNB 的 `GOPROXY` 为 `https://mirrors.cloud.tencent.com/go/|https://goproxy.cn|https://goproxy.io|direct`（`|` 分隔，5xx / 超时也会回退下一源，完整说明见 [mirrors.md](mirrors.md)）、GitHub / GitLab 不设置（用默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。另有 `TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`：容器内统一北京时间与 UTF-8，构建日志、`go build` 产物里的时间戳才对得上。
 2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。包清单统一放在 `apt_packages` 变量里，装完再 `dpkg-query -W ${apt_packages}` 打印每个 deb 的实际版本（输出「包名<TAB>版本」）——各变体镜像的 apt 安装块同理，日志里就能直接核对版本，不用进容器查。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
 4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；GitHub / GitLab 侧不配置 registry（npm / pnpm 用官方默认 `registry.npmjs.org`），CNB 侧才用腾讯云；三侧都设 `pnpm config set ignore-scripts false`。
@@ -168,7 +168,7 @@ FROM ${GOLANG_IMAGE}
 ```
 
 - 与 fnpack 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，只多两层（apt 装 GTK4/WebKitGTK + `go install` wails3）。
-- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已换成腾讯云源，所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已配成 Go module 多源回退（腾讯 → goproxy.cn → goproxy.io → direct），所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
 - 安装的开发包：`zip`、`unzip`、`pkg-config`、`libgtk-4-dev`、`libwebkitgtk-6.0-dev`；装完立刻 `pkg-config --exists gtk4` 与 `webkitgtk-6.0` 断言，避免把问题推迟到使用者手里（这两层**不能**在最后 purge，它们就是镜像的用途）。
 - wails3 版本由 `ARG WAILS3_VERSION` 控制，默认 `latest`（不再钉死某个 tag）；CI 会先解析成 `v3.1.0` 这种具体版本再传进来。安装命令：
 
@@ -197,7 +197,7 @@ FROM ${GOLANG_IMAGE}
 ```
 
 - 与 wails3 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，只多两层（apt 装 OpenGL/X11/Wayland 开发包 + `go install` fyne）。
-- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已换成腾讯云源，所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已配成 Go module 多源回退（腾讯 → goproxy.cn → goproxy.io → direct），所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
 - 安装的开发包照搬官方文档给 Debian / Ubuntu / Raspberry Pi OS 的那一条（`golang` 除外，基座已是 Go 镜像）：`gcc`、`libgl1-mesa-dev`、`xorg-dev`、`libwayland-dev`、`libxkbcommon-dev`。装完立刻断言以下 `.pc` 都能解析，避免问题以 cgo 报错的形式推迟到使用者手里：
 
   ```sh
@@ -231,7 +231,7 @@ FROM ${GOLANG_IMAGE}
 ```
 
 - 与 fyne 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，多三层（apt 装 GTK3/WebKitGTK 4.1 开发包与无头运行库 → `go install` mygo → npm 装 bun）。
-- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已换成腾讯云源，所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已配成 Go module 多源回退（腾讯 → goproxy.cn → goproxy.io → direct），所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
 - 安装的包分两组：
   - 编译 / 运行库：`pkg-config`、`gcc`、`libgtk-3-dev`、`libwebkit2gtk-4.1-dev`、`libayatana-appindicator3-dev`、`libgl1-mesa-dev`、`xorg-dev`、`libwayland-dev`、`libxkbcommon-dev`
   - 无头运行环境：`xvfb`、`xauth`、`dbus-x11`、`libgl1`、`libgl1-mesa-dri`、`libglx-mesa0`、`libegl-mesa0`、`fonts-dejavu-core`（与上游 mygo 的 CI 同一组包）
@@ -281,7 +281,7 @@ FROM ${GOLANG_IMAGE}
 ```
 
 - 与 fyne / mygo 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，多三层（apt 装 EGL/GLES、X11、Wayland、Vulkan 开发包与无头运行库 → `go install` gogio → 真实编译一个最小 Gio 程序做校验）。
-- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已换成腾讯云源，所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已配成 Go module 多源回退（腾讯 → goproxy.cn → goproxy.io → direct），所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
 - **变体名叫 gio，CLI 却叫 `gogio`**（模块 `gioui.org/cmd`），镜像里没有 `gio` 这个二进制。`gogio` 是打包工具（android / ios / tvos / js / windows / macos），**没有 linux 目标**，也**没有 `version` 子命令**；Linux 桌面程序就是普通 `go build` + cgo。所以这个镜像的重点不是 `gogio` 本身，而是 cgo 依赖齐全。
 - 安装的包分两组：
   - 编译 / 运行库：`pkg-config`、`gcc`、`libegl1-mesa-dev`、`libgles2-mesa-dev`、`libx11-dev`、`libx11-xcb-dev`、`libxcursor-dev`、`libxfixes-dev`、`libxrandr-dev`、`libxinerama-dev`、`libxi-dev`、`libxxf86vm-dev`、`libwayland-dev`、`libxkbcommon-dev`、`libxkbcommon-x11-dev`、`libffi-dev`、`libvulkan-dev`

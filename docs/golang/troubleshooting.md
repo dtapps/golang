@@ -119,7 +119,7 @@ gio：解析版本（含 gogio CLI 版本与 gioui.org 库版本）→ 登录 �
 
 症状：日志里出现「无法解析 wails3 最新版本…回退 latest」，元数据 `wails3_version` 是 `latest`。
 
-- 解析用 `go list -m github.com/wailsapp/wails/v3@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧是腾讯云镜像，同步有延迟时会失败；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。等下一次定时任务，或手动触发并显式填 `wails3_version`。
+- 解析用 `go list -m github.com/wailsapp/wails/v3@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧按腾讯 → goproxy.cn → goproxy.io → direct 依次回退，主源 5xx / 超时会自动换源；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。只有全部源都失败才需等下一次定时任务，或手动触发并显式填 `wails3_version`。
 - 回退不会阻断构建，但层缓存会失效（缓存键永远等于 `latest`），且冒烟只验证 `wails3` 可执行、不比对版本。
 
 ### wails3 冒烟报 `wails3-version(...)`
@@ -140,7 +140,7 @@ gio：解析版本（含 gogio CLI 版本与 gioui.org 库版本）→ 登录 �
 
 症状：日志里出现「无法解析 fyne 最新版本…回退 latest」，元数据 `fyne_version` 是 `latest`。
 
-- 解析用 `go list -m fyne.io/tools@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧是腾讯云镜像，同步有延迟时会失败；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。等下一次定时任务，或手动触发并显式填 `fyne_version`。
+- 解析用 `go list -m fyne.io/tools@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧按腾讯 → goproxy.cn → goproxy.io → direct 依次回退，主源 5xx / 超时会自动换源；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。只有全部源都失败才需等下一次定时任务，或手动触发并显式填 `fyne_version`。
 - 回退不会阻断构建，但层缓存会失效（缓存键永远等于 `latest`），且冒烟只验证 `fyne` 可执行、不比对版本。
 
 ### fyne 冒烟报 `fyne-version(...)`
@@ -173,7 +173,7 @@ mygo 的 Linux 后端不带 cgo，它在运行期用 purego `dlopen` GTK3 / WebK
 
 症状：日志里出现「无法解析 mygo 最新版本…回退 latest」，元数据 `mygo_version` 是 `latest`。
 
-- 解析用 `go list -m github.com/egoist/mygo@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧是腾讯云镜像，同步有延迟时会失败；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。等下一次定时任务，或手动触发并显式填 `mygo_version`。
+- 解析用 `go list -m github.com/egoist/mygo@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧按腾讯 → goproxy.cn → goproxy.io → direct 依次回退，主源 5xx / 超时会自动换源；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。只有全部源都失败才需等下一次定时任务，或手动触发并显式填 `mygo_version`。
 - 回退不会阻断构建，但层缓存会失效（缓存键永远等于 `latest`），且冒烟只验证 `mygo` 可执行、不比对版本。
 
 ### bun 版本回退成 `latest`
@@ -205,7 +205,7 @@ mygo 的 Linux 后端不带 cgo，它在运行期用 purego `dlopen` GTK3 / WebK
 
 症状：日志里出现「无法解析 gio 最新版本…回退 latest」，元数据 `gio_version` 是 `latest`。
 
-- 解析用 `go list -m gioui.org/cmd@latest`（gogio CLI），走基座 Dockerfile 的 `GOPROXY`。CNB 侧是腾讯云镜像，同步有延迟时会失败；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。等下一次定时任务，或手动触发并显式填 `gio_version`。
+- 解析用 `go list -m gioui.org/cmd@latest`（gogio CLI），走基座 Dockerfile 的 `GOPROXY`。CNB 侧按腾讯 → goproxy.cn → goproxy.io → direct 依次回退，主源 5xx / 超时会自动换源；GitHub / GitLab 侧走 `proxy.golang.org`，网络不通时同样会失败。只有全部源都失败才需等下一次定时任务，或手动触发并显式填 `gio_version`。
 - 回退不会阻断构建，但层缓存会失效（缓存键永远等于 `latest`），且冒烟只验证 `gogio` 可执行、不比对版本。
 
 ### gio 冒烟报 `gogio-version(...)`
