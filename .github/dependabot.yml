@@ -9,3 +9,28 @@ updates:
     labels:
       - 'dependencies'
       - 'github-actions'
+
+  # Docker 基础镜像依赖（分别扫描三侧 Dockerfile 的 FROM / ARG 镜像标签）
+  - package-ecosystem: 'docker'
+    directory: '/.github/docker'
+    schedule:
+      interval: 'daily'
+    labels:
+      - 'dependencies'
+      - 'docker'
+
+  - package-ecosystem: 'docker'
+    directory: '/.cnb/docker'
+    schedule:
+      interval: 'daily'
+    labels:
+      - 'dependencies'
+      - 'docker'
+
+  - package-ecosystem: 'docker'
+    directory: '/.gitlab/docker'
+    schedule:
+      interval: 'daily'
+    labels:
+      - 'dependencies'
+      - 'docker'

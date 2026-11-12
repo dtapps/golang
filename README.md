@@ -128,7 +128,7 @@ FROM ghcr.io/dtapps/golang:latest
 ├── annotation-fyne.json            # fyne 镜像元数据（CI 生成，.gitignore 已排除）
 ├── annotation-mygo.json            # mygo 镜像元数据（CI 生成，.gitignore 已排除）
 ├── annotation-gio.json             # gio 镜像元数据（CI 生成，.gitignore 已排除）
-└── dependabot.yml                  # GitHub Actions 依赖更新
+└── dependabot.yml                  # GitHub Actions 与 Docker 镜像依赖更新
 .gitlab/
 ├── docker/                         # GitLab 侧的 Dockerfile
 ├── scripts/                        # GitLab 侧的七份构建脚本
