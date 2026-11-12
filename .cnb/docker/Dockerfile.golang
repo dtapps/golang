@@ -122,12 +122,14 @@ RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.
     || sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list
 
 # 3. 安装基础构建工具（含 tzdata，配合上面的 TZ）
+# xz-utils / zstd：.tar.xz（UPX、Node）与 .tar.zst 的打包解压；zstd 当前无调用，先预留
 # wixl / wixl-data：编译 Windows MSI 安装包（msitools，替代 Windows 上的 WiX）
 RUN set -eu; \
     export DEBIAN_FRONTEND=noninteractive; \
     apt_packages=" \
     wget \
     xz-utils \
+    zstd \
     ca-certificates \
     curl \
     gnupg \
@@ -289,9 +291,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     echo "[${TARGETPLATFORM:-unknown}] --- Go 工具链安装完成 ---"; \
     ls -l "$GOPATH/bin" /usr/local/bin
 
-# 7. 卸载不需要的工具，并清空所有 apt 缓存
-RUN apt-get purge -y wget xz-utils \
-    && apt-get autoremove -y \
+# 7. 清空所有 apt 缓存（保留 wget / xz-utils，不卸载）
+RUN apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /root/.npm
 

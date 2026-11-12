@@ -57,7 +57,7 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 ### 安装顺序
 
 1. **环境变量**：Go 侧 CNB 的 `GOPROXY` 为 `https://mirrors.cloud.tencent.com/go/|https://goproxy.cn|https://goproxy.io|direct`（`|` 分隔，5xx / 超时也会回退下一源，完整说明见 [mirrors.md](mirrors.md)）、GitHub / GitLab 不设置（用默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。另有 `TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`：容器内统一北京时间与 UTF-8，构建日志、`go build` 产物里的时间戳才对得上。
-2. **基础包**：wget、xz-utils、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。包清单统一放在 `apt_packages` 变量里，装完再 `dpkg-query -W ${apt_packages}` 打印每个 deb 的实际版本（输出「包名<TAB>版本」）——各变体镜像的 apt 安装块同理，日志里就能直接核对版本，不用进容器查。
+2. **基础包**：wget、xz-utils（`tar -Jf` 解压 UPX / Node 的 `.tar.xz`）、zstd（`tar --zstd` 处理 `.tar.zst`，当前无调用，先预留）、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。包清单统一放在 `apt_packages` 变量里，装完再 `dpkg-query -W ${apt_packages}` 打印每个 deb 的实际版本（输出「包名<TAB>版本」）——各变体镜像的 apt 安装块同理，日志里就能直接核对版本，不用进容器查。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
 4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；GitHub / GitLab 侧不配置 registry（npm / pnpm 用官方默认 `registry.npmjs.org`），CNB 侧才用腾讯云；三侧都设 `pnpm config set ignore-scripts false`。
 5. **Go 工具链（含 nfpm）**：按职责分成 5 层（打包与代码生成 nfpm+sqlc / 实体生成 ent+entc / 质量与安全 golangci-lint+govulncheck / 格式化与数据处理 shfmt+dockerfmt+yamlfmt+gojq+markdownfmt+sql-formatter / 测试与覆盖率报告 gotestsum+gocover-cobertura+gcov2lcov）。**有官方二进制的先下载二进制**（`install-tool`），失败才回退 `go install -v`（见下一节）；每层都挂 BuildKit 缓存目录：
@@ -65,14 +65,14 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
    - `--mount=type=cache,target=/root/.cache/go-build`：编译缓存
 
    缓存挂载不进镜像层，所以不再需要「同一层内 `rm -rf /go/pkg/mod`」那种清理；拆层是为了让某个工具发版时只重建它自己那一层。`-v` 只是让日志可读，不影响产物；`build-golang.sh` 的 `dockerfile_tool_vars` 用 `grep -o 'go install[^@;]*@${VAR}'` 提取版本变量，所以这里在 `go install` 与包路径之间再加别的 flag 也不会漏检。
-6. **清理**：purge wget / xz-utils，清 APT 缓存与 `/tmp`。
+6. **清理**：保留 `wget` / `xz-utils` 等基础工具，不做 purge；末尾一层统一 `apt-get autoremove` / `apt-get clean`，并清掉 `/var/lib/apt/lists/*`、`/tmp`、`/root/.npm`。
 7. **OCI 元数据标签**：放在文件最后。`BUILD_DATE` / `VCS_REF` / `IMAGE_VERSION` 每次都变，放前面会让 apt、Node、`go install` 这些层的缓存键跟着每次提交一起变。
 
 > 所有 `echo` 都带 `[${TARGETPLATFORM:-unknown}]` 前缀（BuildKit 自动提供的目标平台，需要在 stage 里 `ARG TARGETPLATFORM` 声明才能进 `RUN` 的环境）：`buildx` 多架构构建时同一个 `RUN` 会按 `linux/amd64`、`linux/arm64` 各跑一遍，日志里连着出现两遍「--- UPX 安装的 ---」是正常的，前缀能直接看出当前是哪一架构、不是重复安装。用旧版非 BuildKit 的 `docker build` 时显示 `unknown`。
 
 > CNB 侧会在安装基础包之前把 APT 源换成 `mirrors.cloud.tencent.com`；GitHub / GitLab 侧不换源。
 
-> 清理必须与安装同层：跨层 `rm` 只会产生 whiteout，旧层数据仍会随镜像分发。
+> 清理必须与安装同层：跨层 `rm` 只会产生 whiteout，旧层数据仍会随镜像分发；末尾那一层只是对各安装层已清过的缓存再兜一次底，不承担卸载。
 
 ### 二进制优先，go install 兜底
 
@@ -169,7 +169,7 @@ FROM ${GOLANG_IMAGE}
 
 - 与 fnpack 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，只多两层（apt 装 GTK4/WebKitGTK + `go install` wails3）。
 - apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已配成 Go module 多源回退（腾讯 → goproxy.cn → goproxy.io → direct），所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
-- 安装的开发包：`zip`、`unzip`、`pkg-config`、`libgtk-4-dev`、`libwebkitgtk-6.0-dev`；装完立刻 `pkg-config --exists gtk4` 与 `webkitgtk-6.0` 断言，避免把问题推迟到使用者手里（这两层**不能**在最后 purge，它们就是镜像的用途）。
+- 安装的开发包：`zip`、`unzip`、`pkg-config`、`libgtk-4-dev`、`libwebkitgtk-6.0-dev`；装完立刻 `pkg-config --exists gtk4` 与 `webkitgtk-6.0` 断言，避免把问题推迟到使用者手里（这些包必须留在镜像里，它们就是镜像的用途）。
 - wails3 版本由 `ARG WAILS3_VERSION` 控制，默认 `latest`（不再钉死某个 tag）；CI 会先解析成 `v3.1.0` 这种具体版本再传进来。安装命令：
 
 ```dockerfile
@@ -212,7 +212,7 @@ FROM ${GOLANG_IMAGE}
   pkg-config --exists xkbcommon
   ```
 
-  这些包是镜像的用途本身，**不能**在最后 purge：编译 Fyne 应用要开 cgo 并链接 GL / X11 / Wayland。
+  这些包是镜像的用途本身，必须留在镜像里：编译 Fyne 应用要开 cgo 并链接 GL / X11 / Wayland。
 - fyne **CLI** 版本由 `ARG FYNE_VERSION` 控制，默认 `latest`（不再钉死某个 tag）；CI 会先解析成 `v1.7.4` 这种具体版本再传进来。安装命令：
 
   ```dockerfile
@@ -255,7 +255,7 @@ FROM ${GOLANG_IMAGE}
   ldconfig -p | grep -q 'libayatana-appindicator3\.so\.1'
   ```
 
-  与 fyne / wails 的区别在于：mygo 的 Linux 后端是**纯 Go、不带 cgo**，它用 `github.com/ebitengine/purego` 在运行期 `dlopen` GTK3 / WebKitGTK。所以 `-dev` 包在这里有两个作用——(a) 顺带装上运行期要加载的 `.so`，(b) 用户应用若自带 cgo 绑定，编译期能解析 `.pc` 与头文件。这些包是镜像的用途本身，**不能**在最后 purge。
+  与 fyne / wails 的区别在于：mygo 的 Linux 后端是**纯 Go、不带 cgo**，它用 `github.com/ebitengine/purego` 在运行期 `dlopen` GTK3 / WebKitGTK。所以 `-dev` 包在这里有两个作用——(a) 顺带装上运行期要加载的 `.so`，(b) 用户应用若自带 cgo 绑定，编译期能解析 `.pc` 与头文件。这些包是镜像的用途本身，必须留在镜像里。
 - mygo **CLI** 版本由 `ARG MYGO_VERSION` 控制，默认 `latest`；CI 会先解析成 `v0.8.1` 这种具体版本再传进来。安装命令：
 
   ```dockerfile
@@ -315,7 +315,7 @@ FROM ${GOLANG_IMAGE}
   ldconfig -p | grep -q 'libX11\.so\.6'
   ```
 
-  这些 `-dev` 包既是编译依赖也是运行依赖（`-dev` 会把运行库一起装上），是镜像的用途本身，**不能**在最后 purge。
+  这些 `-dev` 包既是编译依赖也是运行依赖（`-dev` 会把运行库一起装上），是镜像的用途本身，必须留在镜像里。
 - gogio **CLI** 版本由 `ARG GIO_VERSION` 控制（模块 `gioui.org/cmd`），默认 `latest`；CI 会先解析成 `v0.10.3` 这种具体版本再传进来。安装命令：
 
   ```dockerfile

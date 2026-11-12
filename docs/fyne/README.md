@@ -21,7 +21,7 @@ sudo apt-get install golang gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbco
 apt-get install gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
 ```
 
-它们是**编译 Fyne 应用**用的：应用要开 cgo 并链接 GL / X11 / Wayland，所以不能像基座镜像那样在最后 purge。装完立刻断言一遍 `pkg-config` 能解析全部 `.pc`：
+它们是**编译 Fyne 应用**用的：应用要开 cgo 并链接 GL / X11 / Wayland，必须留在镜像里，不能在构建末尾卸载。装完立刻断言一遍 `pkg-config` 能解析全部 `.pc`：
 
 ```dockerfile
 pkg-config --exists gl

@@ -21,7 +21,7 @@
 - 另外七个（`glesv2` / `xrandr` / `xinerama` / `xi` / `xxf86vm` / `libffi` / `vulkan`）来自官方安装文档与上游 CI：gio 自己不用 pkg-config 找它们（GLES 是运行期 `dlopen` `libGLESv2.so.3.0` / `libGLESv2.so.2`，Vulkan 只 include 头文件、运行期 `dlopen` 加载器），但使用者项目常带 X11 扩展、libffi、Vulkan 的 cgo 绑定，官方文档与上游 CI 就是这么装的，镜像照装并一并断言，省得使用者再往镜像里加包。
 - 清单是三处取并集，逐项在 Debian trixie 的 amd64 与 arm64 索引里核对过：gioui.org v0.10.3 源码里的 cgo 指令（上面那十个）、官方安装文档 https://gioui.org/doc/install/linux 的 apt 列表、上游 CI（`.builds/linux.yml`）额外装的 `libxkbcommon-dev` / `libxrandr-dev` / `libxinerama-dev` / `libxi-dev` / `libxxf86vm-dev` / `mesa-vulkan-drivers` / `xvfb`。
 - `libvulkan-dev` 提供 `vulkan/vulkan.h` 与加载器 `libvulkan.so.1`（gio 用 `VK_NO_PROTOTYPES` 只要头文件，函数在运行期 `dlopen` 加载器再取指针）；`mesa-vulkan-drivers` 提供真正的 ICD 驱动，没有它加载器找不到可用设备。编译期与运行期各要一样东西，两个都得装。
-- 这些 `-dev` 包既是编译依赖也是运行依赖（`-dev` 会把运行库一起装上），不能像基座镜像那样在最后 purge 掉。
+- 这些 `-dev` 包既是编译依赖也是运行依赖（`-dev` 会把运行库一起装上），必须留在镜像里，不能在构建末尾卸载。
 - 无头包（Xvfb + mesa + DRI 驱动 + 字体）让 GUI 冒烟在没有显示器的 CI 里也能跑。
 
 装完立刻断言一遍 `.pc` 与运行库：
