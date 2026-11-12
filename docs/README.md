@@ -42,6 +42,18 @@
 | GitHub Actions / GHCR 平台层      | [github.md](github.md)                                                                                                                                                                                                                                       |
 | GitLab CI / Registry 平台层       | [gitlab.md](gitlab.md)                                                                                                                                                                                                                                       |
 
+## 各镜像的 CLI 工具清单
+
+按功能分类拆成三份 CSV，列定义与 [ci-mirror-dependency.csv](ci-mirror-dependency.csv) 一致（工具名 / 功能分类 / 具体作用 / 适用镜像）：
+
+| 文件                                                   | 内容                                                                                                            |
+|--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| [cli-per-image.csv](cli-per-image.csv)                 | 七个镜像**各自独有**的 CLI：`fnpack` / `fyne` / `gogio` / `mygo` / `bun` / `wails` / `wails3`，以及对应版本变量 |
+| [cli-go-toolchain.csv](cli-go-toolchain.csv)           | 基座安装的 Go 工具链 CLI（sqlc / ent / golangci-lint / gotestsum 等），全部镜像继承                             |
+| [cli-runtime-packaging.csv](cli-runtime-packaging.csv) | Go / Node 运行时与打包分发 CLI（upx / nfpm / wixl / lintian / rpm 等），全部镜像继承                            |
+
+七个变体镜像都是在 Golang 基础镜像之上 `FROM` 出来的，所以后两份表里的工具在**全部七个镜像**里都有；第一份表里的 CLI 只在对应镜像存在，互不混装。系统包（apt）清单见 [ci-mirror-dependency.csv](ci-mirror-dependency.csv)。
+
 ## 事实来源
 
 - 镜像内容：`.cnb/docker/Dockerfile.golang`、`.cnb/docker/Dockerfile.fnpack`、`.cnb/docker/Dockerfile.wails3`、`.cnb/docker/Dockerfile.wails2`、`.cnb/docker/Dockerfile.fyne`、`.cnb/docker/Dockerfile.mygo`、`.cnb/docker/Dockerfile.gio`（GitHub 侧同名文件在 `.github/docker/`，GitLab 侧在 `.gitlab/docker/`）。

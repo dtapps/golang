@@ -68,7 +68,18 @@ RUN set -eux; \
     libgl1-mesa-dri \
     libglx-mesa0 \
     libegl-mesa0 \
-    fonts-dejavu-core"; \
+    fonts-dejavu-core \
+    libnss3 \
+    libnspr4 \
+    glib-networking \
+    librsvg2-common \
+    libgdk-pixbuf-2.0-dev \
+    adwaita-icon-theme \
+    libsecret-1-dev \
+    libnotify-dev \
+    libdbus-1-dev \
+    libharfbuzz-dev \
+    libpango1.0-dev"; \
     apt-get update; \
     apt-get install -y --no-install-recommends ${apt_packages}; \
     rm -rf /var/lib/apt/lists/*; \

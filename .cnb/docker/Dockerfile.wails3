@@ -37,19 +37,51 @@ ARG IMAGE_SOURCE
 # libgtk-4-dev / libwebkitgtk-6.0-dev 提供 gtk4.pc / webkitgtk-6.0.pc：
 # wails3 CLI 的 go install 以及后续的 wails3 build / go build / go test
 # 都需要 pkg-config 找到这些头文件，否则会直接构建失败。
-# 这些是使用镜像时也要用的编译依赖，不能像基座镜像那样在最后 purge 掉。
-# 装完立刻用 pkg-config 验证两个 .pc 真的可解析：否则问题会以 cgo 报错的形式
+# libglib2.0-dev / libsoup-3.0-dev / libepoxy-dev / libgraphene-1.0-dev：
+# GTK4 / WebKitGTK 6.0 的底层编译依赖，显式声明（含传递依赖）以保证 .pc 可用；
+# libayatana-appindicator3-dev：系统托盘（systray）支持。
+# 这些是使用镜像时也要用的编译依赖，必须留在镜像里，不能在构建末尾卸载。
+# 装完立刻用 pkg-config 验证 .pc 真的可解析：否则问题会以 cgo 报错的形式
 # 推迟到使用镜像的人身上。
 RUN export DEBIAN_FRONTEND=noninteractive; \
     apt_packages=" \
     pkg-config \
     libgtk-4-dev \
-    libwebkitgtk-6.0-dev"; \
+    libwebkitgtk-6.0-dev \
+    libglib2.0-dev \
+    libsoup-3.0-dev \
+    libepoxy-dev \
+    libgraphene-1.0-dev \
+    libayatana-appindicator3-dev \
+    xvfb \
+    xauth \
+    dbus-x11 \
+    libgl1 \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
+    libegl-mesa0 \
+    libnss3 \
+    libnspr4 \
+    glib-networking \
+    librsvg2-common \
+    libgdk-pixbuf-2.0-dev \
+    adwaita-icon-theme \
+    fonts-dejavu-core \
+    libsecret-1-dev \
+    libnotify-dev \
+    libdbus-1-dev \
+    libharfbuzz-dev \
+    libpango1.0-dev"; \
     apt-get update; \
     apt-get install -y --no-install-recommends ${apt_packages}; \
     rm -rf /var/lib/apt/lists/*; \
     pkg-config --exists gtk4; \
     pkg-config --exists webkitgtk-6.0; \
+    pkg-config --exists glib-2.0; \
+    pkg-config --exists libsoup-3.0; \
+    pkg-config --exists epoxy; \
+    pkg-config --exists graphene-1.0; \
+    pkg-config --exists ayatana-appindicator3-0.1; \
     echo "[${TARGETPLATFORM:-unknown}] --- apt 包版本 ---"; \
     dpkg-query -W ${apt_packages}
 

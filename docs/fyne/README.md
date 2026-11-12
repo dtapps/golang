@@ -10,7 +10,7 @@
 
 - 基座：本仓库构建的 Golang 构建环境镜像（CI 按 `<go 版本>` 钉住当天刚推好的那份；Dockerfile 默认基座是官方 `golang:1-trixie`，只用于不依赖私有仓库的本地构建）
 - 继承基座全部内容：Go 工具链、UPX、nfpm、Node.js + npm + pnpm、sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt / gojq / sql-formatter / gotestsum / markdownfmt / gocover-cobertura / gcov2lcov、wixl、git / curl / make / jq / zip / unzip / pkg-config、`TZ=Asia/Shanghai` 与 `C.UTF-8`
-- 新增：`gcc`、`libgl1-mesa-dev`、`xorg-dev`、`libwayland-dev`、`libxkbcommon-dev`，以及 `/go/bin/fyne`（`GOPATH=/go`，已在 `PATH` 里）。`pkg-config` 在基座里已装，这里再声明一次只是为了 `FROM` 上游 `golang` 单独构建本文件时也自洽（apt 幂等）
+- 新增：`gcc`、`libgl1-mesa-dev`、`xorg-dev`、`libwayland-dev`、`libxkbcommon-dev`，以及无头 / GL 运行 / 字体包 `xvfb`、`xauth`、`dbus-x11`、`libgl1`、`libgl1-mesa-dri`、`libglx-mesa0`、`libegl-mesa0`、`fonts-dejavu-core`，以及 `/go/bin/fyne`（`GOPATH=/go`，已在 `PATH` 里）。`pkg-config` 在基座里已装，这里再声明一次只是为了 `FROM` 上游 `golang` 单独构建本文件时也自洽（apt 幂等）
 
 这五个包来自 Fyne 官方文档给 Debian / Ubuntu / Raspberry Pi OS 的那一条，只去掉 `golang`（基座已是 Go 镜像）：
 

@@ -1,0 +1,18 @@
+工具名,功能分类,具体作用 (在 CI / 打包 / 运行中的意义),适用镜像
+运行时,,,
+go,Go 工具链,基础镜像自带；go build / go test / go install；ARG GO_VERSION 默认 1 跟随 golang:1-trixie 浮动标签,全部镜像（基座）
+node,Node.js 运行时,官方 tar.xz 解压到 /usr/local；ARG NODE_VERSION,全部镜像（基座安装，变体继承）
+npm,Node 包管理,随 Node.js 一起提供,全部镜像（基座安装，变体继承）
+pnpm,Node 包管理,npm 全局安装；ARG PNPM_VERSION；CNB 侧配腾讯云 registry,全部镜像（基座安装，变体继承）
+打包与分发,,,
+upx,二进制压缩,压缩 ELF / PE 可执行文件；/usr/local/bin/upx，ARG UPX_VERSION,全部镜像（基座安装，变体继承）
+nfpm,Linux 包打包,纯 Go 生成 .deb / .rpm / .apk / .tar.gz；ARG NFPM_VERSION,全部镜像（基座安装，变体继承）
+wixl,Windows MSI 打包,msitools，在 Linux 上编译 .msi 安装包（替代 WiX）；apt 安装,全部镜像（基座安装，变体继承）
+file,文件类型检查,检查产物架构是 x86_64 还是 arm64；apt 安装,全部镜像（基座安装，变体继承）
+patchelf,ELF 修改,修改二进制 RPATH，AppImage 打包时常用；apt 安装,全部镜像（基座安装，变体继承）
+chrpath,ELF 修改,查看或修改 RPATH；apt 安装,全部镜像（基座安装，变体继承）
+lintian,Deb 包检查,校验 .deb 包的规范与依赖；apt 安装,全部镜像（基座安装，变体继承）
+rpm,RPM 打包,rpmbuild 等工具，nfpm 生成 RPM 时需要；apt 安装,全部镜像（基座安装，变体继承）
+fakeroot,权限模拟,dpkg-buildpackage / debuild 模拟 root 设置文件属主与权限；apt 安装,全部镜像（基座安装，变体继承）
+desktop-file-validate,桌面文件校验,校验 .desktop 是否符合 Linux 规范；由 desktop-file-utils 提供,全部镜像（基座安装，变体继承）
+pkg-config,库查找工具,帮 CGO 找到系统 C 库的头文件与链接路径；apt 安装,全部镜像（基座安装，变体继承）

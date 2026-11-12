@@ -1,0 +1,9 @@
+工具名,功能分类,具体作用 (在 CI / 打包 / 运行中的意义),适用镜像
+镜像专属 CLI（七个镜像互不混装；其余 CLI 由基座提供，见另外两份表）,,,
+fnpack,FnOS 打包 CLI,给 FnOS 打 .fpk 包；/usr/local/bin/fnpack，从 static2.fnnas.com 下载，ARG FNPACK_VERSION 默认 1.2.3（上游没有 latest 接口）,Golang 基础 + fnpack
+fyne,Fyne CLI,编译与打包 Fyne 桌面应用；/go/bin/fyne，go install fyne-io/tools，ARG FYNE_VERSION,Golang 基础 + fyne
+gogio,Gio CLI,编译 Gio 桌面应用；/go/bin/gogio，go install gioui.org/cmd，ARG GIO_VERSION,Golang 基础 + gio
+mygo,MyGo CLI,编译 MyGo 桌面应用；/go/bin/mygo，go install egoist/mygo，ARG MYGO_VERSION,Golang 基础 + mygo
+bun,JS 运行时,MyGo 镜像用 npm 全局安装的 bun；ARG BUN_VERSION，冒烟断言 bun --version,Golang 基础 + mygo
+wails,Wails v2 CLI,编译 Wails v2 应用；/go/bin/wails，go install wailsapp/wails/v2，ARG WAILS2_VERSION,Golang 基础 + wails2
+wails3,Wails v3 CLI,编译 Wails v3 应用；/go/bin/wails3，go install wailsapp/wails/v3，ARG WAILS3_VERSION,Golang 基础 + wails3

@@ -1,0 +1,18 @@
+工具名,功能分类,具体作用 (在 CI / 打包 / 运行中的意义),适用镜像
+代码生成,,,
+sqlc,SQL 代码生成,从 SQL 生成类型安全的 Go 代码；官方二进制优先，失败回退 go install；ARG SQLC_VERSION,全部镜像（基座安装，变体继承）
+ent / entc,实体与代码生成,ent ORM 与 entc 代码生成器；无官方二进制，只能 go install；ARG ENT_VERSION,全部镜像（基座安装，变体继承）
+质量与安全,,,
+golangci-lint,静态检查,Go lint 聚合器；官方二进制优先；ARG GOLANGCI_LINT_VERSION,全部镜像（基座安装，变体继承）
+govulncheck,漏洞扫描,按调用图检查 Go 依赖漏洞；只能 go install；ARG GOVULNCHECK_VERSION,全部镜像（基座安装，变体继承）
+格式化与数据处理,,,
+shfmt,Shell 格式化,格式化 shell 脚本；官方裸二进制；ARG SHFMT_VERSION,全部镜像（基座安装，变体继承）
+dockerfmt,Dockerfile 格式化,格式化 Dockerfile；ARG DOCKERFMT_VERSION,全部镜像（基座安装，变体继承）
+yamlfmt,YAML 格式化,格式化 YAML；ARG YAMLFMT_VERSION,全部镜像（基座安装，变体继承）
+gojq,JSON 处理,Go 版 jq，CI 里解析 JSON；ARG GOJQ_VERSION,全部镜像（基座安装，变体继承）
+sql-formatter,SQL 格式化,格式化 SQL 语句；ARG GOSQLFORMATTER_VERSION,全部镜像（基座安装，变体继承）
+markdownfmt,Markdown 格式化,格式化 Markdown；只能 go install；ARG MARKDOWNFMT_VERSION,全部镜像（基座安装，变体继承）
+测试与覆盖率,,,
+gotestsum,测试运行器,跑 go test 并产出 JUnit；ARG GOTESTSUM_VERSION,全部镜像（基座安装，变体继承）
+gocover-cobertura,覆盖率转换,把 Go coverprofile 转成 Cobertura XML；只能 go install；ARG GOCOVER_COBERTURA_VERSION,全部镜像（基座安装，变体继承）
+gcov2lcov,覆盖率转换,把 Go coverprofile 转成 lcov；ARG GCOV2LCOV_VERSION,全部镜像（基座安装，变体继承）

@@ -105,6 +105,10 @@ ENV TZ=Asia/Shanghai \
 
 # 2. 安装基础构建工具（含 tzdata，配合上面的 TZ）
 # xz-utils / zstd：.tar.xz（UPX、Node）与 .tar.zst 的打包解压；zstd 当前无调用，先预留
+# build-essential / libc6-dev：显式钉住 gcc / g++ / make / libc6-dev 这套 cgo 工具链，
+#   不依赖上游 golang 镜像的内部实现；libc6-dev 与元包重复，显式声明、apt 幂等
+# dpkg-dev：dpkg-buildpackage / dpkg-architecture 等 .deb 源码构建工具，nfpm 不需要，先预留
+# fakeroot / desktop-file-utils：debuild / dpkg-buildpackage -rfakeroot 与 .desktop 校验注册，先预留
 # wixl / wixl-data：编译 Windows MSI 安装包（msitools，替代 Windows 上的 WiX）
 RUN set -eu; \
     export DEBIAN_FRONTEND=noninteractive; \
@@ -117,13 +121,23 @@ RUN set -eu; \
     gnupg \
     git \
     make \
+    build-essential \
+    libc6-dev \
     jq \
     zip \
     unzip \
     pkg-config \
+    dpkg-dev \
+    fakeroot \
+    desktop-file-utils \
     tzdata \
     wixl \
-    wixl-data"; \
+    wixl-data \
+    file \
+    patchelf \
+    chrpath \
+    lintian \
+    rpm"; \
     apt-get update; \
     apt-get install -y --no-install-recommends ${apt_packages}; \
     rm -rf /var/lib/apt/lists/*; \

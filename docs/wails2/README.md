@@ -12,7 +12,7 @@
 
 - 基座：本仓库构建的 Golang 构建环境镜像（CI 按 `<go 版本>` 钉住当天刚推好的那份；Dockerfile 默认基座是官方 `golang:1-trixie`，只用于不依赖私有仓库的本地构建）
 - 继承基座全部内容：Go 工具链、UPX、nfpm、Node.js + npm + pnpm、sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt / gojq / sql-formatter / gotestsum / markdownfmt / gocover-cobertura / gcov2lcov、wixl、git / curl / make / jq / zip / unzip / pkg-config、`TZ=Asia/Shanghai` 与 `C.UTF-8`
-- 新增：`libgtk-3-dev`、`libwebkit2gtk-4.1-dev`，以及 `/go/bin/wails`（`GOPATH=/go`，已在 `PATH` 里）。`pkg-config` 在基座里已装，这里再声明一次只是为了 `FROM` 上游 `golang` 单独构建本文件时也自洽（apt 幂等）
+- 新增：`libgtk-3-dev`、`libwebkit2gtk-4.1-dev`，以及无头 / GL / WebKit TLS / 图标 / 字体 / 系统功能 / 文字渲染包 `xvfb`、`xauth`、`dbus-x11`、`libgl1`、`libgl1-mesa-dri`、`libglx-mesa0`、`libegl-mesa0`、`libnss3`、`libnspr4`、`glib-networking`、`librsvg2-common`、`libgdk-pixbuf-2.0-dev`、`adwaita-icon-theme`、`fonts-dejavu-core`、`libsecret-1-dev`、`libnotify-dev`、`libdbus-1-dev`、`libharfbuzz-dev`、`libpango1.0-dev`，以及 `/go/bin/wails`（`GOPATH=/go`，已在 `PATH` 里）。`pkg-config` 在基座里已装，这里再声明一次只是为了 `FROM` 上游 `golang` 单独构建本文件时也自洽（apt 幂等）
 
 后续的 `wails build` / `go build` / `go test` 都要 pkg-config 找到 `gtk+-3.0.pc` 与 `webkit2gtk-4.1.pc`，所以这些开发包必须留在镜像里、不做卸载——它们是这个镜像的用途本身。Dockerfile 装完立刻断言一次：
 

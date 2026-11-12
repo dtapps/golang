@@ -57,7 +57,7 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 ### 安装顺序
 
 1. **环境变量**：Go 侧 CNB 的 `GOPROXY` 为 `https://mirrors.cloud.tencent.com/go/|https://goproxy.cn|https://goproxy.io|direct`（`|` 分隔，5xx / 超时也会回退下一源，完整说明见 [mirrors.md](mirrors.md)）、GitHub / GitLab 不设置（用默认代理）；`GOPATH=/go`，`PATH` 加入 `/go/bin`。另有 `TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`：容器内统一北京时间与 UTF-8，构建日志、`go build` 产物里的时间戳才对得上。
-2. **基础包**：wget、xz-utils（`tar -Jf` 解压 UPX / Node 的 `.tar.xz`）、zstd（`tar --zstd` 处理 `.tar.zst`，当前无调用，先预留）、ca-certificates、curl、gnupg、git、make、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。包清单统一放在 `apt_packages` 变量里，装完再 `dpkg-query -W ${apt_packages}` 打印每个 deb 的实际版本（输出「包名<TAB>版本」）——各变体镜像的 apt 安装块同理，日志里就能直接核对版本，不用进容器查。
+2. **基础包**：wget、xz-utils（`tar -Jf` 解压 UPX / Node 的 `.tar.xz`）、zstd（`tar --zstd` 处理 `.tar.zst`，当前无调用，先预留）、ca-certificates、curl、gnupg、git、make、build-essential / libc6-dev（显式钉住 gcc / g++ / make / libc6-dev 这套 cgo 工具链，不依赖上游 golang 镜像的内部实现；libc6-dev 与元包重复，显式声明、apt 幂等）、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo）、dpkg-dev（`dpkg-buildpackage` / `dpkg-architecture` 等从源码构建 `.deb` 的工具，nfpm 不需要，先预留）、fakeroot / desktop-file-utils（`debuild` / `dpkg-buildpackage -rfakeroot` 与 `.desktop` 校验注册，先预留）、file / patchelf / chrpath / lintian / rpm（打包工具：ELF 修正、rpath 调整、`.deb` 规范检查与 RPM 打包），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。包清单统一放在 `apt_packages` 变量里，装完再 `dpkg-query -W ${apt_packages}` 打印每个 deb 的实际版本（输出「包名<TAB>版本」）——各变体镜像的 apt 安装块同理，日志里就能直接核对版本，不用进容器查。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
 4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；GitHub / GitLab 侧不配置 registry（npm / pnpm 用官方默认 `registry.npmjs.org`），CNB 侧才用腾讯云；三侧都设 `pnpm config set ignore-scripts false`。
 5. **Go 工具链（含 nfpm）**：按职责分成 5 层（打包与代码生成 nfpm+sqlc / 实体生成 ent+entc / 质量与安全 golangci-lint+govulncheck / 格式化与数据处理 shfmt+dockerfmt+yamlfmt+gojq+markdownfmt+sql-formatter / 测试与覆盖率报告 gotestsum+gocover-cobertura+gcov2lcov）。**有官方二进制的先下载二进制**（`install-tool`），失败才回退 `go install -v`（见下一节）；每层都挂 BuildKit 缓存目录：
@@ -73,6 +73,21 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 > CNB 侧会在安装基础包之前把 APT 源换成 `mirrors.cloud.tencent.com`；GitHub / GitLab 侧不换源。
 
 > 清理必须与安装同层：跨层 `rm` 只会产生 whiteout，旧层数据仍会随镜像分发；末尾那一层只是对各安装层已清过的缓存再兜一次底，不承担卸载。
+
+### 按类别补齐的系统包
+
+各镜像在核心开发包之外，还按下表统一补齐了打包、无头测试、运行期与桌面集成相关系统包（三侧 `Dockerfile.*` 的 `apt_packages` 清单一致；`gio` 的无头测试包原本已具备，不重复添加）：
+
+| 类别        | 包名                                                           | 适用镜像                            |
+|-------------|----------------------------------------------------------------|-------------------------------------|
+| 打包工具    | `file` `patchelf` `chrpath` `lintian` `rpm`                    | Golang 基础                         |
+| CI 无头测试 | `xvfb` `xauth` `dbus-x11`                                      | Fyne / Gio / Mygo / Wails2 / Wails3 |
+| GL 运行时   | `libgl1` `libgl1-mesa-dri` `libglx-mesa0` `libegl-mesa0`       | Fyne / Mygo / Wails2 / Wails3       |
+| WebKit TLS  | `libnss3` `libnspr4` `glib-networking`                         | Mygo / Wails2 / Wails3              |
+| 图标 / 图片 | `librsvg2-common` `libgdk-pixbuf-2.0-dev` `adwaita-icon-theme` | Mygo / Wails2 / Wails3              |
+| 字体        | `fonts-dejavu-core`                                            | Fyne / Mygo / Wails2 / Wails3       |
+| 系统功能    | `libsecret-1-dev` `libnotify-dev` `libdbus-1-dev`              | Mygo / Wails2 / Wails3              |
+| 文字渲染    | `libharfbuzz-dev` `libpango1.0-dev`                            | Mygo / Wails2 / Wails3              |
 
 ### 二进制优先，go install 兜底
 
@@ -169,7 +184,7 @@ FROM ${GOLANG_IMAGE}
 
 - 与 fnpack 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，只多两层（apt 装 GTK4/WebKitGTK + `go install` wails3）。
 - apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已配成 Go module 多源回退（腾讯 → goproxy.cn → goproxy.io → direct），所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
-- 安装的开发包：`zip`、`unzip`、`pkg-config`、`libgtk-4-dev`、`libwebkitgtk-6.0-dev`；装完立刻 `pkg-config --exists gtk4` 与 `webkitgtk-6.0` 断言，避免把问题推迟到使用者手里（这些包必须留在镜像里，它们就是镜像的用途）。
+- 安装的开发包：`zip`、`unzip`、`pkg-config`、`libgtk-4-dev`、`libwebkitgtk-6.0-dev`、`libglib2.0-dev`、`libsoup-3.0-dev`、`libepoxy-dev`、`libgraphene-1.0-dev`、`libayatana-appindicator3-dev`（中间四个补齐 GTK4 / WebKitGTK 6.0 底层编译依赖，最后一个用于系统托盘）；装完立刻 `pkg-config --exists gtk4` / `webkitgtk-6.0` / `glib-2.0` / `libsoup-3.0` / `epoxy` / `graphene-1.0` / `ayatana-appindicator3-0.1` 断言，避免把问题推迟到使用者手里（这些包必须留在镜像里，它们就是镜像的用途）。
 - wails3 版本由 `ARG WAILS3_VERSION` 控制，默认 `latest`（不再钉死某个 tag）；CI 会先解析成 `v3.1.0` 这种具体版本再传进来。安装命令：
 
 ```dockerfile

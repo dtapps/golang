@@ -1,0 +1,68 @@
+﻿依赖包名,功能分类,具体作用 (在 CI / 打包 / 运行中的意义),适用镜像
+基础构建与系统工具,,,
+wget", "curl,网络下载,下载外部依赖、脚本或 Release 二进制文件。,Golang 基础
+ca-certificates,网络安全,提供根证书，确保 wget/curl 访问 HTTPS 链接不报错。,Golang 基础
+gnupg,签名验证,验证下载的第三方包或镜像的 GPG 签名。,Golang 基础
+git,版本控制,go mod download 拉取私有仓库代码，或克隆子模块。,Golang 基础
+make,构建工具,执行项目中的 Makefile 自动化构建流程。,Golang 基础
+jq,JSON 处理,在 CI 脚本中解析和提取 JSON 数据（如 GitHub API 返回）。,Golang 基础
+zip", "unzip,压缩解压,处理 .zip 格式的资产（如 Windows 资源、前端打包产物）。,Golang 基础
+xz-utils", "zstd,压缩解压,处理 .tar.xz (Node.js/UPX) 和 .tar.zst 格式。,Golang 基础
+tzdata,时区数据,配合 TZ 环境变量，确保 CI 日志和打包产物的时间戳正确。,Golang 基础
+bash", "coreutils 等,基础 Shell,findutils", "grep", "sed", "gawk 等，CI 脚本中处理文本和文件必备。,Golang 基础
+C/C++ 编译与底层库,,,
+build-essential,C/C++ 编译器,元包，包含 gcc", "g++", "make 等。Go 的 CGO 编译必须有它。,"Golang 基础, Fyne, Gio, Mygo"
+libc6-dev,C 标准库,提供 C 标准库头文件，CGO 编译底层依赖。,Golang 基础
+pkg-config,库查找工具,帮助 Go/CGO 找到系统中安装的 C 库的头文件和链接路径（.pc 文件）。,所有镜像
+gcc,C 编译器,编译 C 代码（build-essential 已包含，部分镜像显式声明以防万一）。,"Fyne, Gio, Mygo"
+libffi-dev,外部函数接口,允许代码在运行时动态调用 C 库（Gio 等底层框架需要）。,Gio
+打包与分发工具 (nfpm/MSI),,,
+dpkg-dev,Debian 打包,提供 dpkg-architecture 等，linuxdeploy 或底层打包工具获取架构信息用。,Golang 基础
+fakeroot,权限模拟,nfpm 打包 `.deb` 必备，模拟 root 权限设置文件 owner 和 755 等权限。,Golang 基础
+desktop-file-utils,桌面文件校验,提供 desktop-file-validate，校验 .desktop 文件是否符合 Linux 规范。,Golang 基础
+lintian,Deb 包质量检查,CI 最后一步校验 .deb 包，发现缺失依赖、权限错误等潜在问题。,Golang 基础
+rpm,RPM 打包工具,nfpm 打包 `.rpm` 必备，没有它 nfpm 无法生成 RPM 包。,Golang 基础
+file,文件类型检查,检查编译出的二进制文件架构（如确认是 x86_64 还是 arm64）。,Golang 基础
+patchelf", "chrpath,ELF 修改工具,修改 Linux 二进制的 RPATH（动态库搜索路径），AppImage 打包时常用。,Golang 基础
+wixl", "wixl-data,MSI 打包工具,在 Linux 下编译 Windows .msi 安装包（替代 Windows 下的 WiX）。,Golang 基础
+openssl,加密工具,生成证书、哈希校验等 CI 辅助操作。,Golang 基础
+libarchive-tools,归档工具,提供 bsdtar，支持处理各种复杂的压缩格式。,Golang 基础
+GUI 框架核心依赖 (GTK/WebKit),,,
+libgtk-3-dev,GTK3 开发包,Mygo / Wails2 编译 GTK3 UI 必需。,"Mygo, Wails2"
+libgtk-4-dev,GTK4 开发包,Wails3 编译 GTK4 UI 必需。,Wails3
+libwebkit2gtk-4.1-dev,WebKit2 开发包,Mygo / Wails2 渲染前端 HTML/JS 的 Web 引擎。,"Mygo, Wails2"
+libwebkitgtk-6.0-dev,WebKitGTK 6.0,Wails3 使用的最新版 Web 引擎。,Wails3
+libglib2.0-dev,GLib 开发包,GTK 的底层核心库，Wails3 显式声明防坑。,Wails3
+libsoup-3.0-dev,HTTP 客户端库,WebKitGTK 6.0 的网络请求底层依赖，缺了 WebKit 编译会报错。,Wails3
+libepoxy-dev,OpenGL 管理,GTK4 强依赖的 OpenGL 函数指针管理库。,Wails3
+libgraphene-1.0-dev,矩阵数学库,GTK4 强依赖的 3D 矩阵和向量数学库。,Wails3
+libayatana-appindicator3-dev,系统托盘库,提供系统托盘（Systray）功能，防止编译时 undefined reference。,"Mygo, Wails2, Wails3"
+图形渲染与显示服务 (X11/Wayland/GL),,,
+libgl1-mesa-dev,Mesa GL 开发包,提供 OpenGL 编译头文件（Fyne/Gio/Mygo/Wails 都需要）。,"Fyne, Mygo, Wails2, Wails3"
+xorg-dev,X11 开发包合集,"包含 X11 各种扩展库的开发文件（Xrandr, Xcursor 等）。","Fyne, Mygo, Wails2"
+libwayland-dev,Wayland 开发包,现代 Linux 显示服务器 Wayland 的编译依赖。,"Fyne, Gio, Mygo, Wails2, Wails3"
+libxkbcommon-dev,键盘处理库,处理键盘布局和按键事件（X11/Wayland 都需要）。,"Fyne, Gio, Mygo, Wails2, Wails3"
+libgles2-mesa-dev,OpenGL ES 开发包,嵌入式/移动端 OpenGL ES 2.0 编译依赖（Gio 需要）。,Gio
+libegl1-mesa-dev,EGL 开发包,OpenGL 与底层窗口系统（X11/Wayland）的接口（Gio 需要）。,Gio
+libvulkan-dev,Vulkan 开发包,现代图形 API Vulkan 的编译依赖。,"Gio, Wails3"
+libgl1", "libgl1-mesa-dri 等,GL 运行时库,OpenGL/EGL 的动态链接库（.so），CI 跑测试时动态加载必须。,"Fyne, Mygo, Wails2, Wails3"
+mesa-vulkan-drivers,Vulkan 驱动,Mesa 的 Vulkan 软件/硬件驱动，CI 测试 Vulkan 渲染需要。,"Gio, Wails3"
+CI 无头测试环境 (Headless),,,
+xvfb,虚拟帧缓冲,CI 无头测试核心，提供虚拟 X11 屏幕，让 GUI 程序能在无显示器的 CI 中运行。,"Fyne, Gio, Mygo, Wails2, Wails3"
+xauth,X11 授权,配合 Xvfb 处理 X11 的 Magic Cookie 授权。,"Fyne, Gio, Mygo, Wails2, Wails3"
+dbus-x11,D-Bus X11 桥接,让 D-Bus 消息总线能在 X11 环境下正常工作，GTK 应用启动常依赖。,"Fyne, Gio, Mygo, Wails2, Wails3"
+WebKit/网络/系统服务运行时,,,
+libnss3", "libnspr4,网络安全服务,WebKit 加载 HTTPS 网页必须，没有它 WebKit 无法验证 SSL 证书。,"Mygo, Wails2, Wails3"
+glib-networking,GIO 网络模块,提供 TLS/SSL 支持给 GLib/GIO，Go 调用底层网络库时需要。,"Mygo, Wails2, Wails3"
+librsvg2-common,SVG 渲染库,渲染 SVG 格式的图标和图片（Linux 桌面应用必备）。,"Mygo, Wails2, Wails3"
+libgdk-pixbuf-2.0-dev,图像加载库,处理 PNG/JPEG 等常见图片格式的加载和转换。,"Mygo, Wails2, Wails3"
+libsecret-1-dev,密钥存储,安全存储密码和凭据（如 Linux 的 Keyring）。,"Mygo, Wails2, Wails3"
+libnotify-dev,系统通知,发送桌面系统通知（弹窗提示）。,"Mygo, Wails2, Wails3"
+libcanberra-gtk3-module,声音反馈,GTK3 应用触发事件时的系统声音反馈模块。,"Mygo, Wails2"
+libdbus-1-dev,D-Bus 开发包,进程间通信（IPC），Linux 桌面应用与系统服务交互必备。,"Mygo, Wails2, Wails3"
+libharfbuzz-dev,文字排版引擎,处理复杂的文字排版和字形渲染（多语言支持必备）。,"Mygo, Wails2, Wails3"
+libpango1.0-dev,文本布局与渲染,配合 HarfBuzz 进行文本的布局和渲染。,"Mygo, Wails2, Wails3"
+主题、图标与字体,,,
+adwaita-icon-theme,默认图标主题,GTK 默认的图标主题，防止 GTK 应用启动时报“找不到图标”警告。,"Mygo, Wails2, Wails3"
+gsettings-desktop-schemas,桌面设置 Schema,提供桌面环境的默认配置（如字体大小、主题），GTK 启动时读取。,"Mygo, Wails2, Wails3"
+fonts-dejavu-core,核心字体,提供基础英文字体，防止 CI 测试时文字渲染变成方块或崩溃。,"Fyne, Gio, Mygo, Wails2, Wails3"
