@@ -32,7 +32,8 @@ format-yaml:
 		".cnb.yml" \
 		".github" \
 		".gitlab" \
-		".gitlab-ci.yml" || { echo "❌ yamlfmt 格式化失败"; exit 1; }
+		".gitlab-ci.yml" \
+		"action.yml" || { echo "❌ yamlfmt 格式化失败"; exit 1; }
 	@echo "[Format] YAML 格式化完成（yamlfmt）。"
 
 # 格式化 Markdown 文件
@@ -58,14 +59,14 @@ format-markdown:
 .PHONY: format-shell
 format-shell:
 	@echo "[Format] 格式化脚本 (Shell)…"
-	@shfmt -w -i 2 -ci -bn -s -ln posix .cnb/scripts/ .github/scripts/ .gitlab/scripts/ .cnb/docker/install-tool.sh .github/docker/install-tool.sh .gitlab/docker/install-tool.sh || { echo "❌ shfmt 格式化失败"; exit 1; }
+	@shfmt -w -i 2 -ci -bn -s -ln posix .cnb/scripts/ .github/scripts/ .gitlab/scripts/ .cnb/docker/install-tool.sh .github/docker/install-tool.sh .gitlab/docker/install-tool.sh scripts || { echo "❌ shfmt 格式化失败"; exit 1; }
 	@echo "[Format] Shell 格式化完成（shfmt）。"
 
 # 静态检查：shellcheck 按 POSIX sh 方言检查 CI 脚本
 .PHONY: lint-shell
 lint-shell:
 	@echo "[Lint] 检查脚本 (ShellCheck)…"
-	@shellcheck -s sh -S warning .cnb/scripts/*.sh .github/scripts/*.sh .gitlab/scripts/*.sh .cnb/docker/install-tool.sh .github/docker/install-tool.sh .gitlab/docker/install-tool.sh || { echo "❌ shellcheck 未通过"; exit 1; }
+	@shellcheck -s sh -S warning .cnb/scripts/*.sh .github/scripts/*.sh .gitlab/scripts/*.sh .cnb/docker/install-tool.sh .github/docker/install-tool.sh .gitlab/docker/install-tool.sh scripts || { echo "❌ shellcheck 未通过"; exit 1; }
 	@echo "[Lint] ShellCheck 通过。"
 
 # 格式化 Dockerfile 文件

@@ -78,21 +78,23 @@ git push origin go-gui-build-v1
 
 选填：
 
-| 输入                | 默认                    | 说明                                                                                                                                                      |
-|---------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `image-tag`         | `latest`                | 镜像标签（如 `1.27.3` / `1.27` / `latest`；也接受 digest）：仅**构建模式**的 Linux 分支用，setup-only 不需要                                              |
-| `image-registry`    | `ghcr.io/dtapps/golang` | 镜像仓库根命名空间；变体路径由 framework 派生（见「镜像引用」）                                                                                           |
-| `working-directory` | `.`                     | `go.mod` / `Taskfile.yml` 所在目录，相对仓库根；绝对路径直接报错                                                                                          |
-| `build-command`     | 空                      | 覆盖默认 build 命令（多条命令可 `&&` 串联）                                                                                                               |
-| `install-command`   | 空                      | **覆盖**默认 CLI 安装命令；仅原生分支执行                                                                                                                 |
-| `tools`             | 空                      | 额外工具，逗号分隔的**枚举**（当前支持 `task` = go-task）：装到 PATH，七个 framework 通用；Linux 镜像已自带 task，主要给 macOS / Windows 与 setup-only 用 |
-| `package-command`   | 空                      | 覆盖默认打包命令                                                                                                                                          |
-| `package`           | `false`                 | 是否追加打包命令（`true` / `false`，其他值报错）                                                                                                          |
-| `setup-only`        | `false`                 | 只装环境不构建：所有平台 `go install` CLI 并导出 `PATH` 给后续步骤，**不需要 Docker**；Linux 需自备 GUI 系统库                                            |
-| `bin-dir`           | `bin`                   | 产物目录（相对 `working-directory`），随 artifact 上传                                                                                                    |
-| `artifact-name`     | 空                      | artifact 名称；留空 = `<framework>-<OS>`（如 `wails3-Linux`、`wails3-macOS`）                                                                             |
-| `native-shell`      | `bash`                  | 原生分支 run 步骤的 shell；Windows 上命令需要 PowerShell 时设 `pwsh`                                                                                      |
-| `container-shell`   | `/bin/bash -lc`         | Linux 容器内执行命令的 shell（含参数）；alpine 系传 `/bin/sh -c`，镜像有自定义 ENTRYPOINT 时按需调整                                                      |
+| 输入                | 默认                    | 说明                                                                                                                                                                                               |
+|---------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `image-tag`         | `latest`                | 镜像标签（如 `1.27.3` / `1.27` / `latest`；也接受 digest）：仅**构建模式**的 Linux 分支用，setup-only 不需要                                                                                       |
+| `image-registry`    | `ghcr.io/dtapps/golang` | 镜像仓库根命名空间；变体路径由 framework 派生（见「镜像引用」）                                                                                                                                    |
+| `working-directory` | `.`                     | `go.mod` / `Taskfile.yml` 所在目录，相对仓库根；绝对路径直接报错                                                                                                                                   |
+| `build-command`     | 空                      | 覆盖默认 build 命令（多条命令可 `&&` 串联）                                                                                                                                                        |
+| `install-command`   | 空                      | **覆盖**默认 CLI 安装命令；仅原生分支执行                                                                                                                                                          |
+| `tools`             | 空                      | 额外工具，逗号分隔的**枚举**：`task`（go-task，走通用安装器 `scripts/install-tool.sh`：二进制优先、`go install` 兜底）、`nsis`（仅 Windows，执行 `scripts/install-nsis.ps1`）；七个 framework 通用 |
+| `nsis-version`      | `latest`                | NSIS 版本（`tools` 含 `nsis` 时使用，仅 Windows）：`latest` 用 SourceForge RSS 解析最新（约 1 秒），解析失败回退 `3.13`                                                                            |
+| `cache`             | `false`                 | 是否缓存已安装的 CLI 二进制（仅原生 / setup-only 路径）：开启后第二次起跳过安装，默认关闭                                                                                                          |
+| `package-command`   | 空                      | 覆盖默认打包命令                                                                                                                                                                                   |
+| `package`           | `false`                 | 是否追加打包命令（`true` / `false`，其他值报错）                                                                                                                                                   |
+| `setup-only`        | `false`                 | 只装环境不构建：所有平台 `go install` CLI 并导出 `PATH` 给后续步骤，**不需要 Docker**；Linux 需自备 GUI 系统库                                                                                     |
+| `bin-dir`           | `bin`                   | 产物目录（相对 `working-directory`），随 artifact 上传                                                                                                                                             |
+| `artifact-name`     | 空                      | artifact 名称；留空 = `<framework>-<OS>`（如 `wails3-Linux`、`wails3-macOS`）                                                                                                                      |
+| `native-shell`      | `bash`                  | 原生分支 run 步骤的 shell；Windows 上命令需要 PowerShell 时设 `pwsh`                                                                                                                               |
+| `container-shell`   | `/bin/bash -lc`         | Linux 容器内执行命令的 shell（含参数）；alpine 系传 `/bin/sh -c`，镜像有自定义 ENTRYPOINT 时按需调整                                                                                               |
 
 ## 命令解析
 
@@ -110,7 +112,7 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
 覆盖与追加规则：
 
 1. 三个 `*-command` 输入**非空时**覆盖对应默认值；
-2. `tools` 是**枚举**（逗号分隔，当前只有 `task`）：映射成带 pin 的安装命令，**追加**在默认安装之后（`&&` 串联，不覆盖）；七个 framework 通用，Linux 容器构建时在构建命令前执行；非法值报 `::error::`；
+2. `tools` 是**枚举**（逗号分隔，支持 `task` / `nsis`）：`task` 走通用安装器 `scripts/install-tool.sh <tool> <pin>`（**先下载官方预编译二进制，失败才 `go install`**；追加在默认安装之后，Linux 容器构建时通过只读挂载在容器内先执行）；`nsis` 走 `scripts/install-nsis.ps1`（专用 Windows 步骤 `Install NSIS`，非 Windows 只打 warning）；非法值报 `::error::`；新增工具只需在 `install-tool.sh` 的工具表里加一段；
 3. `package=true` 且 package 命令非空时，把 build 与 package 用 `&&` 串成一条命令执行；
 4. `package=true` 但无 package 命令（如 `golang`）：跳过打包并打 `::notice::`。
 
@@ -288,13 +290,13 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
 
 ## 执行流程
 
-| 步骤                | Linux（`runner.os == 'Linux'`）                                                                                                                                        | macOS / Windows（`runner.os != 'Linux'`）                                                                                                                                                                                                                                       |
-|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1. Resolve commands | 解析 framework → build / install / package + 镜像仓库引用                                                                                                              | 同左                                                                                                                                                                                                                                                                            |
-| 2. 容器构建         | `docker run --rm`：`$GITHUB_WORKSPACE` 挂到 `/workspace`，`-w` = `/workspace` + working-directory，`-e CGO_ENABLED=1`，`--entrypoint` 覆盖镜像 ENTRYPOINT 后执行命令串 | —                                                                                                                                                                                                                                                                               |
-| 3. 原生构建         | —                                                                                                                                                                      | `Check Go`（有 Go 就继续，没有直接报错；**不安装、不校验版本**）→ `Cache CLI binaries` → install 非空且缓存未命中才跑 → `Export CLI path` → `Print CLI versions`（把实际版本打进日志）→ 在 working-directory 下执行同一份 build 命令串（shell = native-shell，`CGO_ENABLED=1`） |
-| 4. artifact 计算    | 名称 = `artifact-name` 或 `<framework>-<OS>`                                                                                                                           | 同左                                                                                                                                                                                                                                                                            |
-| 5. 上传产物         | `actions/upload-artifact`：path = working-directory/bin-dir，`if-no-files-found: error`                                                                                | 同左                                                                                                                                                                                                                                                                            |
+| 步骤                | Linux（`runner.os == 'Linux'`）                                                                                                                                        | macOS / Windows（`runner.os != 'Linux'`）                                                                                                                                                                                                                                                                                                                                               |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1. Resolve commands | 解析 framework → build / install / package + 镜像仓库引用                                                                                                              | 同左                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2. 容器构建         | `docker run --rm`：`$GITHUB_WORKSPACE` 挂到 `/workspace`，`-w` = `/workspace` + working-directory，`-e CGO_ENABLED=1`，`--entrypoint` 覆盖镜像 ENTRYPOINT 后执行命令串 | —                                                                                                                                                                                                                                                                                                                                                                                       |
+| 3. 原生构建         | —                                                                                                                                                                      | `Check Go`（有 Go 就继续，没有直接报错；**不安装、不校验版本**）→ `Cache CLI binaries`（`cache=true` 才跑）→ install 非空且缓存未命中才跑 → `Export CLI path` → `Install NSIS`（仅 Windows 且 `tools` 含 `nsis`，脚本 `scripts/install-nsis.ps1`）→ `Print CLI versions`（把实际版本打进日志）→ 在 working-directory 下执行同一份 build 命令串（shell = native-shell，`CGO_ENABLED=1`） |
+| 4. artifact 计算    | 名称 = `artifact-name` 或 `<framework>-<OS>`                                                                                                                           | 同左                                                                                                                                                                                                                                                                                                                                                                                    |
+| 5. 上传产物         | `actions/upload-artifact`：path = working-directory/bin-dir，`if-no-files-found: error`                                                                                | 同左                                                                                                                                                                                                                                                                                                                                                                                    |
 
 实现细节：
 
@@ -339,8 +341,9 @@ steps:
 | 构建模式（macOS / Windows） | 同上 + 编译应用             | 同上                                                             |
 | 构建模式（Linux）           | 拉镜像（几十秒 ~ 几分钟）   | 镜像无法跨 runner 缓存；但省掉了装系统库的时间                   |
 
-- 改任一 CLI pin 或 `tools` 都会换缓存键，自动重新安装；
-- 默认 `latest` 时缓存键带 ISO 周戳（如 `-2026-46`），每周自动刷新一次，不会永远用第一次装到的版本；全部 pin 成具体 tag 后周戳消失；
+- 缓存默认**关闭**（`cache: false`），需要加速重复构建时显式开 `cache: true`；
+- 开启后：改任一 CLI pin 或 `tools` 都会换缓存键，自动重新安装；
+- 开启后：默认 `latest` 时缓存键带 ISO 周戳（如 `-2026-46`），每周自动刷新一次，不会永远用第一次装到的版本；全部 pin 成具体 tag 后周戳消失；
 - 原生分支装完会打一段 `--- 工具版本 ---`（framework CLI + `tools` + `go` 的实际版本），用来核对 pin 与缓存内容；
 - `FYNE_CLI_PIN=latest` 这类键不变，会一直复用首次装好的二进制，要升级就改 pin；
 - 缓存按 `runner.os` + `runner.arch` 隔离；
@@ -394,5 +397,7 @@ steps:
 
 - action 实现：`action.yml`（仓库根目录）
 - 示例 workflow：`.github/examples/go-gui-build/{golang,fnpack,wails3,wails2,fyne,gio,mygo}.yml`
+- 通用工具安装器：`scripts/install-tool.sh`（`tools: task` 等；内置工具表，二进制优先 + `go install` 兜底，新增工具在表里加一段）
+- NSIS 安装脚本：`scripts/install-nsis.ps1`（`tools: nsis`，仅 Windows）
 - 镜像内容与标签：`.github/docker/Dockerfile.*`、`.github/scripts/build-*.sh`（见 [golang/images-and-tags.md](golang/images-and-tags.md)）
 - 文档与脚本冲突时，以脚本和 Dockerfile 为准，并回头修文档（见 [文档索引](README.md)）。

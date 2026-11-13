@@ -44,7 +44,8 @@
 # https://github.com/actions/upload-artifact
 
 name: 'go-gui-build'
-description: '在 GHCR GUI 变体镜像（Linux）或原生 runner（macOS/Windows）中编排 Go GUI 应用构建与打包，产物上传为 artifact；setup-only=true 时只准备环境（装 CLI + 导出 PATH）'
+description: '在 GHCR GUI 变体镜像（Linux）或原生 runner（macOS/Windows）中编排 Go GUI 应用构建与打包，产物上传为 artifact；setup-only=true 时只准备环境（装 CLI
+  + 导出 PATH）'
 author: 'dtapps'
 
 # Marketplace 列表展示用的图标与颜色（Feather 图标名 + 官方枚举色）
@@ -69,7 +70,8 @@ inputs:
     required: false
     default: '.'
   build-command:
-    description: '覆盖默认 build 命令。Wails 的 -tags（如 gtk3 走 GTK3/WebKit2GTK 4.1 旧路径，会转成 EXTRA_TAGS 传给底层 Taskfile）必须显式写在命令里，action 不隐式猜 tag'
+    description: '覆盖默认 build 命令。Wails 的 -tags（如 gtk3 走 GTK3/WebKit2GTK 4.1 旧路径，会转成 EXTRA_TAGS 传给底层 Taskfile）必须显式写在命令里，action
+      不隐式猜 tag'
     required: false
     default: ''
   install-command:
@@ -80,6 +82,14 @@ inputs:
     description: '额外工具（逗号分隔，枚举）：task = go-task；七个 framework 通用，装好后在 PATH 里（Linux 镜像已自带，主要给 macOS / Windows 用）'
     required: false
     default: ''
+  cache:
+    description: '是否缓存已安装的 CLI 二进制（仅原生 / setup-only 路径有效）；开启后第二次起跳过安装，默认关闭'
+    required: false
+    default: 'false'
+  nsis-version:
+    description: 'NSIS 版本（tools 含 nsis 时使用，仅 Windows）：默认 latest（SourceForge RSS 解析最新），要复现可钉 3.13 这类具体版本'
+    required: false
+    default: 'latest'
   package-command:
     description: '覆盖默认打包命令（package=true 时与 build 用 && 串成一条命令）'
     required: false
@@ -229,30 +239,34 @@ runs:
         install_cmd="${INSTALL_COMMAND:-$default_install}"
         package_cmd="${PACKAGE_COMMAND:-$default_package}"
 
-        # 额外工具：tools 是枚举（逗号/空格分隔），逐个映射成带 pin 的安装命令
-        tools_install=""
+        # 额外工具：tools 是枚举，统一走 scripts/install-tool.sh <tool> <pin>
+        # （脚本内部：官方预编译二进制优先，失败回退 go install）
+        tools_list=""
         if [ -n "${TOOLS}" ]; then
           for tool in $(printf '%s' "${TOOLS}" | tr ',' ' '); do
             case "${tool}" in
-              task)
-                # go-task：Taskfile 任务运行器
-                tools_install="${tools_install:+${tools_install} && }go install github.com/go-task/task/v3/cmd/task@${TASK_CLI_PIN}"
+              task) tools_list="${tools_list:+${tools_list} }task:${TASK_CLI_PIN}" ;;
+              nsis)
+                # NSIS 由专用 Windows 步骤安装（见 Install NSIS），不进 install 命令
+                if [ "${RUNNER_OS:-}" != "Windows" ]; then
+                  echo "::warning::tools 里的 nsis 只在 Windows 上安装，当前 runner.os=${RUNNER_OS:-unknown}，已跳过"
+                fi
                 ;;
               *)
-                echo "::error::tools 只支持 task，收到：${tool}"
+                echo "::error::tools 只支持 task / nsis，收到：${tool}"
                 exit 1
                 ;;
             esac
           done
         fi
 
-        # 追加规则：tools 的安装命令串在默认安装之后（不覆盖默认安装）
-        if [ -n "${tools_install}" ]; then
-          if [ -n "${install_cmd}" ]; then
-            install_cmd="${install_cmd} && ${tools_install}"
-          else
-            install_cmd="${tools_install}"
-          fi
+        # 追加规则：tools 的安装串在默认安装之后（不覆盖默认安装）
+        if [ -n "${tools_list}" ]; then
+          for _entry in ${tools_list}; do
+            _name="${_entry%%:*}"
+            _pin="${_entry#*:}"
+            install_cmd="${install_cmd:+${install_cmd} && }bash \"\$GITHUB_ACTION_PATH/scripts/install-tool.sh\" ${_name} ${_pin}"
+          done
         fi
 
         # package=true 且 package 命令非空时，把 build 与 package 用 && 串成一条命令
@@ -280,7 +294,7 @@ runs:
         write_output package "${package_cmd}"
         write_output image_repo "${image_repo}"
         write_output setup_only "${SETUP_ONLY}"
-        write_output tools_install "${tools_install}"
+        write_output tools_list "${tools_list}"
         # 缓存键：framework + 全部 pin + tools；有 latest 时按 ISO 周换键，
         # 否则缓存的二进制会把 latest 冻在第一次装到的版本上。
         tools_key="$(printf '%s' "${TOOLS}" | tr -c '[:alnum:]' '-')"
@@ -312,7 +326,7 @@ runs:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
         CONTAINER_SHELL: ${{ inputs.container-shell }}
         BUILD_CMD: ${{ steps.commands.outputs.build }}
-        TOOLS_INSTALL: ${{ steps.commands.outputs.tools_install }}
+        TOOLS_LIST: ${{ steps.commands.outputs.tools_list }}
       run: |
         set -euo pipefail
 
@@ -349,14 +363,19 @@ runs:
         shell_bin="$1"
         shift
 
-        # tools 指定的工具在容器内先装（镜像里没有的工具用它补）
-        if [ -n "${TOOLS_INSTALL}" ]; then
-          BUILD_CMD="${TOOLS_INSTALL} && ${BUILD_CMD}"
+        # tools 指定的工具在容器内先装：scripts 目录只读挂载到 /opt/go-gui-tools
+        if [ -n "${TOOLS_LIST}" ]; then
+          for _entry in ${TOOLS_LIST}; do
+            _name="${_entry%%:*}"
+            _pin="${_entry#*:}"
+            BUILD_CMD="sh /opt/go-gui-tools/install-tool.sh ${_name} ${_pin} && ${BUILD_CMD}"
+          done
         fi
 
         echo "镜像 ${image_ref}；容器内工作目录 ${container_wd}"
         docker run --rm \
           -v "${GITHUB_WORKSPACE}:/workspace" \
+          -v "${GITHUB_ACTION_PATH}/scripts:/opt/go-gui-tools:ro" \
           -w "${container_wd}" \
           -e CGO_ENABLED=1 \
           --entrypoint "${shell_bin}" \
@@ -379,10 +398,10 @@ runs:
         echo "go=$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
 
     # 缓存已装好的 CLI 二进制：命中就直接跳过下面的安装（编译 CLI 是耗时大头）
-    # 执行：同 Check Go（原生平台，或 Linux 的 setup-only）
+    # 执行：同 Check Go，且 cache=true（默认关闭）
     - name: Cache CLI binaries
       id: cli-cache
-      if: runner.os != 'Linux' || inputs.setup-only == 'true'
+      if: (runner.os != 'Linux' || inputs.setup-only == 'true') && inputs.cache == 'true'
       uses: actions/cache@v6
       with:
         path: ~/go/bin
@@ -390,7 +409,8 @@ runs:
 
     # 执行：同 Check Go，且有安装命令、缓存未命中
     - name: Install CLI
-      if: steps.commands.outputs.install != '' && (runner.os != 'Linux' || inputs.setup-only == 'true') && steps.cli-cache.outputs.cache-hit != 'true'
+      if: steps.commands.outputs.install != '' && (runner.os != 'Linux' || inputs.setup-only == 'true') && steps.cli-cache.outputs.cache-hit
+        != 'true'
       shell: ${{ inputs.native-shell }}
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -411,6 +431,15 @@ runs:
           echo "::warning::Linux runner 上没有 GTK/WebKit 等 GUI 系统库：setup-only 只装 CLI，wails / fyne / gio 的编译仍需要这些库，请自备（或只用纯 Go 的 framework）"
         fi
 
+    # 执行：仅 Windows，且 tools 里包含 nsis（实现在 scripts/install-nsis.ps1）
+    - name: Install NSIS
+      if: runner.os == 'Windows' && contains(format(',{0},', inputs.tools), ',nsis,')
+      shell: pwsh
+      env:
+        NSIS_VERSION: ${{ inputs.nsis-version }}
+      run: |
+        pwsh -NoProfile -File "$env:GITHUB_ACTION_PATH/scripts/install-nsis.ps1"
+
     # 装完（或命中缓存）把实际版本打进日志，方便核对 pin / 缓存内容
     # 执行：同 Check Go（缓存命中也会打印）
     - name: Print CLI versions
@@ -427,6 +456,12 @@ runs:
           _bin="$1"
           if ! command -v "${_bin}" >/dev/null 2>&1; then
             printf '  %-10s 未安装\n' "${_bin}"
+            return 0
+          fi
+          # makensis 只认 -VERSION（version / --version 都会报错或进入编译流程）
+          if [ "${_bin}" = "makensis" ]; then
+            _out="$(makensis -VERSION 2>&1)" || _out=""
+            printf '  %-10s %s\n' "${_bin}" "${_out:-（版本未知）}"
             return 0
           fi
           # 有的 CLI 把版本打到 stderr（如 wails3），所以合并 2>&1，只按退出码判定
@@ -449,9 +484,8 @@ runs:
           fnpack) show fnpack ;;
           gio | golang) : ;;
         esac
-        case ",${TOOLS}," in
-          *,task,*) show task ;;
-        esac
+        case ",${TOOLS}," in *,task,*) show task ;; esac
+        case ",${TOOLS}," in *,nsis,*) show makensis ;; esac
         show go
 
     # 执行：仅 macOS / Windows 构建模式（runner.os != 'Linux' 且 setup-only != true）

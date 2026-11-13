@@ -23,7 +23,8 @@ jobs:
         with:
           framework: wails3
           setup-only: true
-          tools: task
+          tools: task # 需要打 NSIS 安装包时写成 tools: task,nsis（仅 Windows 生效）
+          # cache: true   # 想加速重复构建时打开（第二次起跳过 CLI 编译）
 
       # 2) 使用：wails3 和 task 都在 PATH 里（wails3 build 或 task xxx 都行）
       - name: 构建并打包
