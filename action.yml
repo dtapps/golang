@@ -137,11 +137,15 @@ runs:
         PACKAGE: ${{ inputs.package }}
         SETUP_ONLY: ${{ inputs.setup-only }}
         TOOLS: ${{ inputs.tools }}
+        NSIS_VERSION: ${{ inputs.nsis-version }}
         BUILD_COMMAND: ${{ inputs.build-command }}
         INSTALL_COMMAND: ${{ inputs.install-command }}
         PACKAGE_COMMAND: ${{ inputs.package-command }}
       run: |
         set -euo pipefail
+
+        # 便于排查「跑的是哪份代码」：composite action 自己的仓库与 ref
+        echo "action: ${GITHUB_ACTION_REPOSITORY:-（本地路径）}@${GITHUB_ACTION_REF:-（本地路径）}"
 
         # ---- CLI 版本 pin 点：升级改这里（也可在 workflow 用同名 env 覆盖）----
         # 默认全部跟 latest；要可复现就在 workflow 用同名 env 钉具体 tag。
@@ -295,6 +299,12 @@ runs:
         write_output image_repo "${image_repo}"
         write_output setup_only "${SETUP_ONLY}"
         write_output tools_list "${tools_list}"
+        # NSIS 缓存键：版本号；latest 时带 ISO 周戳，避免永远用第一次下到的版本
+        case "${NSIS_VERSION:-latest}" in
+          '' | latest) nsis_key="latest-$(date -u +%G-%V)" ;;
+          *) nsis_key="${NSIS_VERSION}" ;;
+        esac
+        write_output nsis_cache_key "${nsis_key}"
         # 缓存键：framework + 全部 pin + tools；有 latest 时按 ISO 周换键，
         # 否则缓存的二进制会把 latest 冻在第一次装到的版本上。
         tools_key="$(printf '%s' "${TOOLS}" | tr -c '[:alnum:]' '-')"
@@ -387,6 +397,7 @@ runs:
     # Go 不由本 action 管理：有就用，没有就报错（版本不管，调用方自己决定）
     # 执行：macOS / Windows（构建或 setup-only），以及 Linux 的 setup-only
     - name: Check Go
+      id: go-check
       if: runner.os != 'Linux' || inputs.setup-only == 'true'
       shell: bash
       run: |
@@ -395,7 +406,12 @@ runs:
           echo "::error::没有找到 go。本 action 不安装 Go：请先自行准备（如 actions/setup-go），或换用自带 Go 的 runner / 本仓库镜像"
           exit 1
         fi
-        echo "go=$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
+        # 缓存与 PATH 都用实际的 GOPATH/bin（不写死 ~/go，兼容自定义 GOPATH）
+        gobin="$(go env GOPATH)/bin"
+        {
+          printf 'gobin=%s\n' "${gobin}"
+        } >>"${GITHUB_OUTPUT}"
+        echo "go=$(go env GOVERSION 2>/dev/null | sed 's/^go//')  bin=${gobin}"
 
     # 缓存已装好的 CLI 二进制：命中就直接跳过下面的安装（编译 CLI 是耗时大头）
     # 执行：同 Check Go，且 cache=true（默认关闭）
@@ -404,7 +420,8 @@ runs:
       if: (runner.os != 'Linux' || inputs.setup-only == 'true') && inputs.cache == 'true'
       uses: actions/cache@v6
       with:
-        path: ~/go/bin
+        # 框架 CLI 与 tools 的二进制都装在同一个 GOPATH/bin 下（task 等），一起缓存
+        path: ${{ steps.go-check.outputs.gobin }}
         key: go-gui-cli-${{ runner.os }}-${{ runner.arch }}-${{ steps.commands.outputs.cli_cache_key }}
 
     # 执行：同 Check Go，且有安装命令、缓存未命中
@@ -422,14 +439,24 @@ runs:
     - name: Export CLI path
       if: runner.os != 'Linux' || inputs.setup-only == 'true'
       shell: bash
+      env:
+        GOBIN_DIR: ${{ steps.go-check.outputs.gobin }}
       run: |
         set -euo pipefail
-        gobin="$(go env GOPATH)/bin"
-        echo "${gobin}" >>"${GITHUB_PATH}"
-        echo "已把 ${gobin} 加入 PATH（后续步骤可用 CLI）"
+        echo "${GOBIN_DIR}" >>"${GITHUB_PATH}"
+        echo "已把 ${GOBIN_DIR} 加入 PATH（后续步骤可用 CLI）"
         if [ "${RUNNER_OS}" = "Linux" ]; then
           echo "::warning::Linux runner 上没有 GTK/WebKit 等 GUI 系统库：setup-only 只装 CLI，wails / fyne / gio 的编译仍需要这些库，请自备（或只用纯 Go 的 framework）"
         fi
+
+    # 执行：仅 Windows，且 tools 含 nsis、cache=true
+    - name: Cache NSIS
+      id: nsis-cache
+      if: runner.os == 'Windows' && contains(format(',{0},', inputs.tools), ',nsis,') && inputs.cache == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/nsis
+        key: go-gui-nsis-${{ runner.os }}-${{ steps.commands.outputs.nsis_cache_key }}
 
     # 执行：仅 Windows，且 tools 里包含 nsis（实现在 scripts/install-nsis.ps1）
     - name: Install NSIS
@@ -445,13 +472,17 @@ runs:
     - name: Print CLI versions
       if: runner.os != 'Linux' || inputs.setup-only == 'true'
       shell: bash
+      # 第二层保险：即使脚本意外失败，也不让 action / 工作流失败
+      continue-on-error: true
       env:
         FRAMEWORK: ${{ inputs.framework }}
         TOOLS: ${{ inputs.tools }}
       run: |
-        set -uo pipefail
-        # 各 CLI 的版本命令不统一（wails3 只认 `wails3 version`，task 只认 `task --version`），
-        # 逐个试，只接受「退出码 0 且有输出」的形式
+        # 纯信息步骤：绝不让构建失败。GitHub 的 bash 包装器默认带 -e（-o pipefail），
+        # 探测命令返回非 0 会把整步干掉，所以这里关掉 -e 和 -u，末尾再 exit 0。
+        set +eu
+        set -o pipefail
+
         show() {
           _bin="$1"
           if ! command -v "${_bin}" >/dev/null 2>&1; then
@@ -460,20 +491,27 @@ runs:
           fi
           # makensis 只认 -VERSION（version / --version 都会报错或进入编译流程）
           if [ "${_bin}" = "makensis" ]; then
-            _out="$(makensis -VERSION 2>&1)" || _out=""
+            _out="$(makensis -VERSION 2>&1)"
             printf '  %-10s %s\n' "${_bin}" "${_out:-（版本未知）}"
             return 0
           fi
-          # 有的 CLI 把版本打到 stderr（如 wails3），所以合并 2>&1，只按退出码判定
+          # 各 CLI 的版本命令不统一（wails3 只认 version，task 只认 --version），
+          # 而且有的 CLI 打完版本仍返回非 0（wails3 version 会返回 200）；
+          # 所以先看输出里有没有版本号，再看退出码。
           for _form in version --version -v; do
             _out="$("${_bin}" "${_form}" 2>&1)"
             _rc=$?
+            if printf '%s' "${_out}" | grep -qiE 'v?[0-9]+\.[0-9]+'; then
+              printf '  %-10s %s\n' "${_bin}" "$(printf '%s' "${_out}" | head -n 1)"
+              return 0
+            fi
             if [ "${_rc}" -eq 0 ] && [ -n "${_out}" ]; then
               printf '  %-10s %s\n' "${_bin}" "$(printf '%s' "${_out}" | head -n 1)"
               return 0
             fi
           done
           printf '  %-10s (版本未知)\n' "${_bin}"
+          return 0
         }
         echo "--- 工具版本 ---"
         case "${FRAMEWORK}" in
@@ -487,6 +525,7 @@ runs:
         case ",${TOOLS}," in *,task,*) show task ;; esac
         case ",${TOOLS}," in *,nsis,*) show makensis ;; esac
         show go
+        exit 0
 
     # 执行：仅 macOS / Windows 构建模式（runner.os != 'Linux' 且 setup-only != true）
     - name: Build (native)

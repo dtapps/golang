@@ -10,6 +10,7 @@
 #   原生 / setup-only：bash "$GITHUB_ACTION_PATH/scripts/install-tool.sh" task v3.54.0
 #   Linux 容器构建   ：sh /opt/go-gui-tools/install-tool.sh task v3.54.0
 #   （scripts 目录以只读方式挂载到 /opt/go-gui-tools）
+# https://github.com/go-task/task
 set -eu
 
 tool="${1:?用法: install-tool.sh <tool> [pin]}"

@@ -6,8 +6,21 @@
 # 注意：GitHub 的 pwsh 默认 $ErrorActionPreference='Stop'，Write-Error 会被升级为
 # OperationStopped 异常直接终止脚本（表现为 "OperationStopped: exit code 1"）。
 # 故显式设为 Continue，并用 Write-Host + exit 1 报告失败，避免异常中断。
+# https://nsis.sourceforge.io/Download
 
 $ErrorActionPreference = 'Continue'
+
+$dest = "$env:RUNNER_TEMP\nsis"
+
+# 缓存命中：actions/cache 已把上次解压好的目录还原，直接用——
+# 放在版本解析之前，命中时连 RSS 请求都省掉
+$cached = Get-ChildItem -Path $dest -Filter makensis.exe -Recurse -ErrorAction SilentlyContinue |
+  Select-Object -First 1
+if ($cached) {
+  Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $cached.FullName)
+  Write-Host "NSIS 命中缓存：$($cached.FullName)"
+  exit 0
+}
 
 $nsisVer = $env:NSIS_VERSION
 
@@ -36,7 +49,6 @@ $urls = @(
   "https://downloads.sourceforge.net/project/nsis/NSIS%203/$nsisVer/nsis-$nsisVer.zip",
   "https://master.dl.sourceforge.net/project/nsis/NSIS%203/$nsisVer/nsis-$nsisVer.zip"
 )
-$dest = "$env:RUNNER_TEMP\nsis"
 $zip = "$env:RUNNER_TEMP\nsis-$nsisVer.zip"
 if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }
 
