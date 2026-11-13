@@ -116,6 +116,7 @@ runs:
     # 根据 framework 生成 build / install / package 三组命令写入 GITHUB_OUTPUT，
     # Linux 与原生分支共用同一份解析结果，case 不写两遍。
     # build 输出是最终命令串：package=true 且 package 命令非空时已与 build 串联。
+    # 执行：所有平台、所有模式（Linux 构建 / 原生构建 / setup-only）
     - name: Resolve commands
       id: commands
       shell: bash
@@ -144,7 +145,7 @@ runs:
         FNPACK_CLI_PIN="${FNPACK_CLI_PIN:-1.2.3}"
 
         case "${WORKING_DIRECTORY}" in
-          /* | [A-Za-z]:*)
+          /* | [[:alpha:]]:*)
             echo "::error::working-directory 必须是相对仓库根的路径（如 . 或 app），收到：${WORKING_DIRECTORY}"
             exit 1
             ;;
@@ -214,8 +215,10 @@ runs:
         else
           image_repo="${IMAGE_REGISTRY%/}/${FRAMEWORK}"
         fi
+        # 用 POSIX [[:upper:]] 而不是 [A-Z]：后者在 UTF-8 locale 下按排列顺序匹配，
+        # 连小写字母都会命中（GitHub runner 默认 en_US.UTF-8）
         case "${image_repo}" in
-          *[A-Z]*)
+          *[[:upper:]]*)
             echo "::error::image-registry 不能含大写字母（registry 仓库路径要求小写）：${image_repo}"
             exit 1
             ;;
@@ -299,6 +302,7 @@ runs:
     #（container-shell），debian 系默认 /bin/bash -lc，alpine 传 /bin/sh -c。
     # 可选扩展点：wails3 task setup:docker / fyne-cross 等交叉编译需要
     # docker-in-docker，本 action 不启用、也不假设容器内有 docker，需要时调用方自编排。
+    # 执行：仅 Linux 构建模式（runner.os == 'Linux' 且 setup-only != true）
     - name: Build in container (Linux)
       if: runner.os == 'Linux' && inputs.setup-only != 'true'
       shell: bash
@@ -362,6 +366,7 @@ runs:
     # macOS / Windows 跑不了 Linux 容器，直接在原生 runner 上执行同一份命令字符串，
     # 保证产物可签名、可打包。
     # Go 不由本 action 管理：有就用，没有就报错（版本不管，调用方自己决定）
+    # 执行：macOS / Windows（构建或 setup-only），以及 Linux 的 setup-only
     - name: Check Go
       if: runner.os != 'Linux' || inputs.setup-only == 'true'
       shell: bash
@@ -374,6 +379,7 @@ runs:
         echo "go=$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
 
     # 缓存已装好的 CLI 二进制：命中就直接跳过下面的安装（编译 CLI 是耗时大头）
+    # 执行：同 Check Go（原生平台，或 Linux 的 setup-only）
     - name: Cache CLI binaries
       id: cli-cache
       if: runner.os != 'Linux' || inputs.setup-only == 'true'
@@ -382,6 +388,7 @@ runs:
         path: ~/go/bin
         key: go-gui-cli-${{ runner.os }}-${{ runner.arch }}-${{ steps.commands.outputs.cli_cache_key }}
 
+    # 执行：同 Check Go，且有安装命令、缓存未命中
     - name: Install CLI
       if: steps.commands.outputs.install != '' && (runner.os != 'Linux' || inputs.setup-only == 'true') && steps.cli-cache.outputs.cache-hit != 'true'
       shell: ${{ inputs.native-shell }}
@@ -391,6 +398,7 @@ runs:
       run: ${{ steps.commands.outputs.install }}
 
     # setup-go 式体验：把 CLI 所在目录写进 GITHUB_PATH，后续步骤可直接用
+    # 执行：同 Check Go（原生平台，或 Linux 的 setup-only）
     - name: Export CLI path
       if: runner.os != 'Linux' || inputs.setup-only == 'true'
       shell: bash
@@ -403,6 +411,50 @@ runs:
           echo "::warning::Linux runner 上没有 GTK/WebKit 等 GUI 系统库：setup-only 只装 CLI，wails / fyne / gio 的编译仍需要这些库，请自备（或只用纯 Go 的 framework）"
         fi
 
+    # 装完（或命中缓存）把实际版本打进日志，方便核对 pin / 缓存内容
+    # 执行：同 Check Go（缓存命中也会打印）
+    - name: Print CLI versions
+      if: runner.os != 'Linux' || inputs.setup-only == 'true'
+      shell: bash
+      env:
+        FRAMEWORK: ${{ inputs.framework }}
+        TOOLS: ${{ inputs.tools }}
+      run: |
+        set -uo pipefail
+        # 各 CLI 的版本命令不统一（wails3 只认 `wails3 version`，task 只认 `task --version`），
+        # 逐个试，只接受「退出码 0 且有输出」的形式
+        show() {
+          _bin="$1"
+          if ! command -v "${_bin}" >/dev/null 2>&1; then
+            printf '  %-10s 未安装\n' "${_bin}"
+            return 0
+          fi
+          # 有的 CLI 把版本打到 stderr（如 wails3），所以合并 2>&1，只按退出码判定
+          for _form in version --version -v; do
+            _out="$("${_bin}" "${_form}" 2>&1)"
+            _rc=$?
+            if [ "${_rc}" -eq 0 ] && [ -n "${_out}" ]; then
+              printf '  %-10s %s\n' "${_bin}" "$(printf '%s' "${_out}" | head -n 1)"
+              return 0
+            fi
+          done
+          printf '  %-10s (版本未知)\n' "${_bin}"
+        }
+        echo "--- 工具版本 ---"
+        case "${FRAMEWORK}" in
+          wails3) show wails3 ;;
+          wails2) show wails ;;
+          fyne) show fyne ;;
+          mygo) show mygo ;;
+          fnpack) show fnpack ;;
+          gio | golang) : ;;
+        esac
+        case ",${TOOLS}," in
+          *,task,*) show task ;;
+        esac
+        show go
+
+    # 执行：仅 macOS / Windows 构建模式（runner.os != 'Linux' 且 setup-only != true）
     - name: Build (native)
       if: runner.os != 'Linux' && inputs.setup-only != 'true'
       shell: ${{ inputs.native-shell }}
@@ -412,6 +464,7 @@ runs:
       run: ${{ steps.commands.outputs.build }}
 
     # ---------- 4. 计算 artifact 名称与路径 ----------
+    # 执行：非 setup-only（三平台构建模式）
     - name: Compute artifact name
       id: artifact
       if: inputs.setup-only != 'true'
@@ -441,6 +494,7 @@ runs:
         echo "artifact ${name} ← ${path}"
 
     # ---------- 5. 上传产物 ----------
+    # 执行：非 setup-only（三平台构建模式）
     - name: Upload artifact
       if: inputs.setup-only != 'true'
       uses: actions/upload-artifact@v7

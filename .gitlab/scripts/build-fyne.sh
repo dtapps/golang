@@ -220,7 +220,7 @@ case "${REGISTRY}" in
   *) die "IMAGE 必须带 registry 前缀（如 registry.example.com/<group>/<project>），收到：${IMAGE}" ;;
 esac
 case "${IMAGE}" in
-  *[A-Z]*) die "IMAGE 不能含大写字母：${IMAGE}" ;;
+  *[[:upper:]]*) die "IMAGE 不能含大写字母：${IMAGE}" ;;
 esac
 
 FYNE_IMAGE="${IMAGE}/fyne"
