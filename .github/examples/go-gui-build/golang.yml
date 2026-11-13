@@ -1,0 +1,28 @@
+# 示例：普通 Go 程序 —— 两个步骤：准备环境 → 使用
+# 本仓库自测时把 uses 改成 ./
+name: build-golang
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # 1) 准备环境：检查 Go（runner 自带；没有就报错，action 不安装 Go）
+      - name: 准备环境
+        uses: dtapps/golang@main
+        with:
+          framework: golang
+          setup-only: true
+
+      # 2) 使用：普通 go build
+      - name: 构建
+        run: go build -o bin/app ./cmd/app

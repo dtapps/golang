@@ -1,0 +1,29 @@
+# 示例：Gio —— 两个步骤：准备环境 → 使用
+# 本仓库自测时把 uses 改成 ./；Linux 需自备 EGL/GLES、X11、Wayland 系统库
+# gogio 没有 linux 目标（跨平台打包要额外 SDK），Linux 桌面程序就是普通 go build
+name: build-gio
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # 1) 准备环境：检查 Go（runner 自带；gio 没有额外 CLI，action 不安装 Go）
+      - name: 准备环境
+        uses: dtapps/golang@main
+        with:
+          framework: gio
+          setup-only: true
+
+      # 2) 使用：普通 go build（cgo）
+      - name: 构建
+        run: go build -o bin/app .

@@ -1,0 +1,32 @@
+# 示例：Wails v2 —— 两个步骤：准备环境 → 使用
+# 本仓库自测时把 uses 改成 ./；Linux 需自备 GTK3/WebKit2GTK 4.1 系统库
+name: build-wails2
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # 1) 准备环境：装 wails CLI 并导出 PATH（不需要 Docker）
+      - name: 准备环境
+        uses: dtapps/golang@main
+        with:
+          framework: wails2
+          setup-only: true
+          # 项目里有 Taskfile、要用 task xxx 时加一行（任何 framework 都能用）：
+          # tools: task
+
+      # 2) 使用：CLI 已在 PATH 里；GTK3 旧路径加 -tags webkit2_41
+      - name: 构建并打包
+        run: |
+          wails build
+          wails package

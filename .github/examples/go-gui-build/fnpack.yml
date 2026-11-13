@@ -1,0 +1,31 @@
+# 示例：fnpack —— 两个步骤：准备环境 → 使用
+# fnpack 官方有 linux / darwin / windows 二进制，action 按官方地址下载并导出 PATH
+# 本仓库自测时把 uses 改成 ./
+name: build-fnpack
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # 1) 准备环境：下载 fnpack 二进制并导出 PATH（不需要 Docker）
+      - name: 准备环境
+        uses: dtapps/golang@main
+        with:
+          framework: fnpack
+          setup-only: true
+
+      # 2) 使用：编译 + 打 .fpk
+      - name: 构建并打包
+        run: |
+          go build -trimpath -ldflags="-s -w" -o dist/app .
+          fnpack build

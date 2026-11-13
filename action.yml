@@ -1,0 +1,450 @@
+# ===================================================================
+# go-gui-build：GitHub 侧 GUI 变体镜像的「编排」composite action
+#
+#   本文件在仓库根目录，所以第三方（应用仓库）直接引用：
+#     uses: dtapps/golang@<ref>        # 版本 tag / 分支
+#   本仓库自己的 workflow 用相对路径：
+#     uses: ./                        # 先 actions/checkout
+#   使用文档：docs/go-gui-build.md（含七个 framework 示例与三平台 workflow）
+#
+#   服务于本仓库的 7 个平级变体镜像（golang / fnpack / wails3 / wails2 /
+#   fyne / mygo / gio），只做这一个通用 action：framework 输入选变体与默认命令。
+#   不造合并镜像，不拆七个 action。
+#
+#   分层契约（不要破坏）：
+#     · 镜像负责「环境」：系统库、CLI、Go 版本、软件源配置（见 .github/docker/）
+#     · action 只负责「编排」：选镜像、拼命令、挂载代码、传产物
+#       本文件不安装任何系统依赖、不动软件源配置——依赖清单只存在于 Dockerfile，
+#       否则会扩散成第四份清单，与仓库「三套平台脚本各维护」的问题叠加。
+#
+#   执行模型（hybrid，硬约束）：
+#     · Linux job        → docker run 复用变体镜像（容器只有 Linux 跑得起来）
+#     · macOS / Windows  → 原生 runner（检查 Go + 安装 CLI + 直接执行命令），
+#                          产物保持可签名、可打包；不做「全 Linux 交叉编译发版」。
+#     · 不默认假设 docker-in-docker；wails3 task setup:docker / fyne-cross 之类
+#       交叉编译是调用方的可选扩展点（见 Linux 分支注释）。
+#
+#   平台胶水只服务 GitHub 侧（默认 registry ghcr.io）。CNB / GitLab 各自维护
+#   自己的调用方式，不要用本 action 覆盖三个 registry 和三套源配置。
+#
+#   使用边界（调用方职责）：
+#     · 私有 GHCR 登录：调用方先 docker login（GITHUB_TOKEN），job 加
+#       permissions: packages: read；本 action 不处理登录。
+#     · image-tag 用标签或 digest：仓库有标签提升规则，浮动 tag 会漂移，
+#       要严格复现就传 digest；action 的 git ref 与 image-tag 建议同批发。
+#     · macOS 公证 / Windows 签名（signtool）需要证书 secrets，由调用方在
+#       本 action 之后自行追加步骤，不在这里实现。
+#     · 第三方 action 用主版本 tag（cache@v6 / upload-artifact@v4），升级就改版本号。
+#     · Go 不由本 action 安装：有就用，没有 / 太旧就报错（调用方用 actions/setup-go）。
+#     · setup-only=true：只装环境不构建——所有平台都 go install CLI 并把 PATH 导出给
+#       后续步骤，不需要 Docker（Linux 需自备 GUI 系统库，镜像里的库不会凭空出现）。
+# ===================================================================
+
+# https://github.com/actions/cache
+# https://github.com/actions/upload-artifact
+
+name: 'go-gui-build'
+description: '在 GHCR GUI 变体镜像（Linux）或原生 runner（macOS/Windows）中编排 Go GUI 应用构建与打包，产物上传为 artifact；setup-only=true 时只准备环境（装 CLI + 导出 PATH）'
+author: 'dtapps'
+
+# Marketplace 列表展示用的图标与颜色（Feather 图标名 + 官方枚举色）
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  framework:
+    description: '镜像变体与默认命令选择器：wails3 | wails2 | fyne | gio | golang | fnpack | mygo'
+    required: true
+  image-tag:
+    description: '镜像标签（如 1.27.3、1.27、latest；也接受 digest）：仅构建模式的 Linux 分支使用，setup-only 不需要'
+    required: false
+    default: 'latest'
+  image-registry:
+    description: '镜像仓库根命名空间；变体路径由 framework 派生（golang 用根镜像，其余拼 /<framework>）'
+    required: false
+    default: 'ghcr.io/dtapps/golang'
+  working-directory:
+    description: 'go.mod / Taskfile.yml 所在目录，相对仓库根'
+    required: false
+    default: '.'
+  build-command:
+    description: '覆盖默认 build 命令。Wails 的 -tags（如 gtk3 走 GTK3/WebKit2GTK 4.1 旧路径，会转成 EXTRA_TAGS 传给底层 Taskfile）必须显式写在命令里，action 不隐式猜 tag'
+    required: false
+    default: ''
+  install-command:
+    description: '覆盖默认 CLI 安装命令（仅原生分支执行；Linux 默认假设镜像已装好 CLI，缺了就在 build-command 里串 go install 或补镜像）'
+    required: false
+    default: ''
+  tools:
+    description: '额外工具（逗号分隔，枚举）：task = go-task；七个 framework 通用，装好后在 PATH 里（Linux 镜像已自带，主要给 macOS / Windows 用）'
+    required: false
+    default: ''
+  package-command:
+    description: '覆盖默认打包命令（package=true 时与 build 用 && 串成一条命令）'
+    required: false
+    default: ''
+  package:
+    description: '是否追加打包命令（true / false）'
+    required: false
+    default: 'false'
+  setup-only:
+    description: '只准备环境（所有平台 go install CLI 并把 $(go env GOPATH)/bin 导出到 PATH），不构建、不上传、不需要 Docker；Linux 需自备 GUI 系统库'
+    required: false
+    default: 'false'
+  bin-dir:
+    description: '产物目录（相对 working-directory），随 artifact 上传'
+    required: false
+    default: 'bin'
+  artifact-name:
+    description: 'artifact 名称；留空 = <framework>-<OS>'
+    required: false
+    default: ''
+  native-shell:
+    description: '原生分支 run 步骤的 shell；Windows 上命令需要 PowerShell 时设 pwsh'
+    required: false
+    default: 'bash'
+  container-shell:
+    description: 'Linux 容器内执行命令的 shell（含参数，按空白拆 argv）：debian 系默认 /bin/bash -lc；alpine 传 /bin/sh -c；镜像带自定义 ENTRYPOINT 时按需调整'
+    required: false
+    default: '/bin/bash -lc'
+
+runs:
+  using: composite
+  steps:
+    # ---------- 1. Resolve commands ----------
+    # 根据 framework 生成 build / install / package 三组命令写入 GITHUB_OUTPUT，
+    # Linux 与原生分支共用同一份解析结果，case 不写两遍。
+    # build 输出是最终命令串：package=true 且 package 命令非空时已与 build 串联。
+    - name: Resolve commands
+      id: commands
+      shell: bash
+      env:
+        FRAMEWORK: ${{ inputs.framework }}
+        IMAGE_REGISTRY: ${{ inputs.image-registry }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        PACKAGE: ${{ inputs.package }}
+        SETUP_ONLY: ${{ inputs.setup-only }}
+        TOOLS: ${{ inputs.tools }}
+        BUILD_COMMAND: ${{ inputs.build-command }}
+        INSTALL_COMMAND: ${{ inputs.install-command }}
+        PACKAGE_COMMAND: ${{ inputs.package-command }}
+      run: |
+        set -euo pipefail
+
+        # ---- CLI 版本 pin 点：升级改这里（也可在 workflow 用同名 env 覆盖）----
+        # 默认全部跟 latest；要可复现就在 workflow 用同名 env 钉具体 tag。
+        WAILS3_CLI_PIN="${WAILS3_CLI_PIN:-latest}"
+        WAILS2_CLI_PIN="${WAILS2_CLI_PIN:-latest}"
+        FYNE_CLI_PIN="${FYNE_CLI_PIN:-latest}"
+        MYGO_CLI_PIN="${MYGO_CLI_PIN:-latest}"
+        # go-task：tools=task 时安装
+        TASK_CLI_PIN="${TASK_CLI_PIN:-latest}"
+        # fnpack 例外：官方 URL 里必须带具体版本号，没有 latest 这一档
+        FNPACK_CLI_PIN="${FNPACK_CLI_PIN:-1.2.3}"
+
+        case "${WORKING_DIRECTORY}" in
+          /* | [A-Za-z]:*)
+            echo "::error::working-directory 必须是相对仓库根的路径（如 . 或 app），收到：${WORKING_DIRECTORY}"
+            exit 1
+            ;;
+        esac
+
+        case "${PACKAGE}" in
+          true | false) : ;;
+          *)
+            echo "::error::package 只接受 true / false，收到：${PACKAGE}"
+            exit 1
+            ;;
+        esac
+
+        case "${SETUP_ONLY}" in
+          true | false) : ;;
+          *)
+            echo "::error::setup-only 只接受 true / false，收到：${SETUP_ONLY}"
+            exit 1
+            ;;
+        esac
+
+        case "${FRAMEWORK}" in
+          wails3)
+            default_build="wails3 build"
+            default_install="go install github.com/wailsapp/wails/v3/cmd/wails3@${WAILS3_CLI_PIN}"
+            default_package="wails3 package"
+            ;;
+          wails2)
+            default_build="wails build"
+            default_install="go install github.com/wailsapp/wails/v2/cmd/wails@${WAILS2_CLI_PIN}"
+            default_package="wails package"
+            ;;
+          fyne)
+            # fyne CLI 已从 fyne.io/fyne/v2/cmd/fyne 迁出：旧路径只剩弃用提示桩，
+            # 装出来执行不了 fyne package。与镜像 Dockerfile.fyne 保持一致。
+            default_build="go build ./..."
+            default_install="go install fyne.io/tools/cmd/fyne@${FYNE_CLI_PIN}"
+            default_package="fyne package"
+            ;;
+          mygo)
+            # 与镜像 Dockerfile.mygo 一致：native 构建要走 mygo CLI，没装就 command not found
+            default_build="go build ./..."
+            default_install="go install github.com/egoist/mygo/cmd/mygo@${MYGO_CLI_PIN}"
+            default_package=""
+            ;;
+          fnpack)
+            # 官方二进制覆盖 linux / darwin / windows（amd64 + arm64），
+            # 与 Dockerfile.fnpack 同源；arm64 先按官方命名，失败再试镜像里的 -arm
+            default_build="go build ./..."
+            default_install='os=; exe=; case "$(uname -s)" in Linux*) os=linux ;; Darwin*) os=darwin ;; MINGW*|MSYS*|CYGWIN*) os=windows; exe=.exe ;; *) echo "::error::fnpack: 不支持的系统" >&2; exit 1 ;; esac; arch="$(go env GOARCH)"; dest="$(go env GOPATH)/bin/fnpack${exe}"; mkdir -p "$(go env GOPATH)/bin"; curl -fsSL --retry 2 -o "$dest" "https://static2.fnnas.com/fnpack/fnpack-'"${FNPACK_CLI_PIN}"'-${os}-${arch}" || curl -fsSL --retry 2 -o "$dest" "https://static2.fnnas.com/fnpack/fnpack-'"${FNPACK_CLI_PIN}"'-${os}-arm"; chmod +x "$dest"'
+            default_package=""
+            ;;
+          gio | golang)
+            default_build="go build ./..."
+            default_install=""
+            default_package=""
+            ;;
+          *)
+            echo "::error::framework 必须是 wails3 | wails2 | fyne | gio | golang | fnpack | mygo 之一，收到：${FRAMEWORK}"
+            exit 1
+            ;;
+        esac
+
+        # 镜像仓库引用：golang 变体就是仓库根镜像，其余变体拼 /<framework>
+        if [ "${FRAMEWORK}" = "golang" ]; then
+          image_repo="${IMAGE_REGISTRY%/}"
+        else
+          image_repo="${IMAGE_REGISTRY%/}/${FRAMEWORK}"
+        fi
+        case "${image_repo}" in
+          *[A-Z]*)
+            echo "::error::image-registry 不能含大写字母（registry 仓库路径要求小写）：${image_repo}"
+            exit 1
+            ;;
+        esac
+
+        # 覆盖规则：三个 *-command 输入非空时覆盖对应默认值
+        build_cmd="${BUILD_COMMAND:-$default_build}"
+        install_cmd="${INSTALL_COMMAND:-$default_install}"
+        package_cmd="${PACKAGE_COMMAND:-$default_package}"
+
+        # 额外工具：tools 是枚举（逗号/空格分隔），逐个映射成带 pin 的安装命令
+        tools_install=""
+        if [ -n "${TOOLS}" ]; then
+          for tool in $(printf '%s' "${TOOLS}" | tr ',' ' '); do
+            case "${tool}" in
+              task)
+                # go-task：Taskfile 任务运行器
+                tools_install="${tools_install:+${tools_install} && }go install github.com/go-task/task/v3/cmd/task@${TASK_CLI_PIN}"
+                ;;
+              *)
+                echo "::error::tools 只支持 task，收到：${tool}"
+                exit 1
+                ;;
+            esac
+          done
+        fi
+
+        # 追加规则：tools 的安装命令串在默认安装之后（不覆盖默认安装）
+        if [ -n "${tools_install}" ]; then
+          if [ -n "${install_cmd}" ]; then
+            install_cmd="${install_cmd} && ${tools_install}"
+          else
+            install_cmd="${tools_install}"
+          fi
+        fi
+
+        # package=true 且 package 命令非空时，把 build 与 package 用 && 串成一条命令
+        if [ "${PACKAGE}" = "true" ]; then
+          if [ -n "${package_cmd}" ]; then
+            build_cmd="${build_cmd} && ${package_cmd}"
+          else
+            echo "::notice::package=true，但 ${FRAMEWORK} 没有默认 package 命令且未传 package-command，跳过打包"
+          fi
+        fi
+
+        # GITHUB_OUTPUT 多行安全写入（覆盖命令允许含换行）
+        write_output() {
+          _key=$1
+          _value=$2
+          _delim="__GO_GUI_BUILD_${_key}_$$_${RANDOM}__"
+          {
+            printf '%s<<%s\n' "${_key}" "${_delim}"
+            printf '%s\n' "${_value}"
+            printf '%s\n' "${_delim}"
+          } >>"${GITHUB_OUTPUT}"
+        }
+        write_output build "${build_cmd}"
+        write_output install "${install_cmd}"
+        write_output package "${package_cmd}"
+        write_output image_repo "${image_repo}"
+        write_output setup_only "${SETUP_ONLY}"
+        write_output tools_install "${tools_install}"
+        # 缓存键：framework + 全部 pin + tools；有 latest 时按 ISO 周换键，
+        # 否则缓存的二进制会把 latest 冻在第一次装到的版本上。
+        tools_key="$(printf '%s' "${TOOLS}" | tr -c '[:alnum:]' '-')"
+        week=""
+        case "${WAILS3_CLI_PIN}${WAILS2_CLI_PIN}${FYNE_CLI_PIN}${MYGO_CLI_PIN}${TASK_CLI_PIN}" in
+          *latest*) week="-$(date -u +%G-%V)" ;;
+        esac
+        write_output cli_cache_key "${FRAMEWORK}-${WAILS3_CLI_PIN}-${WAILS2_CLI_PIN}-${FYNE_CLI_PIN}-${MYGO_CLI_PIN}-${FNPACK_CLI_PIN}-${TASK_CLI_PIN}-${tools_key}${week}"
+
+        echo "build:   ${build_cmd}"
+        echo "install: ${install_cmd:-<空>}"
+        echo "package: ${package_cmd:-<空>}"
+        echo "image:   ${image_repo}"
+
+    # ---------- 2. Linux 分支：docker run 复用变体镜像 ----------
+    # 用 run: docker run 执行命令，而不是用 uses 直接引用镜像：uses 的镜像引用
+    # 不支持表达式拼动态 tag，而镜像 tag/digest 必须由输入传入。
+    # --entrypoint 覆盖镜像自带 ENTRYPOINT 后执行命令字符串；容器 shell 是可覆盖点
+    #（container-shell），debian 系默认 /bin/bash -lc，alpine 传 /bin/sh -c。
+    # 可选扩展点：wails3 task setup:docker / fyne-cross 等交叉编译需要
+    # docker-in-docker，本 action 不启用、也不假设容器内有 docker，需要时调用方自编排。
+    - name: Build in container (Linux)
+      if: runner.os == 'Linux' && inputs.setup-only != 'true'
+      shell: bash
+      env:
+        IMAGE_REPO: ${{ steps.commands.outputs.image_repo }}
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        CONTAINER_SHELL: ${{ inputs.container-shell }}
+        BUILD_CMD: ${{ steps.commands.outputs.build }}
+        TOOLS_INSTALL: ${{ steps.commands.outputs.tools_install }}
+      run: |
+        set -euo pipefail
+
+        command -v docker >/dev/null 2>&1 \
+          || { echo "::error::Linux 分支需要 Docker，但 runner 上没有 docker 命令"; exit 1; }
+
+        # 镜像引用：仓库根路径由 Resolve 步骤按 framework 派生（image_repo 输出），
+        # 这里只负责组合 tag / digest
+        image_repo="${IMAGE_REPO}"
+        case "${IMAGE_TAG}" in
+          sha256:*)  image_ref="${image_repo}@${IMAGE_TAG}" ;;
+          @sha256:*) image_ref="${image_repo}${IMAGE_TAG}" ;;
+          *)         image_ref="${image_repo}:${IMAGE_TAG}" ;;
+        esac
+
+        # 容器内工作目录 = 挂载点 /workspace + working-directory 拼接
+        #（working-directory != '.' 时不能硬写 /workspace）
+        wd="${WORKING_DIRECTORY%/}"
+        while [ "${wd#./}" != "${wd}" ]; do wd="${wd#./}"; done
+        if [ -z "${wd}" ] || [ "${wd}" = "." ]; then
+          container_wd="/workspace"
+        else
+          container_wd="/workspace/${wd}"
+        fi
+
+        # container-shell 按空白拆成 argv：首词是可执行文件，其余是参数（如 -lc），
+        # 最后追加命令字符串。例：/bin/bash -lc → bash -lc '<命令>'；
+        # 自定义 ENTRYPOINT（如 tini）可传 'tini -- /bin/bash -lc'。
+        set -f
+        # shellcheck disable=SC2086  # 有意按空白拆词
+        set -- ${CONTAINER_SHELL}
+        set +f
+        [ "$#" -ge 1 ] || { echo "::error::container-shell 不能为空"; exit 1; }
+        shell_bin="$1"
+        shift
+
+        # tools 指定的工具在容器内先装（镜像里没有的工具用它补）
+        if [ -n "${TOOLS_INSTALL}" ]; then
+          BUILD_CMD="${TOOLS_INSTALL} && ${BUILD_CMD}"
+        fi
+
+        echo "镜像 ${image_ref}；容器内工作目录 ${container_wd}"
+        docker run --rm \
+          -v "${GITHUB_WORKSPACE}:/workspace" \
+          -w "${container_wd}" \
+          -e CGO_ENABLED=1 \
+          --entrypoint "${shell_bin}" \
+          "${image_ref}" "$@" "${BUILD_CMD}"
+
+    # ---------- 3. 原生分支：检查 Go → install → build ----------
+    # macOS / Windows 跑不了 Linux 容器，直接在原生 runner 上执行同一份命令字符串，
+    # 保证产物可签名、可打包。
+    # Go 不由本 action 管理：有就用，没有就报错（版本不管，调用方自己决定）
+    - name: Check Go
+      if: runner.os != 'Linux' || inputs.setup-only == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v go >/dev/null 2>&1; then
+          echo "::error::没有找到 go。本 action 不安装 Go：请先自行准备（如 actions/setup-go），或换用自带 Go 的 runner / 本仓库镜像"
+          exit 1
+        fi
+        echo "go=$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
+
+    # 缓存已装好的 CLI 二进制：命中就直接跳过下面的安装（编译 CLI 是耗时大头）
+    - name: Cache CLI binaries
+      id: cli-cache
+      if: runner.os != 'Linux' || inputs.setup-only == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ~/go/bin
+        key: go-gui-cli-${{ runner.os }}-${{ runner.arch }}-${{ steps.commands.outputs.cli_cache_key }}
+
+    - name: Install CLI
+      if: steps.commands.outputs.install != '' && (runner.os != 'Linux' || inputs.setup-only == 'true') && steps.cli-cache.outputs.cache-hit != 'true'
+      shell: ${{ inputs.native-shell }}
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CGO_ENABLED: '1'
+      run: ${{ steps.commands.outputs.install }}
+
+    # setup-go 式体验：把 CLI 所在目录写进 GITHUB_PATH，后续步骤可直接用
+    - name: Export CLI path
+      if: runner.os != 'Linux' || inputs.setup-only == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        gobin="$(go env GOPATH)/bin"
+        echo "${gobin}" >>"${GITHUB_PATH}"
+        echo "已把 ${gobin} 加入 PATH（后续步骤可用 CLI）"
+        if [ "${RUNNER_OS}" = "Linux" ]; then
+          echo "::warning::Linux runner 上没有 GTK/WebKit 等 GUI 系统库：setup-only 只装 CLI，wails / fyne / gio 的编译仍需要这些库，请自备（或只用纯 Go 的 framework）"
+        fi
+
+    - name: Build (native)
+      if: runner.os != 'Linux' && inputs.setup-only != 'true'
+      shell: ${{ inputs.native-shell }}
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CGO_ENABLED: '1'
+      run: ${{ steps.commands.outputs.build }}
+
+    # ---------- 4. 计算 artifact 名称与路径 ----------
+    - name: Compute artifact name
+      id: artifact
+      if: inputs.setup-only != 'true'
+      shell: bash
+      env:
+        FRAMEWORK: ${{ inputs.framework }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        BIN_DIR: ${{ inputs.bin-dir }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        if [ -n "${ARTIFACT_NAME}" ]; then
+          name="${ARTIFACT_NAME}"
+        else
+          name="${FRAMEWORK}-${RUNNER_OS}"
+        fi
+        wd="${WORKING_DIRECTORY%/}"
+        if [ -z "${wd}" ] || [ "${wd}" = "." ]; then
+          path="${BIN_DIR}"
+        else
+          path="${wd}/${BIN_DIR}"
+        fi
+        {
+          printf 'name=%s\n' "${name}"
+          printf 'path=%s\n' "${path}"
+        } >>"${GITHUB_OUTPUT}"
+        echo "artifact ${name} ← ${path}"
+
+    # ---------- 5. 上传产物 ----------
+    - name: Upload artifact
+      if: inputs.setup-only != 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.artifact.outputs.name }}
+        path: ${{ steps.artifact.outputs.path }}
+        if-no-files-found: error

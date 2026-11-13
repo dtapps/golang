@@ -1,0 +1,33 @@
+# 示例：Wails v3 —— 两个步骤：准备环境 → 使用
+# 本仓库自测时把 uses 改成 ./；Linux 需自备 GTK/WebKit 系统库
+name: build-wails3
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # 1) 准备环境：装 wails3 CLI 并导出 PATH（不需要 Docker）
+      #    tools: task → 额外装 go-task（枚举参数，任何 framework 都能用）
+      - name: 准备环境
+        uses: dtapps/golang@main
+        with:
+          framework: wails3
+          setup-only: true
+          tools: task
+
+      # 2) 使用：wails3 和 task 都在 PATH 里（wails3 build 或 task xxx 都行）
+      - name: 构建并打包
+        run: |
+          wails3 build
+          wails3 package
+          # task 也可直接用，例如：task build / task dev
