@@ -85,6 +85,10 @@ case "${tool}" in
     repo=jandelgado/gcov2lcov
     file="gcov2lcov_${v}_linux_${arch}.tar.gz"
     ;;
+  task)
+    repo=go-task/task
+    file="task_linux_${arch}.tar.gz"
+    ;;
   *)
     echo "没有官方二进制，回退 go install：${tool}" >&2
     exit 1

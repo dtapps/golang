@@ -172,6 +172,7 @@ GOTESTSUM_VERSION=gotest.tools/gotestsum
 MARKDOWNFMT_VERSION=github.com/Kunde21/markdownfmt/v3
 GOCOVER_COBERTURA_VERSION=github.com/boumenot/gocover-cobertura
 GCOV2LCOV_VERSION=github.com/jandelgado/gcov2lcov
+TASK_VERSION=github.com/go-task/task/v3
 "
 
 # 版本变量 → 二进制名：元数据里的版本以镜像里实际装上的为准（读二进制而不是靠解析）
@@ -190,6 +191,7 @@ GOTESTSUM_VERSION=gotestsum
 MARKDOWNFMT_VERSION=markdownfmt
 GOCOVER_COBERTURA_VERSION=gocover-cobertura
 GCOV2LCOV_VERSION=gcov2lcov
+TASK_VERSION=task
 UPX_VERSION=upx
 NODE_VERSION=node
 PNPM_VERSION=pnpm
@@ -523,7 +525,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     [ "$got" = "$EXPECT_GO" ] || fail="$fail go-version($got)"
     for b in go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm \
       sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
-      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov wixl; do
+      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task wixl; do
       command -v "$b" >/dev/null 2>&1 || fail="$fail bin:$b"
     done
     # 时区生效：TZ=Asia/Shanghai 下偏移必须是 +0800（tzdata 已装且 zoneinfo 可用）
@@ -531,7 +533,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     # 版本命令实际跑一遍：工具默认 @latest 自动追新后，只查 presence
     # 挡不住装坏的二进制。--version / version / -v 逐个兜底，
     # 输出丢弃，仅以退出码计 fail。
-    for b in node npm pnpm upx nfpm sqlc golangci-lint gojq shfmt gotestsum wixl; do
+    for b in node npm pnpm upx nfpm sqlc golangci-lint gojq shfmt gotestsum task wixl; do
       command -v "$b" >/dev/null 2>&1 || continue
       "$b" --version >/dev/null 2>&1 \
         || "$b" version >/dev/null 2>&1 \
@@ -543,7 +545,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     # 真实版本：从二进制里的模块信息读（go version -m），比解析 --version 输出可靠。
     # 供元数据使用：CI 解析失败回退 latest 时，这里仍能给出实际装上的版本号。
     for b in nfpm sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
-      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov; do
+      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task; do
       v="$(go version -m "$(command -v "$b")" 2>/dev/null \
         | sed -n "s/^[[:space:]]*mod[[:space:]][^[:space:]]*[[:space:]]\([^[:space:]]*\).*/\1/p" \
         | head -n 1 || true)"

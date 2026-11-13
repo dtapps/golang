@@ -60,7 +60,7 @@ if [ -n "${NODE_MIRROR}" ]; then NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"; e
 2. **基础包**：wget、xz-utils（`tar -Jf` 解压 UPX / Node 的 `.tar.xz`）、zstd（`tar --zstd` 处理 `.tar.zst`，当前无调用，先预留）、ca-certificates、curl、gnupg、git、make、build-essential / libc6-dev（显式钉住 gcc / g++ / make / libc6-dev 这套 cgo 工具链，不依赖上游 golang 镜像的内部实现；libc6-dev 与元包重复，显式声明、apt 幂等）、jq（jq 同时用于版本解析）、zip、unzip、pkg-config（打包/解压/cgo）、dpkg-dev（`dpkg-buildpackage` / `dpkg-architecture` 等从源码构建 `.deb` 的工具，nfpm 不需要，先预留）、fakeroot / desktop-file-utils（`debuild` / `dpkg-buildpackage -rfakeroot` 与 `.desktop` 校验注册，先预留）、file / patchelf / chrpath / lintian / rpm（打包工具：ELF 修正、rpath 调整、`.deb` 规范检查与 RPM 打包），以及 **tzdata**——配合上面的 `TZ`：装完 `ln -snf /usr/share/zoneinfo/$TZ /etc/localtime`、写 `/etc/timezone`，再 `date` 打一行日志确认（构建日志里应看到 `CST`）。同一层还装 **wixl / wixl-data**（msitools）：在 Linux 上直接编译 Windows MSI 安装包，不必依赖 Windows 端的 WiX；装完 `wixl --version` 打一行日志确认。包清单统一放在 `apt_packages` 变量里，装完再 `dpkg-query -W ${apt_packages}` 打印每个 deb 的实际版本（输出「包名<TAB>版本」）——各变体镜像的 apt 安装块同理，日志里就能直接核对版本，不用进容器查。
 3. **UPX**：`UPX_VERSION=latest` 时从 `releases.atom` 取第一个稳定 tag（grep 锚定 href 行尾引号，天然跳过 `-beta` / `-rc` 预发布；不走 api.github.com，免认证且无限速），再按 `uname -m` 选 amd64/arm64 下载 tar.xz，装到 `/usr/local/bin/upx`。
 4. **Node.js**：`NODE_VERSION=latest` 时从 `dist/index.json` 取第一个非预发布版本（过滤 `-alpha` / `-rc`），下载官方 tar.xz 解压到 `/usr/local`；GitHub / GitLab 侧不配置 registry（npm / pnpm 用官方默认 `registry.npmjs.org`），CNB 侧才用腾讯云；三侧都设 `pnpm config set ignore-scripts false`。
-5. **Go 工具链（含 nfpm）**：按职责分成 5 层（打包与代码生成 nfpm+sqlc / 实体生成 ent+entc / 质量与安全 golangci-lint+govulncheck / 格式化与数据处理 shfmt+dockerfmt+yamlfmt+gojq+markdownfmt+sql-formatter / 测试与覆盖率报告 gotestsum+gocover-cobertura+gcov2lcov）。**有官方二进制的先下载二进制**（`install-tool`），失败才回退 `go install -v`（见下一节）；每层都挂 BuildKit 缓存目录：
+5. **Go 工具链（含 nfpm）**：按职责分成 6 层（打包与代码生成 nfpm+sqlc / 实体生成 ent+entc / 质量与安全 golangci-lint+govulncheck / 格式化与数据处理 shfmt+dockerfmt+yamlfmt+gojq+markdownfmt+sql-formatter / 测试与覆盖率报告 gotestsum+gocover-cobertura+gcov2lcov / 任务编排 task）。**有官方二进制的先下载二进制**（`install-tool`），失败才回退 `go install -v`（见下一节）；每层都挂 BuildKit 缓存目录：
    - `--mount=type=cache,target=/go/pkg/mod`：模块缓存
    - `--mount=type=cache,target=/root/.cache/go-build`：编译缓存
 
@@ -110,18 +110,19 @@ COPY --chmod=0755 .cnb/docker/install-tool.sh /usr/local/bin/install-tool
 
 各仓库资产命名互不相同，`install-tool.sh` 里按工具列了一张表（升级版本不用改它，新增工具要加一行）：
 
-| 工具          | 仓库                      | 资产名（`<ver>` 不含前缀 v）                     |
-|---------------|---------------------------|--------------------------------------------------|
-| nfpm          | goreleaser/nfpm           | `nfpm_<ver>_Linux_{arm64,x86_64}.tar.gz`         |
-| sqlc          | sqlc-dev/sqlc             | `sqlc_<ver>_linux_{arm64,amd64}.tar.gz`          |
-| golangci-lint | golangci/golangci-lint    | `golangci-lint-<ver>-linux-{arm64,amd64}.tar.gz` |
-| shfmt         | mvdan/sh                  | `shfmt_v<ver>_linux_{arm64,amd64}`（裸二进制）   |
-| dockerfmt     | reteps/dockerfmt          | `dockerfmt-v<ver>-linux-{arm64,amd64}.tar.gz`    |
-| yamlfmt       | google/yamlfmt            | `yamlfmt_<ver>_Linux_{arm64,x86_64}.tar.gz`      |
-| gojq          | itchyny/gojq              | `gojq_v<ver>_linux_{arm64,amd64}.tar.gz`         |
-| sql-formatter | wasilibs/go-sql-formatter | `sql-formatter_<ver>_linux_{arm64,amd64}.tar.gz` |
-| gotestsum     | gotestyourself/gotestsum  | `gotestsum_<ver>_linux_{arm64,amd64}.tar.gz`     |
-| gcov2lcov     | jandelgado/gcov2lcov      | `gcov2lcov_<ver>_linux_{arm64,amd64}.tar.gz`     |
+| 工具          | 仓库                      | 资产名（`<ver>` 不含前缀 v）                        |
+|---------------|---------------------------|-----------------------------------------------------|
+| nfpm          | goreleaser/nfpm           | `nfpm_<ver>_Linux_{arm64,x86_64}.tar.gz`            |
+| sqlc          | sqlc-dev/sqlc             | `sqlc_<ver>_linux_{arm64,amd64}.tar.gz`             |
+| golangci-lint | golangci/golangci-lint    | `golangci-lint-<ver>-linux-{arm64,amd64}.tar.gz`    |
+| shfmt         | mvdan/sh                  | `shfmt_v<ver>_linux_{arm64,amd64}`（裸二进制）      |
+| dockerfmt     | reteps/dockerfmt          | `dockerfmt-v<ver>-linux-{arm64,amd64}.tar.gz`       |
+| yamlfmt       | google/yamlfmt            | `yamlfmt_<ver>_Linux_{arm64,x86_64}.tar.gz`         |
+| gojq          | itchyny/gojq              | `gojq_v<ver>_linux_{arm64,amd64}.tar.gz`            |
+| sql-formatter | wasilibs/go-sql-formatter | `sql-formatter_<ver>_linux_{arm64,amd64}.tar.gz`    |
+| gotestsum     | gotestyourself/gotestsum  | `gotestsum_<ver>_linux_{arm64,amd64}.tar.gz`        |
+| gcov2lcov     | jandelgado/gcov2lcov      | `gcov2lcov_<ver>_linux_{arm64,amd64}.tar.gz`        |
+| task          | go-task/task              | `task_linux_{arm64,amd64}.tar.gz`（文件名不带版本） |
 
 没有官方二进制、只能 `go install` 的（都已核实 latest release 资产数为 0）：`ent` / `entc`、`govulncheck`、`markdownfmt`、`gocover-cobertura`，以及变体镜像里的 `wails`（wailsapp/wails v2）、`wails3`（v3）、`fyne`（fyne-io/tools）、`gogio`（gioui/gio）、`mygo`（egoist/mygo）。
 
@@ -154,6 +155,7 @@ COPY --chmod=0755 .cnb/docker/install-tool.sh /usr/local/bin/install-tool
 | `MARKDOWNFMT_VERSION`       | `latest` | markdownfmt               | 同上                                        |
 | `GOCOVER_COBERTURA_VERSION` | `latest` | gocover-cobertura         | `go install @latest`                        |
 | `GCOV2LCOV_VERSION`         | `latest` | gcov2lcov                 | `go install @latest`                        |
+| `TASK_VERSION`              | `latest` | task（go-task）           | `go install @latest`                        |
 
 `go install @latest` 走模块路径解析：各工具的模块路径带 `/v2`、`/v3` 等后缀，latest 不会自动跨 major；major 升级需要改 Dockerfile 里的模块路径。
 
