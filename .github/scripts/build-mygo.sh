@@ -12,7 +12,7 @@
 # 工具链完全一致。
 #
 # 触发方式（见 build-mygo.yml）：
-#   schedule          → 每天固定时间跑（比 build-fyne 晚 3 小时）
+#   schedule          → 每天固定时间跑（比 build-fyne 晚 1 小时）
 #   workflow_dispatch → 手动跑，需要基础镜像标签已存在（脚本会等待并给出提示）
 #                       可传 version / mygo_version / bun_version 覆盖默认版本
 #

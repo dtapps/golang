@@ -5,7 +5,7 @@
 #                                      开发包 + 无头运行库 + gogio CLI
 #
 #   基础镜像由 build-golang.yml 产出。本工作流独立定时触发（比 build-mygo
-#   再晚 3 小时）或手动触发，都要求 <go 版本> 标签已经存在。
+#   再晚 1 小时）或手动触发，都要求 <go 版本> 标签已经存在。
 #
 #   实现：GitHub 侧独立维护一份（与 CNB 各自维护，不共用）
 #         · Dockerfile  .github/docker/Dockerfile.gio
@@ -27,9 +27,9 @@ name: build-gio
 
 on:
   schedule:
-    # 每天 18:05（Asia/Shanghai）= 10:05 UTC，与 CNB 的 crontab '5 18 * * *' 同刻。
-    # 比 build-mygo 的 07:05 UTC 晚 3 小时，给基础镜像留出构建时间。
-    - cron: '5 10 * * *'
+    # 每天 08:05（Asia/Shanghai）= 00:05 UTC，与 CNB 的 crontab '5 8 * * *' 同刻。
+    # 比 build-mygo 的 23:05 UTC 晚 1 小时，给基础镜像留出构建时间。
+    - cron: '5 0 * * *'
   workflow_dispatch:
     inputs:
       version:

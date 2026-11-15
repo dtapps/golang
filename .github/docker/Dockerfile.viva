@@ -1,0 +1,160 @@
+# ===================================================================
+# Golang 构建环境镜像 + viva
+#
+# 在 Dockerfile.golang 产出的镜像之上做两件事：
+#   1. 安装运行 / 调试 viva 桌面程序所需的系统依赖（XCB、Vulkan、Pango / Cairo、
+#      fontconfig，以及可选 vivagtk 壳层的 GTK3 / WebKit2GTK 4.1，外加无头运行库）
+#   2. go install viva CLI（模块 github.com/vivaui/viva，命令在 cmd/viva）
+#
+# viva 用 purego 在运行期 dlopen 系统库，Linux 默认后端是 XCB + Vulkan，纯 Go
+# 就能编译，不需要 cgo；带 `vivagtk` build tag 时改走 GTK3 壳层，内嵌 WebView 用
+# WebKit2GTK 4.1。所以这里装的是运行期库，同时保留对应的 -dev 包，方便使用者
+# 项目自己写 cgo 绑定。装完用 pkg-config / ldconfig 逐个断言；缺一个就构建失败，
+# 不会推迟到使用者手里。这里不做「真编一个 viva 程序」的额外校验层，保持九个
+# 变体结构一致。
+#
+# 三个平台各留一份：本文件（GitHub 侧）、.cnb/docker/Dockerfile.viva（CNB 侧）与
+# .gitlab/docker/Dockerfile.viva（GitLab 侧），各自维护、不互相引用。
+#
+# 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
+#   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
+# 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
+# APT / GOPROXY 继承基座镜像（CNB 侧 GOPROXY 为多源回退），本文件没有额外的镜像源开关。
+#
+# viva：https://github.com/vivaui/viva
+# VIVA_VERSION 是 github.com/vivaui/viva 的版本，默认 latest；CI 会先解析成具体
+# tag 再传进来，裸 build 由 go 解析。
+# ===================================================================
+
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+
+# BuildKit 自动提供的目标平台（linux/amd64、linux/arm64 …）。多架构构建时同一个
+# RUN 会按架构各跑一遍，echo 带上它才能分清当前是哪个架构、不会误以为重复安装。
+ARG TARGETPLATFORM
+
+ARG GOLANG_IMAGE
+ARG VIVA_VERSION=latest
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+ARG BASE_DIGEST=unknown
+ARG IMAGE_SOURCE
+
+# 1. 安装运行 viva 桌面程序所需的系统依赖
+# 清单来源：
+#   a. viva doctor 在 Linux 上推荐的运行库：libxcb1、libvulkan1 + mesa-vulkan-drivers；
+#   b. XCB 后端实际 dlopen 的库：xcb、xcb-randr、xcb-sync、xcb-cursor、X11、X11-xcb、
+#      xkbcommon / xkbcommon-x11；
+#   c. 文本渲染：fontconfig、Pango / Cairo、GdkPixbuf、GLib / GObject / GIO；
+#   d. 可选 vivagtk 壳层与内嵌 WebView：GTK3 + WebKit2GTK 4.1；
+#   e. 无头运行环境（Xvfb + mesa + 字体），CI 里没有显示器也能跑 GUI 冒烟。
+# 这些 -dev 包既是编译依赖也是运行依赖（-dev 会把运行库一起装上），
+# 不能像基座镜像那样在最后 purge 掉。
+# 装完用 pkg-config / ldconfig 验证一遍：缺了这里就失败。
+# 用 set -e 串联，每条断言都生效（不要退回 `;` 串，那样只有最后一条算数）。
+RUN set -eux; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    apt_packages=" \
+    pkg-config \
+    libx11-dev \
+    libx11-xcb-dev \
+    libxcb1-dev \
+    libxcb-randr0-dev \
+    libxcb-sync-dev \
+    libxcb-cursor-dev \
+    libxkbcommon-dev \
+    libxkbcommon-x11-dev \
+    libvulkan-dev \
+    libfontconfig1-dev \
+    libglib2.0-dev \
+    libpango1.0-dev \
+    libcairo2-dev \
+    libgdk-pixbuf-2.0-dev \
+    libgtk-3-dev \
+    libwebkit2gtk-4.1-dev \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
+    libegl-mesa0 \
+    mesa-vulkan-drivers \
+    xvfb \
+    xauth \
+    dbus-x11 \
+    shared-mime-info \
+    adwaita-icon-theme \
+    fonts-dejavu-core"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ${apt_packages}; \
+    rm -rf /var/lib/apt/lists/*; \
+    pkg-config --exists xcb; \
+    pkg-config --exists xcb-randr; \
+    pkg-config --exists xcb-sync; \
+    pkg-config --exists xcb-cursor; \
+    pkg-config --exists x11; \
+    pkg-config --exists x11-xcb; \
+    pkg-config --exists xkbcommon; \
+    pkg-config --exists xkbcommon-x11; \
+    pkg-config --exists vulkan; \
+    pkg-config --exists fontconfig; \
+    pkg-config --exists glib-2.0; \
+    pkg-config --exists gobject-2.0; \
+    pkg-config --exists gio-2.0; \
+    pkg-config --exists pango; \
+    pkg-config --exists pangocairo; \
+    pkg-config --exists cairo; \
+    pkg-config --exists gdk-pixbuf-2.0; \
+    pkg-config --exists gtk+-3.0; \
+    pkg-config --exists webkit2gtk-4.1; \
+    ldconfig -p | grep -q 'libxcb\.so\.1'; \
+    ldconfig -p | grep -q 'libxcb-randr\.so\.0'; \
+    ldconfig -p | grep -q 'libxcb-sync\.so\.1'; \
+    ldconfig -p | grep -q 'libxcb-cursor\.so\.0'; \
+    ldconfig -p | grep -q 'libX11\.so\.6'; \
+    ldconfig -p | grep -q 'libX11-xcb\.so\.1'; \
+    ldconfig -p | grep -q 'libxkbcommon\.so\.0'; \
+    ldconfig -p | grep -q 'libxkbcommon-x11\.so\.0'; \
+    ldconfig -p | grep -q 'libvulkan\.so\.1'; \
+    ldconfig -p | grep -q 'libfontconfig\.so\.1'; \
+    ldconfig -p | grep -q 'libglib-2\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libgobject-2\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libgio-2\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libpango-1\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libpangocairo-1\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libcairo\.so\.2'; \
+    ldconfig -p | grep -q 'libgdk_pixbuf-2\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libgtk-3\.so\.0'; \
+    ldconfig -p | grep -q 'libgdk-3\.so\.0'; \
+    ldconfig -p | grep -q 'libwebkit2gtk-4\.1\.so\.0'; \
+    ldconfig -p | grep -q 'libjavascriptcoregtk-4\.1\.so\.0'; \
+    test -n "$(find /usr/share/vulkan/icd.d -name '*.json' -print -quit)"; \
+    command -v Xvfb; \
+    echo "[${TARGETPLATFORM:-unknown}] --- apt 包版本 ---"; \
+    dpkg-query -W ${apt_packages}
+
+# 2. 安装 viva CLI
+# 模块缓存与编译缓存挂在构建节点上，不进入镜像层。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    echo "[${TARGETPLATFORM:-unknown}] viva 目标版本: ${VIVA_VERSION}"; \
+    go install -v "github.com/vivaui/viva/cmd/viva@${VIVA_VERSION}"; \
+    test -x "${GOPATH}/bin/viva"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- viva 安装的 ---"; \
+    viva --version 2>&1 || true
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# apt 与 go install 这两层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + viva：在 golang 镜像基础上增加 XCB/Vulkan/Pango/Cairo 与 GTK3/WebKit2GTK 4.1 运行与开发包、无头运行库与 viva CLI" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+CMD ["bash"]

@@ -7,7 +7,7 @@
 #
 # 本脚本不构建基础镜像：它要求 <registry>/<repo>:<go 版本> 已由 build-golang
 # 流水线推好，直接 FROM 那个 manifest list，只追加 OpenGL/X11/Wayland 开发包与
-# fyne CLI。定时任务给 build-golang 留了十二小时（00:05 → 12:05）。
+# fyne CLI。定时任务排在 wails3（04:05）之后 2 小时，即 06:05（距基础镜像 00:05 已过六小时）。
 #
 # CNB 侧独立实现，与 .github/scripts/build-fyne.sh 各自维护、不互相引用。
 # 标签规则、冒烟断言与 GitHub 侧保持一致。
@@ -299,7 +299,7 @@ docker buildx version || die "docker buildx 不可用"
 docker buildx inspect >/dev/null || die "buildx builder 不可用"
 
 # ---------- 7. 等基础镜像就绪 ----------
-# 定时任务里 build-golang 先跑（00:05），fyne 后跑（12:05）；
+# 定时任务里 build-golang 先跑（00:05），fyne 后跑（06:05）；
 # 手动触发时要求基础镜像已经存在。
 attempt=0
 while [ "${attempt}" -lt "${BASE_WAIT_ATTEMPTS}" ]; do

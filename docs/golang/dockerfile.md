@@ -11,6 +11,8 @@
 | fyne   | `.cnb/docker/Dockerfile.fyne`   | `.github/docker/Dockerfile.fyne`   | `.gitlab/docker/Dockerfile.fyne`   |
 | mygo   | `.cnb/docker/Dockerfile.mygo`   | `.github/docker/Dockerfile.mygo`   | `.gitlab/docker/Dockerfile.mygo`   |
 | gio    | `.cnb/docker/Dockerfile.gio`    | `.github/docker/Dockerfile.gio`    | `.gitlab/docker/Dockerfile.gio`    |
+| nsgo   | `.cnb/docker/Dockerfile.nsgo`   | `.github/docker/Dockerfile.nsgo`   | `.gitlab/docker/Dockerfile.nsgo`   |
+| viva   | `.cnb/docker/Dockerfile.viva`   | `.github/docker/Dockerfile.viva`   | `.gitlab/docker/Dockerfile.viva`   |
 
 ## 1. golang 镜像
 
@@ -343,18 +345,124 @@ FROM ${GOLANG_IMAGE}
 - `--mount=type=cache` 挂 Go 模块与编译缓存：冷缓存下 `go install` 是耗时大头。
 - OCI 元数据标签放在最后：`BUILD_DATE` / `VCS_REF` / `IMAGE_VERSION` 每次构建都变，放前面会让 apt 与 `go install` 两层的缓存键跟着每次提交一起失效。
 
-## 8. 改哪个文件
+## 8. nsgo 镜像
 
-| 要改的东西         | 改哪里                                                                                                                                                                |
-|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Go 基座版本        | 三份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新）                                                                                                   |
-| 某个工具版本       | 三份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）                                                                                                     |
-| fnpack 版本        | 三份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`（默认值，可被手动触发的 `fnpack_version` 覆盖）                                                                          |
-| wails3 版本        | 三份 `Dockerfile.wails3` 的 `WAILS3_VERSION`（默认 `latest`，可被 `wails3_version` 覆盖）                                                                             |
-| wails2 版本        | 三份 `Dockerfile.wails2` 的 `WAILS2_VERSION`（默认 `latest`，可被 `wails2_version` 覆盖）                                                                             |
-| fyne 版本          | 三份 `Dockerfile.fyne` 的 `FYNE_VERSION`（默认 `latest`，可被 `fyne_version` 覆盖）                                                                                   |
-| mygo 版本          | 三份 `Dockerfile.mygo` 的 `MYGO_VERSION`（默认 `latest`，可被 `mygo_version` 覆盖）                                                                                   |
-| bun 版本           | 三份 `Dockerfile.mygo` 的 `BUN_VERSION`（默认 `latest`，可被 `bun_version` 覆盖）                                                                                     |
-| gogio 版本         | 三份 `Dockerfile.gio` 的 `GIO_VERSION`（默认 `latest`，可被 `gio_version` 覆盖）                                                                                      |
-| 下载源             | 构建脚本的 `MIRROR` / 构建参数                                                                                                                                        |
-| 标签规则、冒烟断言 | 三份 `build-golang.sh` + 三份 `build-fnpack.sh` + 三份 `build-wails3.sh` + 三份 `build-wails2.sh` + 三份 `build-fyne.sh` + 三份 `build-mygo.sh` + 三份 `build-gio.sh` |
+```dockerfile
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+```
+
+- 与 fyne / mygo 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，多两层（apt 装 GTK4/WebKitGTK 6.0/GStreamer 开发包与无头运行库 → `go install` nsgo）。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已配成 Go module 多源回退（腾讯 → goproxy.cn → goproxy.io → direct），所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- 安装的包分三组：
+  - 编译 / 运行库：`pkg-config`、`libgtk-4-dev`、`libwebkitgtk-6.0-dev`、`libglib2.0-dev`、`libpango1.0-dev`、`libcairo2-dev`、`libfontconfig1-dev`、`libgdk-pixbuf-2.0-dev`
+  - GStreamer 媒体栈：`libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev`、`gstreamer1.0-tools`、`gstreamer1.0-plugins-base` / `good` / `bad` / `ugly`、`gstreamer1.0-libav`
+  - 无头运行环境：`xvfb`、`xauth`、`dbus-x11`、`libgl1-mesa-dri`、`libglx-mesa0`、`libegl-mesa0`、`shared-mime-info`、`adwaita-icon-theme`、`fonts-dejavu-core`
+
+  装完立刻断言 `.pc`、运行库与解码器都在：
+
+  ```sh
+  pkg-config --exists gtk4
+  pkg-config --exists webkitgtk-6.0
+  pkg-config --exists glib-2.0
+  pkg-config --exists gobject-2.0
+  pkg-config --exists gio-2.0
+  pkg-config --exists pango
+  pkg-config --exists pangocairo
+  pkg-config --exists cairo
+  pkg-config --exists cairo-gobject
+  pkg-config --exists fontconfig
+  pkg-config --exists gdk-pixbuf-2.0
+  pkg-config --exists gstreamer-1.0
+  pkg-config --exists gstreamer-app-1.0
+  pkg-config --exists gstreamer-video-1.0
+  ldconfig -p | grep -q 'libgtk-4\.so\.1'
+  ldconfig -p | grep -q 'libwebkitgtk-6\.0\.so\.4'
+  ldconfig -p | grep -q 'libgstreamer-1\.0\.so\.0'
+  ldconfig -p | grep -q 'libgstapp-1\.0\.so\.0'
+  ldconfig -p | grep -q 'libgstvideo-1\.0\.so\.0'
+  gst-inspect-1.0 avdec_h264 >/dev/null
+  gst-inspect-1.0 avdec_aac >/dev/null
+  ```
+
+  与 wails3 的区别在于：nsgo 还要 GStreamer 媒体栈（WebKitGTK 6.0 的视频播放后端），并且冒烟会实际确认 H.264 / AAC 解码插件可用——光有 `libgstreamer` 不够，`gstreamer1.0-libav` 必须在。nsgo 的 Linux 后端同样不带 cgo，运行期用 purego `dlopen` GTK4 / WebKitGTK，所以 `-dev` 包同时承担编译与运行两种作用。
+- nsgo **CLI** 版本由 `ARG NSGO_VERSION` 控制（模块 `github.com/nsgo-dev/nsgo`），默认 `latest`；上游没有 tag，CI 会先解析成 `v0.0.0-<时间>-<哈希>` 这种伪版本再传进来。安装命令：
+
+  ```dockerfile
+  go install -v "github.com/nsgo-dev/nsgo/cmd/nsgo@${NSGO_VERSION}"
+  ```
+
+- `nsgo` 落在 `${GOPATH}/bin`（`/go/bin`，已在 `PATH` 中），`test -x` 做安装验证；它没有 `version` 子命令，版本用 `go version -m` 读，可执行性用 `nsgo --help` 验证。
+- `--mount=type=cache` 挂 Go 模块与编译缓存：冷缓存下 `go install` 是耗时大头。
+- OCI 元数据标签放在最后：`BUILD_DATE` / `VCS_REF` / `IMAGE_VERSION` 每次构建都变，放前面会让 apt 与 `go install` 两层的缓存键跟着每次提交一起失效。
+
+## 9. viva 镜像
+
+```dockerfile
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+```
+
+- 与 fyne / mygo 同构：`GOLANG_IMAGE` 由 CI 指向上一步刚推好的 `<registry>/<repo>:<go 版本>`，多两层（apt 装 XCB/Vulkan、GTK3/WebKit2GTK 4.1 开发包与无头运行库 → `go install` viva）。
+- apt 与 `GOPROXY` 都继承基座镜像：CNB 侧的 `Dockerfile.golang` 已配成 Go module 多源回退（腾讯 → goproxy.cn → goproxy.io → direct），所以三个平台的这个文件里都没有 `GITHUB_MIRROR` / `NODE_MIRROR` 开关。
+- 安装的包分三组：
+  - XCB / X11：`pkg-config`、`libx11-dev`、`libx11-xcb-dev`、`libxcb1-dev`、`libxcb-randr0-dev`、`libxcb-sync-dev`、`libxcb-cursor-dev`、`libxkbcommon-dev`、`libxkbcommon-x11-dev`
+  - Vulkan 与文本渲染：`libvulkan-dev`、`libfontconfig1-dev`、`libglib2.0-dev`、`libpango1.0-dev`、`libcairo2-dev`、`libgdk-pixbuf-2.0-dev`
+  - GTK3 / WebKit2GTK 4.1 与无头运行环境：`libgtk-3-dev`、`libwebkit2gtk-4.1-dev`、`libgl1-mesa-dri`、`libglx-mesa0`、`libegl-mesa0`、`mesa-vulkan-drivers`、`xvfb`、`xauth`、`dbus-x11`、`shared-mime-info`、`adwaita-icon-theme`、`fonts-dejavu-core`
+
+  装完立刻断言 `.pc` 与运行库都在：
+
+  ```sh
+  pkg-config --exists xcb
+  pkg-config --exists xcb-randr
+  pkg-config --exists xcb-sync
+  pkg-config --exists xcb-cursor
+  pkg-config --exists x11
+  pkg-config --exists x11-xcb
+  pkg-config --exists xkbcommon
+  pkg-config --exists xkbcommon-x11
+  pkg-config --exists vulkan
+  pkg-config --exists fontconfig
+  pkg-config --exists glib-2.0
+  pkg-config --exists gobject-2.0
+  pkg-config --exists gio-2.0
+  pkg-config --exists pango
+  pkg-config --exists pangocairo
+  pkg-config --exists cairo
+  pkg-config --exists gdk-pixbuf-2.0
+  pkg-config --exists gtk+-3.0
+  pkg-config --exists webkit2gtk-4.1
+  ldconfig -p | grep -q 'libxcb\.so\.1'
+  ldconfig -p | grep -q 'libvulkan\.so\.1'
+  ldconfig -p | grep -q 'libgtk-3\.so\.0'
+  ldconfig -p | grep -q 'libwebkit2gtk-4\.1\.so\.0'
+  ```
+
+  viva 默认 Linux 后端是 XCB + Vulkan；`vivagtk` 构建标签才走 GTK3 / WebKit2GTK 4.1。两组依赖都装，用户切换后端时不用再补包。`mesa-vulkan-drivers` 提供 lavapipe 软件驱动，冒烟会确认 `/usr/share/vulkan/icd.d` 下有 ICD JSON。
+- viva **CLI** 版本由 `ARG VIVA_VERSION` 控制（模块 `github.com/vivaui/viva`），默认 `latest`；CI 会先解析成 `v0.6.4` 这种具体 tag 再传进来。安装命令：
+
+  ```dockerfile
+  go install -v "github.com/vivaui/viva/cmd/viva@${VIVA_VERSION}"
+  ```
+
+- `viva` 落在 `${GOPATH}/bin`（`/go/bin`，已在 `PATH` 中），`test -x` + `viva --version` 做安装验证。
+- `--mount=type=cache` 挂 Go 模块与编译缓存：冷缓存下 `go install` 是耗时大头。
+- OCI 元数据标签放在最后：`BUILD_DATE` / `VCS_REF` / `IMAGE_VERSION` 每次构建都变，放前面会让 apt 与 `go install` 两层的缓存键跟着每次提交一起失效。
+
+## 10. 改哪个文件
+
+| 要改的东西         | 改哪里                                                                                                                                                                                                              |
+|--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Go 基座版本        | 三份 `Dockerfile.golang` 的 `GO_VERSION`（默认 `1` = 自动跟随最新）                                                                                                                                                 |
+| 某个工具版本       | 三份 `Dockerfile.golang` 的对应 `ARG`（默认 `latest` = 自动追新）                                                                                                                                                   |
+| fnpack 版本        | 三份 `Dockerfile.fnpack` 的 `FNPACK_VERSION`（默认值，可被手动触发的 `fnpack_version` 覆盖）                                                                                                                        |
+| wails3 版本        | 三份 `Dockerfile.wails3` 的 `WAILS3_VERSION`（默认 `latest`，可被 `wails3_version` 覆盖）                                                                                                                           |
+| wails2 版本        | 三份 `Dockerfile.wails2` 的 `WAILS2_VERSION`（默认 `latest`，可被 `wails2_version` 覆盖）                                                                                                                           |
+| fyne 版本          | 三份 `Dockerfile.fyne` 的 `FYNE_VERSION`（默认 `latest`，可被 `fyne_version` 覆盖）                                                                                                                                 |
+| mygo 版本          | 三份 `Dockerfile.mygo` 的 `MYGO_VERSION`（默认 `latest`，可被 `mygo_version` 覆盖）                                                                                                                                 |
+| bun 版本           | 三份 `Dockerfile.mygo` 的 `BUN_VERSION`（默认 `latest`，可被 `bun_version` 覆盖）                                                                                                                                   |
+| gogio 版本         | 三份 `Dockerfile.gio` 的 `GIO_VERSION`（默认 `latest`，可被 `gio_version` 覆盖）                                                                                                                                    |
+| nsgo 版本          | 三份 `Dockerfile.nsgo` 的 `NSGO_VERSION`（默认 `latest`，上游无 tag，解析为伪版本，可被 `nsgo_version` 覆盖）                                                                                                       |
+| viva 版本          | 三份 `Dockerfile.viva` 的 `VIVA_VERSION`（默认 `latest`，可被 `viva_version` 覆盖）                                                                                                                                 |
+| 下载源             | 构建脚本的 `MIRROR` / 构建参数                                                                                                                                                                                      |
+| 标签规则、冒烟断言 | 三份 `build-golang.sh` + 三份 `build-fnpack.sh` + 三份 `build-wails3.sh` + 三份 `build-wails2.sh` + 三份 `build-fyne.sh` + 三份 `build-mygo.sh` + 三份 `build-gio.sh` + 三份 `build-nsgo.sh` + 三份 `build-viva.sh` |

@@ -11,7 +11,7 @@
 # 这样各变体镜像的 Go 工具链完全一致。
 #
 # 触发方式（见 build-wails2.yml）：
-#   schedule          → 每天 01:35 UTC 跑
+#   schedule          → 暂时停用（仅手动触发）
 #   web → 手动 Run pipeline，需要基础镜像标签已存在（脚本会等待并给出提示）
 #                       可传 version / wails2_version 覆盖默认版本
 #

@@ -2,11 +2,11 @@
 
 ## 日常构建
 
-- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack 镜像，06:05 构建 wails3，12:05 构建 fyne，15:05 构建 mygo，18:05 构建 gio（09:05 的 wails2 定时已停用，见下）。
-- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack 镜像，22:05 UTC（北京 06:05）构建 wails3，04:05 UTC（北京 12:05）构建 fyne，07:05 UTC（北京 15:05）构建 mygo，10:05 UTC（北京 18:05）构建 gio（01:05 UTC 的 wails2 定时已停用）。
-- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:05 UTC golang、19:05 UTC fnpack、22:05 UTC wails3、04:05 UTC fyne、07:05 UTC mygo、10:05 UTC gio，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)（wails2 那条已停用）。
+- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack（与基座间隔 3 小时），之后依次是 04:05 wails3、06:05 fyne、07:05 mygo、08:05 gio、09:05 nsgo、10:05 viva。
+- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack，之后依次是 20:05 UTC（北京 04:05）wails3、22:05 UTC（北京 06:05）fyne、23:05 UTC（北京 07:05）mygo、00:05 UTC（北京 08:05）gio、01:05 UTC（北京 09:05）nsgo、02:05 UTC（北京 10:05）viva。
+- GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:05 UTC golang、19:05 UTC fnpack、20:05 UTC wails3、22:05 UTC fyne、23:05 UTC mygo、00:05 UTC gio、01:05 UTC nsgo、02:05 UTC viva，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)。各变体脚本最多等基座 5 分钟。
 
-> **wails2 不再每天跟踪上游**：wails2 是旧版（Wails v2），仓库已有新版 wails3 镜像；旧版上游发版少、现有 v2 项目一般钉住版本，新旧两版并存时没必要每天跟踪旧版上游重建，因此三侧的 wails2 定时构建都停用，改为**按需手动触发**。CNB / GitHub 的 cron 已在 `.cnb.yml` 与 `.github/workflows/build-wails2.yml` 里注释停用；GitLab 的 cron 在 UI / API 里，需把 `TARGET=wails2` 那条 Pipeline schedule 设为 inactive（或删除）。已推送的 `.../wails2` 镜像、三份 `Dockerfile.wails2` 与三份 `build-wails2.sh` 全部保留，需要新版本时手动触发即可（CNB 自定义按钮 / GitHub `workflow_dispatch` / GitLab Run pipeline 填 `TARGET=wails2`）。 两个注意点：① 若 GitLab 只建了一条不带 `TARGET` 的全量 schedule，`.gitlab/workflows/build-wails2.yml` 的 rules 是 `$TARGET == "" || $TARGET == "wails2"`，wails2 仍会被构建，这种部署方式要排除它得收紧 rules；② wails3 用的是 GTK4/WebKitGTK 6.0 + `wails3` CLI，wails2 用的是 GTK3/WebKit2GTK 4.1 + `wails` CLI（构建还要 `-tags webkit2_41`），两者不通用，编译 Wails v2 项目仍需要 wails2 镜像，所以只停定时、不删镜像定义。
+> **wails2 不再每天跟踪上游**：wails2 是旧版（Wails v2），仓库已有新版 wails3 镜像；旧版上游发版少、现有 v2 项目一般钉住版本，新旧两版并存时没必要每天跟踪旧版上游重建，因此三侧的 wails2 定时构建都暂时停用，改为**按需手动触发**。CNB / GitHub 的 cron 已在 `.cnb.yml` 与 `.github/workflows/build-wails2.yml` 里注释停用；GitLab 的 cron 在 UI / API 里，需把 `TARGET=wails2` 那条 Pipeline schedule 设为 inactive（或删除）。已推送的 `.../wails2` 镜像、三份 `Dockerfile.wails2` 与三份 `build-wails2.sh` 全部保留，需要新版本时手动触发即可（CNB 自定义按钮 / GitHub `workflow_dispatch` / GitLab Run pipeline 填 `TARGET=wails2`）。 两个注意点：① 若 GitLab 只建了一条不带 `TARGET` 的全量 schedule，`.gitlab/workflows/build-wails2.yml` 的 rules 是 `$TARGET == "" || $TARGET == "wails2"`，wails2 仍会被构建，这种部署方式要排除它得收紧 rules；② wails3 用的是 GTK4/WebKitGTK 6.0 + `wails3` CLI，wails2 用的是 GTK3/WebKit2GTK 4.1 + `wails` CLI（构建还要 `-tags webkit2_41`），两者不通用，编译 Wails v2 项目仍需要 wails2 镜像，所以只停定时、不删镜像定义。
 
 `GO_VERSION` 默认是 `1`（`golang:1-trixie` 浮动标签），上游发布新 Go 后下一次构建会自动跟随；想钉版本时手动填 `version`，或直接改三份 Dockerfile 的 `GO_VERSION`。定时构建还会重新解析上游各工具的最新版本：版本变了才重建对应那一层，没变就全命中缓存（只拉基座、跑冒烟）。上游重新推送同一 tag 的基座（安全修复）时，digest 一变，apt 之后的层会全部重建，同样能吃到更新。
 
@@ -77,7 +77,7 @@ https://static2.fnnas.com/fnpack/fnpack-<版本>-linux-<arch>
 
 ## 升级 wails3
 
-**通常什么都不用做**：三份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 06:05 / GitHub 22:05 UTC / GitLab 22:05 UTC）自动进镜像，版本号会写进元数据 `wails3_version` 与徽章。
+**通常什么都不用做**：三份 `Dockerfile.wails3` 的 `WAILS3_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m github.com/wailsapp/wails/v3@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 04:05 / GitHub 20:05 UTC / GitLab 20:05 UTC）自动进镜像，版本号会写进元数据 `wails3_version` 与徽章。
 
 需要人工介入的两种情况：
 
@@ -88,13 +88,13 @@ wails3 版本**不占标签**：`golang/wails3:<go 版本>` 永远是「该 Go �
 
 ## 升级 wails2
 
-**通常什么都不用做**：三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 默认是 `latest`，每次手动构建都会先用 `go list -m github.com/wailsapp/wails/v2@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版不会自动进镜像（定时已停用，见「日常构建」）；需要时手动触发一次，解析出的版本号会写进元数据 `wails2_version` 与徽章。
+**通常什么都不用做**：三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 默认是 `latest`，每次手动构建都会先用 `go list -m github.com/wailsapp/wails/v2@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版不会自动进镜像（定时暂时停用，见「日常构建」）；需要时手动触发一次，解析出的版本号会写进元数据 `wails2_version` 与徽章。
 
 需要人工介入的两种情况与 wails3 相同：手动触发 `build-wails2` 并填 `wails2_version`（`v2.17.1` / `2.17.1` 都接受），或把三份 `Dockerfile.wails2` 的 `WAILS2_VERSION` 改成具体 tag。wails2 版本同样不占标签，复现某次产物请用元数据里的 `wails2_digest`。
 
 ## 升级 fyne
 
-**通常什么都不用做**：三份 `Dockerfile.fyne` 的 `FYNE_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m fyne.io/tools@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 12:05 / GitHub 04:05 UTC / GitLab 04:05 UTC）自动进镜像，版本号会写进元数据 `fyne_version` 与徽章。
+**通常什么都不用做**：三份 `Dockerfile.fyne` 的 `FYNE_VERSION` 默认是 `latest`，每次定时构建都会先用 `go list -m fyne.io/tools@latest` 解析上游最新稳定 tag，再 `go install` 那个具体版本。上游发了新版，第二天（CNB 06:05 / GitHub 22:05 UTC / GitLab 22:05 UTC）自动进镜像，版本号会写进元数据 `fyne_version` 与徽章。
 
 > fyne CLI 的模块是 `fyne.io/tools`。上游把 `v1.26.0` / `v1.26.1` 标了 retract（误发），解析结果里出现它们时不要当成新版本。
 
@@ -132,6 +132,37 @@ gio 镜像里只有一条版本线，升级方式与 mygo 相同：手动触发 
 - 上游 `gioui.org` 增删后端（例如新增/移除某个 `.pc` 依赖）时，apt 列表与 `.pc` 断言都要一起改，并同步 [../gio/README.md](../gio/README.md) 里「镜像里有什么」的说明。
 - 注意变体名与 CLI 名不一致：变体叫 gio，CLI 叫 `gogio`。`gogio` 没有 `version` 子命令，验证版本只能用 `go version -m "$(command -v gogio)"` 读 `gioui.org/cmd` 模块版本；它也没有 linux 打包目标。
 
+## 升级 nsgo
+
+nsgo 镜像只有一条版本线：手动触发 `build-nsgo` 并填 `nsgo_version`，或把三份 `Dockerfile.nsgo` 的 `NSGO_VERSION` 改成具体版本。它不占标签，复现某次产物请用元数据里的 `nsgo_digest`。
+
+- 看上游发了什么版本：
+
+  ```bash
+  go list -m -f '{{.Version}}' github.com/nsgo-dev/nsgo@latest
+  ```
+
+  上游**没有 tag**，`@latest` 解析出来是伪版本（`v0.0.0-<时间>-<哈希>`）。这属正常：层缓存键跟着伪版本走，上游一有新提交伪版本就变，下一次定时构建（CNB 09:05 / GitHub 01:05 UTC / GitLab 01:05 UTC）会重建对应层并更新 `nsgo_version`。
+- 升级 GTK4 / WebKitGTK 6.0 / GStreamer 运行依赖时改三份 `Dockerfile.nsgo` 的 apt 列表，并同步 `pkg-config --exists` 断言（`gtk4` / `webkitgtk-6.0` / `glib-2.0` / `gobject-2.0` / `gio-2.0` / `pango` / `pangocairo` / `cairo` / `cairo-gobject` / `fontconfig` / `gdk-pixbuf-2.0` / `gstreamer-1.0` / `gstreamer-app-1.0` / `gstreamer-video-1.0`）与 `ldconfig -p` 断言（`libgtk-4.so.1` / `libwebkitgtk-6.0.so.4` / `libgstreamer-1.0.so.0` 等），三份 `build-nsgo.sh` 的冒烟段也要跟着改。
+- 媒体播放能力靠 GStreamer 插件：冒烟会跑 `gst-inspect-1.0 avdec_h264` 与 `avdec_aac`，升级 `gstreamer1.0-libav` 后这两个断言仍要能通过。
+- 上游改了模块路径（`github.com/oneo-me/nsgo` 会重定向）或 CLI 子命令时，三份 Dockerfile 的 `go install` 路径、三份脚本的 `go version -m` 正则与 `nsgo --help` 断言要一起改。
+
+## 升级 viva
+
+viva 镜像只有一条版本线：手动触发 `build-viva` 并填 `viva_version`（`v0.6.4` / `0.6.4` 都接受），或把三份 `Dockerfile.viva` 的 `VIVA_VERSION` 改成具体版本。它不占标签，复现某次产物请用元数据里的 `viva_digest`。
+
+- 看上游发了什么版本：
+
+  ```bash
+  go list -m -f '{{.Version}}' github.com/vivaui/viva@latest
+  ```
+
+  上游有 tag，`@latest` 解析出具体版本；上游发版后第二天（CNB 10:05 / GitHub 02:05 UTC / GitLab 02:05 UTC）自动进镜像。
+- viva 是最后一个变体，定时距基座已过十小时，脚本等基座标签的上限与其它变体一样是 5 分钟。
+- 升级 XCB / Vulkan / GTK3 / WebKit2GTK 4.1 运行依赖时改三份 `Dockerfile.viva` 的 apt 列表，并同步 `pkg-config --exists` 断言（`xcb` / `xcb-randr` / `xcb-sync` / `xcb-cursor` / `x11` / `x11-xcb` / `xkbcommon` / `xkbcommon-x11` / `vulkan` / `fontconfig` / `glib-2.0` / `gobject-2.0` / `gio-2.0` / `pango` / `pangocairo` / `cairo` / `gdk-pixbuf-2.0` / `gtk+-3.0` / `webkit2gtk-4.1`）与 `ldconfig -p` 断言（`libxcb.so.1` / `libvulkan.so.1` / `libgtk-3.so.0` / `libwebkit2gtk-4.1.so.0` 等），三份 `build-viva.sh` 的冒烟段也要跟着改。
+- Vulkan 光有加载器不够：冒烟还会确认 `/usr/share/vulkan/icd.d` 下有 ICD JSON（`mesa-vulkan-drivers` 的 lavapipe），换驱动包时别把这条丢掉。
+- viva 默认 Linux 后端是 XCB + Vulkan；`vivagtk` 构建标签才走 GTK3 / WebKit2GTK 4.1。上游改默认后端时，apt 列表与 `.pc` / `ldconfig` 断言要一起调整。
+
 ## 新增工具
 
 1. 在三份 `Dockerfile.golang` 里加 `ARG` 与安装命令。有官方 Release 二进制的，写成 `install-tool <名> "${VAR}" || go install -v <包路径>@${VAR}`，并在三份 `install-tool.sh` 的表里加一行（工具名 = 解压后的二进制名、仓库、资产命名）。
@@ -147,13 +178,13 @@ gio 镜像里只有一条版本线，升级方式与 mygo 相同：手动触发 
 
 改镜像内容后：
 
-- [ ] `.cnb/docker/`、`.github/docker/`、`.gitlab/docker/` 下的七个 Dockerfile 内容一致（镜像源差异除外）
+- [ ] `.cnb/docker/`、`.github/docker/`、`.gitlab/docker/` 下的九个 Dockerfile 内容一致（镜像源差异除外）
 - [ ] 三份 `build-golang.sh` 的标签规则、冒烟断言一致
 - [ ] 三份 `build-golang.sh` 的 `GO_TOOL_MODULES` 覆盖 Dockerfile 里所有 `go install` 版本变量（脚本会自检）
 - [ ] 三份 `install-tool.sh` 内容一致，且表里的资产命名与各仓库实际 release 对得上（新增工具时用 `curl -I` 验证过 URL）
 - [ ] 三份 `build-fnpack.sh` 的标签规则、基础镜像检查、冒烟断言一致
-- [ ] 三份 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` 的标签规则、基础镜像检查、冒烟断言一致
-- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向七个镜像
+- [ ] 三份 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` / `build-nsgo.sh` / `build-viva.sh` 的标签规则、基础镜像检查、冒烟断言一致
+- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向九个镜像
 - [ ] `make format` 通过
 - [ ] `make lint-shell` 通过
 
@@ -161,6 +192,6 @@ gio 镜像里只有一条版本线，升级方式与 mygo 相同：手动触发 
 
 - `<go 版本>` 每天可能被同名覆盖，不是固定点。
 - golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升。
-- fnpack / wails3 / wails2 / fyne / mygo / gio 的 `latest` / `<major.minor>` 只在基础镜像对应标签也指向本次版本时提升。
+- fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 的 `latest` / `<major.minor>` 只在基础镜像对应标签也指向本次版本时提升。
 - 固定产物请用 annotation 里的 digest。
 - GHCR / CNB / GitLab Container Registry 可能有保留策略，长期归档请自行保存 digest 或复制到别处。

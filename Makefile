@@ -29,9 +29,9 @@ format-yaml:
 	@echo "[Format] 格式化配置文件 (YAML)…"
 	@yamlfmt -conf .yamlfmt \
 		".cnb" \
-		".cnb.yml" \
 		".github" \
 		".gitlab" \
+		".cnb.yml" \
 		".gitlab-ci.yml" \
 		"action.yml" || { echo "❌ yamlfmt 格式化失败"; exit 1; }
 	@echo "[Format] YAML 格式化完成（yamlfmt）。"
@@ -42,11 +42,7 @@ format-markdown:
 	@echo "[Format] 格式化文档 (Markdown)…"
 	@for f in $(shell find . -type f -name '*.md' \
 		-not -path './.git/*' \
-		-not -path './.vscode/*' \
-		-not -path './.idea/*' \
-		-not -path './.codebuddy/*' \
-		-not -path './.trae/*' \
-		-not -path './.mimocode/*'); do \
+		-not -path './.mimosa/*'); do \
 		[ -f "$$f" ] || continue; \
 		markdownfmt -w "$$f" || { echo "❌ markdownfmt 格式化失败: $$f"; exit 1; }; \
 	done
@@ -59,14 +55,14 @@ format-markdown:
 .PHONY: format-shell
 format-shell:
 	@echo "[Format] 格式化脚本 (Shell)…"
-	@shfmt -w -i 2 -ci -bn -s -ln posix .cnb/scripts/ .github/scripts/ .gitlab/scripts/ .cnb/docker/install-tool.sh .github/docker/install-tool.sh .gitlab/docker/install-tool.sh scripts || { echo "❌ shfmt 格式化失败"; exit 1; }
+	@shfmt -w -i 2 -ci -bn -s -ln posix .cnb/scripts/ .github/scripts/ .gitlab/scripts/ .cnb/docker/install-tool.sh .github/docker/install-tool.sh .gitlab/docker/install-tool.sh scripts/ || { echo "❌ shfmt 格式化失败"; exit 1; }
 	@echo "[Format] Shell 格式化完成（shfmt）。"
 
 # 静态检查：shellcheck 按 POSIX sh 方言检查 CI 脚本
 .PHONY: lint-shell
 lint-shell:
 	@echo "[Lint] 检查脚本 (ShellCheck)…"
-	@shellcheck -s sh -S warning .cnb/scripts/*.sh .github/scripts/*.sh .gitlab/scripts/*.sh .cnb/docker/install-tool.sh .github/docker/install-tool.sh .gitlab/docker/install-tool.sh scripts || { echo "❌ shellcheck 未通过"; exit 1; }
+	@shellcheck -s sh -S warning .cnb/scripts/*.sh .github/scripts/*.sh .gitlab/scripts/*.sh .cnb/docker/install-tool.sh .github/docker/install-tool.sh .gitlab/docker/install-tool.sh scripts/ || { echo "❌ shellcheck 未通过"; exit 1; }
 	@echo "[Lint] ShellCheck 通过。"
 
 # 格式化 Dockerfile 文件

@@ -3,8 +3,8 @@
 #
 #   产物：ghcr.io/<owner>/<repo>/wails2  → golang + GTK3/WebKit2GTK 4.1 + wails CLI
 #
-#   基础镜像由 build-golang.yml 产出。本工作流独立定时触发或手动触发，
-#   都要求 <go 版本> 标签已经存在。
+#   基础镜像由 build-golang.yml 产出。定时任务暂时停用，仅手动触发，
+#   同样要求 <go 版本> 标签已经存在。
 #
 #   实现：GitHub 侧独立维护一份（与 CNB 各自维护，不共用）
 #         · Dockerfile  .github/docker/Dockerfile.wails2
@@ -23,10 +23,10 @@
 name: build-wails2
 
 on:
+  # schedule 暂时停用（wails2 是旧版，仅手动触发）。
+  # 恢复定时时取消下面两行注释即可。
   # schedule:
-  # 每天 09:05（Asia/Shanghai）= 01:05 UTC，与 CNB 的 crontab '5 9 * * *' 同刻。
-  # 给基础镜像和其它变体构建留出时间。
-  # - cron: '5 1 * * *'
+  #   - cron: '5 21 * * *'
   workflow_dispatch:
     inputs:
       version:

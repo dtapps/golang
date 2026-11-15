@@ -11,7 +11,7 @@
 # 开发包、无头运行库、mygo CLI 与 bun。这样六个镜像的 Go 工具链完全一致。
 #
 # 触发方式（见 build-mygo.yml）：
-#   schedule → 每天固定时间跑（比 build-fyne 晚 3 小时）
+#   schedule → 每天固定时间跑（比 build-fyne 晚 1 小时）
 #   web      → 手动 Run pipeline，需要基础镜像标签已存在（脚本会等待并给出提示）
 #              可传 version / mygo_version / bun_version 覆盖默认版本
 #

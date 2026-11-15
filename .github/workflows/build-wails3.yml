@@ -4,7 +4,7 @@
 #   产物：ghcr.io/<owner>/<repo>/wails3  → golang + GTK4/WebKitGTK + wails3 CLI
 #
 #   基础镜像由 build-golang.yml 产出。本工作流独立定时触发（比 build-fnpack
-#   再晚 3 小时）或手动触发，都要求 <go 版本> 标签已经存在。
+#   再晚 1 小时）或手动触发，都要求 <go 版本> 标签已经存在。
 #
 #   实现：GitHub 侧独立维护一份（与 CNB 各自维护，不共用）
 #         · Dockerfile  .github/docker/Dockerfile.wails3
@@ -24,9 +24,9 @@ name: build-wails3
 
 on:
   schedule:
-    # 每天 06:05（Asia/Shanghai）= 22:05 UTC，与 CNB 的 crontab '5 6 * * *' 同刻。
-    # 比 build-fnpack 的 19:05 UTC 晚 3 小时，给基础镜像留出构建时间。
-    - cron: '5 22 * * *'
+    # 每天 04:05（Asia/Shanghai）= 20:05 UTC，与 CNB 的 crontab '5 4 * * *' 同刻。
+    # 比 build-fnpack 的 19:05 UTC 晚 1 小时，给基础镜像留出构建时间。
+    - cron: '5 20 * * *'
   workflow_dispatch:
     inputs:
       version:

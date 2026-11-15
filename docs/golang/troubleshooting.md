@@ -2,7 +2,7 @@
 
 ## 先定位是哪一步
 
-七条流水线各自输出：
+九条流水线各自输出：
 
 ```text
 golang：解析基座 → 解析工具版本 → 登录 → buildx 自检 → 构建 golang
@@ -25,6 +25,12 @@ mygo：解析版本（含 mygo 版本与 bun 版本）→ 登录 → buildx 自�
 
 gio：解析版本（含 gogio CLI 版本与 gioui.org 库版本）→ 登录 → buildx 自检 → 等待基础镜像 → 构建 gio
     → 派生单平台标签 → 冒烟 gio → 提升标签 → 元数据
+
+nsgo：解析版本（nsgo 版本）→ 登录 → buildx 自检 → 等待基础镜像 → 构建 nsgo
+     → 派生单平台标签 → 冒烟 nsgo → 提升标签 → 元数据
+
+viva：解析版本（viva 版本）→ 登录 → buildx 自检 → 等待基础镜像 → 构建 viva
+     → 派生单平台标签 → 冒烟 viva → 提升标签 → 元数据
 ```
 
 日志里最后一次出现的「构建 …」「等待 …」或「冒烟测试 …」就是失败点。变体作业失败时先确认对应版本的 golang 作业是否成功。
@@ -45,7 +51,7 @@ gio：解析版本（含 gogio CLI 版本与 gioui.org 库版本）→ 登录 �
 
 - 确认 GitHub 的「释放磁盘空间」步骤没有删错目录；
 - 不要在同一个 runner 上同时跑其他重构建；
-- GitLab 侧给 runner 留足磁盘，或把七个镜像拆到不同 runner / schedule；
+- GitLab 侧给 runner 留足磁盘，或把九个镜像拆到不同 runner / schedule；
 - 本地构建时先 `docker buildx prune -af`。
 
 ### 容器内时间不是北京时间
@@ -99,14 +105,14 @@ gio：解析版本（含 gogio CLI 版本与 gioui.org 库版本）→ 登录 �
 3. CNB 上如果原站可访问、DaoCloud 404，可能是代理尚未同步；临时改成直连验证。
 4. 三侧 Dockerfile 的版本 ARG 必须同步。
 
-### fnpack / wails3 / wails2 / fyne / mygo / gio 找不到基础镜像
+### fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 找不到基础镜像
 
 症状：`基础镜像 <registry>/<repo>:<go 版本> 不存在`。
 
 - 变体镜像必须 `FROM` 同版本的 golang 基础镜像，不会自己安装工具链。
-- CNB：确认 00:05 的 `build-golang` 定时任务成功；03:05 的 fnpack、06:05 的 wails3、12:05 的 fyne、15:05 的 mygo、18:05 的 gio 才有基础可用（wails2 定时已停用，仅手动构建）。
-- GitHub：确认 16:05 UTC 的 `build-golang` 定时任务成功；19:05 UTC 的 fnpack、22:05 UTC 的 wails3、04:05 UTC 的 fyne、07:05 UTC 的 mygo、10:05 UTC 的 gio 才有基础可用。手动触发前先跑一次 build-golang。
-- GitLab：确认 `TARGET=golang` 的 schedule 或手动流水线成功；其余六个 `TARGET` 的 schedule 才有基础可用。手动触发变体前先跑一次 `TARGET=golang`。
+- CNB：确认 00:05 的 `build-golang` 定时任务成功；03:05 的 fnpack、04:05 的 wails3、06:05 的 fyne、07:05 的 mygo、08:05 的 gio、09:05 的 nsgo、10:05 的 viva 才有基础可用。
+- GitHub：确认 16:05 UTC 的 `build-golang` 定时任务成功；19:05 UTC 的 fnpack、20:05 UTC 的 wails3、22:05 UTC 的 fyne、23:05 UTC 的 mygo、00:05 UTC 的 gio、01:05 UTC 的 nsgo、02:05 UTC 的 viva 才有基础可用。手动触发前先跑一次 build-golang。
+- GitLab：确认 `TARGET=golang` 的 schedule 或手动流水线成功；其余八个 `TARGET` 的 schedule 才有基础可用。手动触发变体前先跑一次 `TARGET=golang`。
 - 刚推完基础镜像就手动跑变体时，脚本会最多等 5 分钟，仍然失败说明基础镜像确实没推上去。
 
 ### wails3 冒烟报 `pkg:gtk4` / `pkg:webkitgtk-6.0`
@@ -153,7 +159,7 @@ gio：解析版本（含 gogio CLI 版本与 gioui.org 库版本）→ 登录 �
 
 ### fyne 镜像里 `wails3` 也缺失/多余
 
-`golang/fyne` 是 golang + fyne，不包含 wails2 / wails3。冒烟会断言 `fnpack` 与 `wails3` **不存在**；需要多个变体时请在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个，不要指望某个变体镜像里带另一个。
+`golang/fyne` 是 golang + fyne，不包含 wails2 / wails3 / mygo / gio / nsgo / viva。冒烟会断言 `fnpack` / `wails3` / `wails` / `mygo` / `bun` / `gogio` / `nsgo` / `viva` 都**不存在**；需要多个变体时请在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个，不要指望某个变体镜像里带另一个。
 
 ### mygo 冒烟报 `pkg:gtk+-3.0` / `pkg:webkit2gtk-4.1`
 
@@ -193,7 +199,7 @@ mygo 的 Linux 后端不带 cgo，它在运行期用 purego `dlopen` GTK3 / WebK
 
 ### mygo 镜像里 `fyne` / `wails` 也缺失/多余
 
-`golang/mygo` 是 golang + mygo，不包含 fnpack / wails3 / wails2 / fyne。冒烟会断言 `fnpack` / `wails3` / `wails` / `fyne` 都**不存在**。注意 mygo 与 wails2 用同一套 GTK3 / WebKitGTK 4.1 运行库，但 CLI 与编译方式不同（wails2 要 cgo + `-tags webkit2_41`，mygo 纯 Go），所以两个镜像不能互相替代。
+`golang/mygo` 是 golang + mygo，不包含 fnpack / wails3 / wails2 / fyne / gio / nsgo / viva。冒烟会断言 `fnpack` / `wails3` / `wails` / `fyne` / `gogio` / `nsgo` / `viva` 都**不存在**。注意 mygo 与 wails2 用同一套 GTK3 / WebKitGTK 4.1 运行库，但 CLI 与编译方式不同（wails2 要 cgo + `-tags webkit2_41`，mygo 纯 Go），所以两个镜像不能互相替代。
 
 ### gio 冒烟报 `pkg:egl` / `pkg:x11` / `pkg:vulkan` 等
 
@@ -222,7 +228,79 @@ mygo 的 Linux 后端不带 cgo，它在运行期用 purego `dlopen` GTK3 / WebK
 
 ### gio 镜像里 `mygo` / `bun` 也缺失/多余
 
-`golang/gio` 是 golang + gio，不包含 fnpack / wails3 / wails2 / fyne / mygo。冒烟会断言 `fnpack` / `wails3` / `wails` / `fyne` / `mygo` / `bun` 都**不存在**。注意 gio 与 fyne 都装 OpenGL/X11/Wayland 开发包，但 gio 还要 EGL/GLES、Vulkan、libffi 与 `xfixes`，所以两个镜像不能互相替代。
+`golang/gio` 是 golang + gio，不包含 fnpack / wails3 / wails2 / fyne / mygo / nsgo / viva。冒烟会断言 `fnpack` / `wails3` / `wails` / `fyne` / `mygo` / `bun` / `nsgo` / `viva` 都**不存在**。注意 gio 与 fyne 都装 OpenGL/X11/Wayland 开发包，但 gio 还要 EGL/GLES、Vulkan、libffi 与 `xfixes`，所以两个镜像不能互相替代。
+
+### nsgo 冒烟报 `pkg:gtk4` / `pkg:webkitgtk-6.0` / `pkg:gstreamer-1.0` 等
+
+- 说明镜像里对应的 `.pc` 文件解析失败。先看 Dockerfile 的 apt 那层日志：装包成功时同一层就会断言 `gtk4` / `webkitgtk-6.0` / `glib-2.0` / `gobject-2.0` / `gio-2.0` / `pango` / `pangocairo` / `cairo` / `cairo-gobject` / `fontconfig` / `gdk-pixbuf-2.0` / `gstreamer-1.0` / `gstreamer-app-1.0` / `gstreamer-video-1.0`，失败会直接停在那里。
+- 本地验证：`docker run --rm golang-nsgo:local sh -c 'pkg-config --list-all | grep -E "gtk4|webkit|gstreamer"'`。
+- 上层镜像如果自己 `purge` 掉了 `libgtk-4-dev` / `libwebkitgtk-6.0-dev` / `libgstreamer-plugins-base1.0-dev`，也会命中这个断言。
+
+### nsgo 冒烟报 `libgtk-4.so.1` / `libwebkitgtk-6.0.so.4` 找不到
+
+nsgo 的 Linux 后端不带 cgo，它在运行期用 purego `dlopen` GTK4 / WebKitGTK 6.0 / GStreamer，所以 `.pc` 能解析**不等于**运行期能加载：
+
+- 本地验证：`docker run --rm golang-nsgo:local sh -c 'ldconfig -p | grep -E "gtk-4|webkitgtk-6.0|gstreamer-1.0"'`。
+- 缺库通常是因为只装了 `-dev` 的间接依赖却删掉了运行库包，或上游改了 Debian 包名：核对三份 `Dockerfile.nsgo` 的 apt 列表与三份 `build-nsgo.sh` 的 `ldconfig` 断言（`libgtk-4.so.1` / `libwebkitgtk-6.0.so.4` / `libglib-2.0.so.0` / `libgobject-2.0.so.0` / `libgio-2.0.so.0` / `libpango-1.0.so.0` / `libpangocairo-1.0.so.0` / `libcairo.so.2` / `libfontconfig.so.1` / `libgdk_pixbuf-2.0.so.0` / `libgstreamer-1.0.so.0` / `libgstapp-1.0.so.0` / `libgstvideo-1.0.so.0`）。
+
+### nsgo 冒烟报 `gst:avdec_h264` / `gst:avdec_aac`
+
+冒烟用 `gst-inspect-1.0` 确认 H.264 / AAC 解码插件可用。缺插件时检查 `gstreamer1.0-libav` 是否装上、是否被上层镜像删掉；`gstreamer1.0-plugins-base/good/bad/ugly` 不包含这两个解码器。
+
+### nsgo 版本是伪版本
+
+`NSGO_VERSION` 解析用 `go list -m github.com/nsgo-dev/nsgo@latest`，上游**没有 tag**，所以结果是伪版本（`v0.0.0-<时间>-<哈希>`），元数据 `nsgo_version` 也是伪版本。这属正常，不是故障；上游一有新提交伪版本就变，下一次定时构建会重建对应层。冒烟对伪版本做精确比对，落到了别的提交时报 `nsgo-version(...)`。
+
+### nsgo 版本回退成 `latest`
+
+症状：日志里出现「无法解析 nsgo_version 最新版本…回退 latest」，元数据 `nsgo_version` 是 `latest`。
+
+- 解析走基座 Dockerfile 的 `GOPROXY`。CNB 侧按腾讯 → goproxy.cn → goproxy.io → direct 依次回退；GitHub / GitLab 侧走 `proxy.golang.org`。只有全部源都失败才需等下一次定时任务，或手动触发并显式填 `nsgo_version`。
+- 回退不会阻断构建，但层缓存会失效（缓存键永远等于 `latest`），且冒烟不比对版本。
+
+### nsgo 镜像里 `viva` 也缺失/多余
+
+`golang/nsgo` 是 golang + nsgo，不包含 fnpack / wails3 / wails2 / fyne / mygo / gio / viva。冒烟会断言 `fnpack` / `wails3` / `wails` / `fyne` / `mygo` / `bun` / `gogio` / `viva` 都**不存在**。注意 nsgo 与 wails3 都用 GTK4 / WebKitGTK 6.0，但 nsgo 还要求 GStreamer 媒体栈，CLI 与编译方式也不同，两个镜像不能互相替代。
+
+### viva 冒烟报 `pkg:xcb` / `pkg:x11` / `pkg:gtk+-3.0` / `pkg:vulkan` 等
+
+- 说明镜像里对应的 `.pc` 文件解析失败。先看 Dockerfile 的 apt 那层日志：装包成功时同一层就会断言 `xcb` / `xcb-randr` / `xcb-sync` / `xcb-cursor` / `x11` / `x11-xcb` / `xkbcommon` / `xkbcommon-x11` / `vulkan` / `fontconfig` / `glib-2.0` / `gobject-2.0` / `gio-2.0` / `pango` / `pangocairo` / `cairo` / `gdk-pixbuf-2.0` / `gtk+-3.0` / `webkit2gtk-4.1`，失败会直接停在那里。
+- 本地验证：`docker run --rm golang-viva:local sh -c 'pkg-config --list-all | grep -E "xcb|xkbcommon|vulkan|gtk|webkit"'`。
+- 上层镜像如果自己 `purge` 掉了 `libxcb1-dev` / `libxkbcommon-x11-dev` / `libvulkan-dev` / `libgtk-3-dev` / `libwebkit2gtk-4.1-dev`，也会命中这个断言。
+
+### viva 冒烟报 `libxcb.so.1` / `libvulkan.so.1` / `libwebkit2gtk-4.1.so.0` 找不到
+
+viva 的 Linux 后端不带 cgo，运行期用 purego `dlopen` XCB / Vulkan / GTK3 / WebKit2GTK 4.1，所以 `.pc` 能解析**不等于**运行期能加载：
+
+- 本地验证：`docker run --rm golang-viva:local sh -c 'ldconfig -p | grep -E "xcb|X11|vulkan|gtk-3|webkit2gtk-4.1"'`。
+- 核对三份 `Dockerfile.viva` 的 apt 列表与三份 `build-viva.sh` 的 `ldconfig` 断言（`libxcb.so.1` / `libxcb-randr.so.0` / `libxcb-sync.so.1` / `libxcb-cursor.so.0` / `libX11.so.6` / `libX11-xcb.so.1` / `libxkbcommon.so.0` / `libxkbcommon-x11.so.0` / `libvulkan.so.1` / `libfontconfig.so.1` / `libglib-2.0.so.0` / `libpango-1.0.so.0` / `libcairo.so.2` / `libgdk_pixbuf-2.0.so.0` / `libgtk-3.so.0` / `libgdk-3.so.0` / `libwebkit2gtk-4.1.so.0` / `libjavascriptcoregtk-4.1.so.0`）。
+
+### viva 冒烟报 `vulkan-icd`
+
+Vulkan 光有加载器不够，冒烟还会确认 `/usr/share/vulkan/icd.d` 下有 ICD JSON。缺它通常是 `mesa-vulkan-drivers` 没装上或被删掉；本地验证：`docker run --rm golang-viva:local sh -c 'ls /usr/share/vulkan/icd.d'`。
+
+### viva 版本回退成 `latest`
+
+症状：日志里出现「无法解析 viva_version 最新版本…回退 latest」，元数据 `viva_version` 是 `latest`。
+
+- 解析用 `go list -m github.com/vivaui/viva@latest`，走基座 Dockerfile 的 `GOPROXY`。CNB 侧按腾讯 → goproxy.cn → goproxy.io → direct 依次回退；GitHub / GitLab 侧走 `proxy.golang.org`。只有全部源都失败才需等下一次定时任务，或手动触发并显式填 `viva_version`。
+- 回退不会阻断构建，但层缓存会失效（缓存键永远等于 `latest`），且冒烟不比对版本。
+
+### viva 冒烟报 `viva-version(...)`
+
+冒烟用 `go version -m <viva 二进制>` 读内嵌模块版本（`github.com/vivaui/viva`），与本次目标版本不一致时报这个。常见原因：
+
+- `go install` 装成了别的版本：检查 `--build-arg VIVA_VERSION` 与日志里的「viva_version …」是否一致；
+- 解析到了预发布 tag：`resolve_version` 只接受 `vX.Y.Z`，预发布 tag 请显式填 `viva_version`；
+- 想放宽断言时改三份 `build-viva.sh` 的冒烟段，别只改一侧。
+
+### viva 等基础镜像超时
+
+viva 排在 nsgo 之后 1 小时（距基座十小时），脚本等待基座标签的上限与其它变体一样是 5 分钟。超时说明当天的 `golang` 作业失败或还没推完：先看 `golang` 作业日志，再手动重跑 viva。
+
+### viva 镜像里 `nsgo` 也缺失/多余
+
+`golang/viva` 是 golang + viva，不包含 fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo。冒烟会断言 `fnpack` / `wails3` / `wails` / `fyne` / `mygo` / `bun` / `gogio` / `nsgo` 都**不存在**。注意 viva 与 wails2 / mygo 都用 GTK3 / WebKitGTK 4.1 运行库，但 viva 默认后端是 XCB + Vulkan，CLI 与编译方式也不同，不能互相替代。
 
 ### fnpack 下载失败
 
@@ -269,7 +347,7 @@ mygo 的 Linux 后端不带 cgo，它在运行期用 purego `dlopen` GTK3 / WebK
 
 症状：`sed: can't read "${DOCKERFILE...}"` 或自检直接报「脚本被外部改写」。
 
-原因：把 `build-golang.sh` / `build-fnpack.sh` / `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` 放进了 CNB 的 `imports`。把它从 `imports` 移除，改用 `source` 执行。
+原因：把 `build-golang.sh` / `build-fnpack.sh` / `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` / `build-nsgo.sh` / `build-viva.sh` 放进了 CNB 的 `imports`。把它从 `imports` 移除，改用 `source` 执行。
 
 ## 本地复现 CI
 
@@ -282,6 +360,8 @@ sh -n .cnb/scripts/build-wails2.sh
 sh -n .cnb/scripts/build-fyne.sh
 sh -n .cnb/scripts/build-mygo.sh
 sh -n .cnb/scripts/build-gio.sh
+sh -n .cnb/scripts/build-nsgo.sh
+sh -n .cnb/scripts/build-viva.sh
 sh -n .github/scripts/build-golang.sh
 sh -n .github/scripts/build-fnpack.sh
 sh -n .github/scripts/build-wails3.sh
@@ -289,6 +369,8 @@ sh -n .github/scripts/build-wails2.sh
 sh -n .github/scripts/build-fyne.sh
 sh -n .github/scripts/build-mygo.sh
 sh -n .github/scripts/build-gio.sh
+sh -n .github/scripts/build-nsgo.sh
+sh -n .github/scripts/build-viva.sh
 sh -n .gitlab/scripts/build-golang.sh
 sh -n .gitlab/scripts/build-fnpack.sh
 sh -n .gitlab/scripts/build-wails3.sh
@@ -296,6 +378,8 @@ sh -n .gitlab/scripts/build-wails2.sh
 sh -n .gitlab/scripts/build-fyne.sh
 sh -n .gitlab/scripts/build-mygo.sh
 sh -n .gitlab/scripts/build-gio.sh
+sh -n .gitlab/scripts/build-nsgo.sh
+sh -n .gitlab/scripts/build-viva.sh
 
 # ShellCheck
 shellcheck -s sh -S warning .cnb/scripts/*.sh .github/scripts/*.sh .gitlab/scripts/*.sh
@@ -323,6 +407,12 @@ docker build -f .cnb/docker/Dockerfile.mygo \
 docker build -f .cnb/docker/Dockerfile.gio \
   --build-arg GOLANG_IMAGE=golang:local \
   -t golang-gio:local .
+docker build -f .cnb/docker/Dockerfile.nsgo \
+  --build-arg GOLANG_IMAGE=golang:local \
+  -t golang-nsgo:local .
+docker build -f .cnb/docker/Dockerfile.viva \
+  --build-arg GOLANG_IMAGE=golang:local \
+  -t golang-viva:local .
 
 # 构建（GitLab / GitHub 侧：直连官方源）
 docker build -f .gitlab/docker/Dockerfile.golang -t golang:local .

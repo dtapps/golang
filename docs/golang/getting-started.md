@@ -34,6 +34,18 @@ FROM ghcr.io/dtapps/golang/mygo:latest
 FROM ghcr.io/dtapps/golang/gio:latest
 ```
 
+需要编译 nsgo 桌面应用时换镜像：
+
+```dockerfile
+FROM ghcr.io/dtapps/golang/nsgo:latest
+```
+
+需要编译 viva 桌面应用时换镜像：
+
+```dockerfile
+FROM ghcr.io/dtapps/golang/viva:latest
+```
+
 ## 常见用法
 
 ### Go 构建 + 压缩
@@ -157,6 +169,28 @@ docker run --rm -v "$PWD":/src -w /src ghcr.io/dtapps/golang/gio:latest sh -c '
 镜像已装 EGL/GLES、X11（`x11` / `x11-xcb` / `xcursor` / `xfixes` / `xrandr` / `xinerama` / `xi` / `xxf86vm`）、Wayland（`wayland-client` / `wayland-cursor` / `wayland-egl`）、`xkbcommon` / `xkbcommon-x11`、`libffi`、Vulkan 开发包与无头运行库（Xvfb + mesa + DRI 驱动 + 字体），所以 cgo 编译与链接阶段直接可用，GUI 冒烟也能在没有显示器的 CI 里跑（`xvfb-run`）。`gioui.org` 的版本由你自己的 `go.mod` 决定，镜像只提供依赖与 `gogio` CLI。
 
 > 变体名叫 gio，CLI 却叫 `gogio`（模块 `gioui.org/cmd`），镜像里**没有** `gio` 二进制。`gogio` 是打包工具，目标平台是 android / ios / tvos / js / windows / macos，**没有 linux 目标**，也**没有 `version` 子命令**；Linux 桌面程序就是普通 `go build` + cgo，用不到 `gogio`。运行带窗口的二进制需要真实显示环境（容器里要自己准备 X11/Wayland），这个镜像只保证**构建**可用。
+
+### 编译 nsgo 桌面应用
+
+```bash
+docker run --rm -v "$PWD":/src -w /src ghcr.io/dtapps/golang/nsgo:latest sh -c '
+  pkg-config --exists gtk4 && pkg-config --exists webkitgtk-6.0
+  go build -o dist/app .
+'
+```
+
+镜像已装 GTK4 / WebKitGTK 6.0、Pango / Cairo、GStreamer（含 H.264 / AAC 解码插件）开发包与无头运行库（Xvfb + mesa + 字体），编译与 GUI 冒烟都能在没有显示器的 CI 里跑。nsgo 的 Linux 后端是纯 Go、运行期 `dlopen` GTK4 / WebKitGTK，不需要 cgo 构建标签；镜像只提供依赖与 `nsgo` CLI。
+
+### 编译 viva 桌面应用
+
+```bash
+docker run --rm -v "$PWD":/src -w /src ghcr.io/dtapps/golang/viva:latest sh -c '
+  pkg-config --exists xcb && pkg-config --exists vulkan
+  go build -o dist/app .
+'
+```
+
+镜像已装 XCB / X11、Vulkan（含 mesa lavapipe ICD）、字体栈与 GTK3 / WebKit2GTK 4.1 开发包，以及无头运行库（Xvfb + mesa + 字体）。viva 默认 Linux 后端是 XCB + Vulkan；需要 GTK3 后端时用 `vivagtk` 构建标签。运行期用 purego `dlopen`，所以纯 Go 项目不需要 cgo 工具链，镜像里仍提供 `gcc` / `pkg-config` 供自带 cgo 绑定的项目使用。
 
 ## 在 GitHub Actions 里用
 

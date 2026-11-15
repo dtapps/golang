@@ -1,0 +1,150 @@
+# ===================================================================
+# Golang 构建环境镜像 + nsgo
+#
+# 在 Dockerfile.golang 产出的镜像之上做两件事：
+#   1. 安装运行 / 调试 nsgo 桌面程序所需的系统依赖（GTK 4、WebKitGTK 6.0、
+#      Pango / Cairo、GStreamer，外加无头运行库）
+#   2. go install nsgo CLI（模块 github.com/nsgo-dev/nsgo，命令在 cmd/nsgo）
+#
+# nsgo 在 Linux 上走 GTK4 后端，用 purego 在运行期 dlopen 系统库，不需要 cgo。
+# 所以这里装的是运行期库，同时保留对应的 -dev 包，方便使用者项目自己写 cgo 绑定。
+# 装完用 pkg-config / ldconfig / gst-inspect 逐个断言；缺一个就构建失败，不会
+# 推迟到使用者手里。这里不做「真编一个 nsgo 程序」的额外校验层，保持九个变体
+# 结构一致。
+#
+# 三个平台各留一份：本文件（GitLab 侧）、.github/docker/Dockerfile.nsgo（GitHub 侧）与
+# .cnb/docker/Dockerfile.nsgo（CNB 侧），各自维护、不互相引用。
+#
+# 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
+#   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
+# 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
+# APT / GOPROXY 继承基座镜像（CNB 侧 GOPROXY 为多源回退），本文件没有额外的镜像源开关。
+#
+# nsgo：https://github.com/nsgo-dev/nsgo
+#   上游旧地址 github.com/oneo-me/nsgo 会重定向到这里；Go 模块路径是
+#   github.com/nsgo-dev/nsgo，写成 oneo-me 会解析不到。
+#   上游目前没有发 tag，@latest 会解析成伪版本（v0.0.0-<时间>-<哈希>）；CI 解析失败
+#   时回退 latest 交给 go install，元数据里记 latest。
+# NSGO_VERSION 是 github.com/nsgo-dev/nsgo 的版本，默认 latest；CI 会先解析成具体
+# 版本再传进来，裸 build 由 go 解析。
+# ===================================================================
+
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+
+# BuildKit 自动提供的目标平台（linux/amd64、linux/arm64 …）。多架构构建时同一个
+# RUN 会按架构各跑一遍，echo 带上它才能分清当前是哪个架构、不会误以为重复安装。
+ARG TARGETPLATFORM
+
+ARG GOLANG_IMAGE
+ARG NSGO_VERSION=latest
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+ARG BASE_DIGEST=unknown
+ARG IMAGE_SOURCE
+
+# 1. 安装运行 nsgo 桌面程序所需的系统依赖
+# 清单来源：
+#   a. 上游 CI（Linux runner）装的 libgtk-4-dev + xvfb；
+#   b. nsgo 的 GTK4 后端在运行期 dlopen 的库：GTK4、GLib / GObject / GIO、Pango /
+#      Cairo、GdkPixbuf、fontconfig；
+#   c. 内嵌 WebView 的 WebKitGTK 6.0（GTK4 版）；
+#   d. 视频播放的 GStreamer 1.0（H.264 / AAC 靠 plugins-bad / plugins-ugly / libav）；
+#   e. 无头运行环境（Xvfb + mesa + 字体），CI 里没有显示器也能跑 GUI 冒烟。
+# GTK4 依赖的 -dev 包会带进运行库；这些 -dev 包既是编译依赖也是运行依赖，
+# 不能像基座镜像那样在最后 purge 掉。
+# 装完用 pkg-config / ldconfig / gst-inspect 验证一遍：缺了这里就失败。
+# 用 set -e 串联，每条断言都生效（不要退回 `;` 串，那样只有最后一条算数）。
+RUN set -eux; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    apt_packages=" \
+    pkg-config \
+    libgtk-4-dev \
+    libwebkitgtk-6.0-dev \
+    libglib2.0-dev \
+    libpango1.0-dev \
+    libcairo2-dev \
+    libfontconfig1-dev \
+    libgdk-pixbuf-2.0-dev \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-tools \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
+    libegl-mesa0 \
+    xvfb \
+    xauth \
+    dbus-x11 \
+    shared-mime-info \
+    adwaita-icon-theme \
+    fonts-dejavu-core"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ${apt_packages}; \
+    rm -rf /var/lib/apt/lists/*; \
+    pkg-config --exists gtk4; \
+    pkg-config --exists webkitgtk-6.0; \
+    pkg-config --exists glib-2.0; \
+    pkg-config --exists gobject-2.0; \
+    pkg-config --exists gio-2.0; \
+    pkg-config --exists pango; \
+    pkg-config --exists pangocairo; \
+    pkg-config --exists cairo; \
+    pkg-config --exists cairo-gobject; \
+    pkg-config --exists fontconfig; \
+    pkg-config --exists gdk-pixbuf-2.0; \
+    pkg-config --exists gstreamer-1.0; \
+    pkg-config --exists gstreamer-app-1.0; \
+    pkg-config --exists gstreamer-video-1.0; \
+    ldconfig -p | grep -q 'libgtk-4\.so\.1'; \
+    ldconfig -p | grep -q 'libwebkitgtk-6\.0\.so\.4'; \
+    ldconfig -p | grep -q 'libglib-2\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libgobject-2\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libgio-2\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libpango-1\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libpangocairo-1\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libcairo\.so\.2'; \
+    ldconfig -p | grep -q 'libfontconfig\.so\.1'; \
+    ldconfig -p | grep -q 'libgdk_pixbuf-2\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libgstreamer-1\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libgstapp-1\.0\.so\.0'; \
+    ldconfig -p | grep -q 'libgstvideo-1\.0\.so\.0'; \
+    command -v Xvfb; \
+    command -v gst-inspect-1.0; \
+    gst-inspect-1.0 avdec_h264 >/dev/null; \
+    gst-inspect-1.0 avdec_aac >/dev/null; \
+    echo "[${TARGETPLATFORM:-unknown}] --- apt 包版本 ---"; \
+    dpkg-query -W ${apt_packages}
+
+# 2. 安装 nsgo CLI
+# 模块缓存与编译缓存挂在构建节点上，不进入镜像层。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    echo "[${TARGETPLATFORM:-unknown}] nsgo 目标版本: ${NSGO_VERSION}"; \
+    go install -v "github.com/nsgo-dev/nsgo/cmd/nsgo@${NSGO_VERSION}"; \
+    test -x "${GOPATH}/bin/nsgo"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- nsgo 安装的 ---"; \
+    nsgo --help 2>&1 || true
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# apt 与 go install 这两层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + nsgo：在 golang 镜像基础上增加 GTK4/WebKitGTK 6.0/Pango/Cairo/GStreamer 运行与开发包、无头运行库与 nsgo CLI" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+CMD ["bash"]

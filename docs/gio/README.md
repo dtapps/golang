@@ -128,8 +128,8 @@ GUI 需要显示环境：容器里没有显示器时用镜像自带的 `Xvfb`（
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-gio.yml`，每天 18:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05、wails3 06:05、fyne 12:05、mygo 15:05 之后，给基座留了十八小时）；也可用「打包 Golang + gio 镜像（多架构）」按钮手动触发，可填 `version` / `gio_version`。
-- GitHub：`.github/workflows/build-gio.yml`，每天 10:05 UTC（北京 18:05）定时触发（基座 16:05 UTC、fnpack 19:05 UTC、wails3 22:05 UTC、fyne 04:05 UTC、mygo 07:05 UTC 之后）；手动触发同样可填 `version` / `gio_version`。
+- CNB：`.cnb/workflows/build-gio.yml`，每天 08:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05、wails3 04:05、fyne 06:05、mygo 07:05 之后，给基座留了八小时）；也可用「打包 Golang + gio 镜像（多架构）」按钮手动触发，可填 `version` / `gio_version`。
+- GitHub：`.github/workflows/build-gio.yml`，每天 00:05 UTC（北京 08:05）定时触发（基座 16:05 UTC、fnpack 19:05 UTC、wails3 20:05 UTC、fyne 22:05 UTC、mygo 23:05 UTC 之后）；手动触发同样可填 `version` / `gio_version`。
 - GitLab：`.gitlab/workflows/build-gio.yml`，在 UI / API 建 `TARGET=gio` 的 schedule 定时触发（基座先构建）；手动 Run pipeline 时填 `TARGET=gio`，可再填 `VERSION` / `GIO_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 脚本先等 `golang:<go 版本>` 就绪（最多 20 × 15 秒，等不到直接失败），再从它构建、派生单平台标签、跑冒烟、提升移动标签。冒烟断言：
@@ -193,7 +193,7 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 - 徽章显示灰色 `unknown` 通常意味着：这次构建失败（`cnbcool/annotations` 那步没跑）、key 从未写入，或体积解析拿到了非镜像清单（日志里会有「体积解析失败」警告）。
 - GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact `gio-annotation`（保留 30 天）。GitLab 侧同样不写 commit 注解，JSON 作为 job artifact 保留 30 天。跨平台核对以 artifact 为准。
 
-## 七个镜像的关系
+## 九个镜像的关系
 
 同一 `<go 版本>` 下：
 
@@ -205,8 +205,10 @@ golang/wails2:1.27.3 = golang:1.27.3 + GTK3/WebKit2GTK 4.1 + wails
 golang/fyne:1.27.3   = golang:1.27.3 + OpenGL/X11/Wayland + fyne
 golang/mygo:1.27.3   = golang:1.27.3 + GTK3/WebKitGTK 4.1 + 无头运行库 + mygo + bun
 golang/gio:1.27.3    = golang:1.27.3 + EGL/GLES/X11/Wayland/Vulkan 开发包 + 无头运行库 + gogio
+golang/nsgo:1.27.3   = golang:1.27.3 + GTK4/WebKitGTK 6.0/GStreamer + 无头运行库 + nsgo
+golang/viva:1.27.3   = golang:1.27.3 + XCB/Vulkan + GTK3/WebKit2GTK 4.1 + 无头运行库 + viva
 ```
 
-fnpack、wails3、wails2、fyne、mygo 与 gio 是六个**平级**的变体，互不包含：需要打包 `.fpk` 用 `fnpack`，编译 Wails v3 应用用 `wails3`，编译 Wails v2 应用用 `wails2`，编译 Fyne 应用用 `fyne`，编译 MyGo 应用用 `mygo`，用 cgo 编译 Gio 应用用 `gio`；都要就在自己 Dockerfile 里 `FROM golang:latest` 再各装一个。
+fnpack、wails3、wails2、fyne、mygo、gio、nsgo 与 viva 是八个**平级**的变体，互不包含：需要打包 `.fpk` 用 `fnpack`，编译 Wails v3 应用用 `wails3`，编译 Wails v2 应用用 `wails2`，编译 Fyne 应用用 `fyne`，编译 MyGo 应用用 `mygo`，用 cgo 编译 Gio 应用用 `gio`，编译 nsgo 应用用 `nsgo`，编译 viva 应用用 `viva`；都要就在自己 Dockerfile 里 `FROM golang:latest` 再各装一个。
 
 注意 gio 与 fyne 都是「自绘 + OpenGL/EGL」路线，但依赖集合**不同**：fyne 装的是 `libgl1-mesa-dev` + `xorg-dev` 元包（`x11`、`xrandr`、`xcursor`、`xinerama`、`xi`、`xxf86vm` 等由它带进来）+ `libwayland-dev` + `libxkbcommon-dev`；gio 是按 gioui.org 源码里的 cgo 指令逐条列出的精确清单，比 fyne 多 EGL/GLES（`libegl1-mesa-dev` / `libgles2-mesa-dev`）、`libxkbcommon-x11-dev`、`libffi-dev`、`libvulkan-dev`，外加整套无头运行库（Xvfb / xauth / dbus-x11 / mesa DRI 驱动 / 字体），并且多一个 `gogio` 打包工具。所以不能用 fyne 镜像替代 gio 镜像。

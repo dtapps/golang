@@ -10,7 +10,7 @@
 # OpenGL/X11/Wayland 开发包与 fyne CLI。这样六个镜像的 Go 工具链完全一致。
 #
 # 触发方式（见 build-fyne.yml）：
-#   schedule          → 每天固定时间跑（比 build-wails2 晚 3 小时）
+#   schedule          → 每天固定时间跑（排在 build-wails3 之后 2 小时）
 #   workflow_dispatch → 手动跑，需要基础镜像标签已存在（脚本会等待并给出提示）
 #                       可传 version / fyne_version 覆盖默认版本
 #

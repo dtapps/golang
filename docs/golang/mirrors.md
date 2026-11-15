@@ -44,11 +44,11 @@ NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"  # nodejs.org
 
 fnpack 镜像只从 `https://static2.fnnas.com` 下载二进制，三个平台的 `build-fnpack.sh` 都不传镜像参数。
 
-wails3 / wails2 / fyne / mygo / gio 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧 `Dockerfile.golang` 已配成 Go module 多源回退，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」用同一份 `GOPROXY` 配置。
+wails3 / wails2 / fyne / mygo / gio / nsgo / viva 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧 `Dockerfile.golang` 已配成 Go module 多源回退，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` / `build-nsgo.sh` / `build-viva.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」用同一份 `GOPROXY` 配置。
 
 mygo 的 `bun` 走 npm：`npm install -g` 与版本解析（`npm view bun version`）都用基座镜像的 npm registry，CNB 侧即腾讯云、GitHub / GitLab 侧即官方默认，两边天然一致，`build-mygo.sh` 不需要额外传源参数。
 
-fyne 的 apt 开发包（OpenGL/X11/Wayland）、mygo 的 apt 开发包（GTK3/WebKitGTK 4.1 与无头运行库）与 gio 的 apt 开发包（EGL/GLES、X11、Wayland、Vulkan 与无头运行库）都不单独配源：继承基座镜像的 APT 配置，CNB 侧即腾讯云，GitHub / GitLab 侧即 `deb.debian.org`。
+fyne 的 apt 开发包（OpenGL/X11/Wayland）、mygo 的 apt 开发包（GTK3/WebKitGTK 4.1 与无头运行库）、gio 的 apt 开发包（EGL/GLES、X11、Wayland、Vulkan 与无头运行库）、nsgo 的 apt 开发包（GTK4/WebKitGTK 6.0/GStreamer 与无头运行库）与 viva 的 apt 开发包（XCB/Vulkan、GTK3/WebKit2GTK 4.1 与无头运行库）都不单独配源：继承基座镜像的 APT 配置，CNB 侧即腾讯云，GitHub / GitLab 侧即 `deb.debian.org`。
 
 ## 为什么 GitHub / GitLab 侧不传
 

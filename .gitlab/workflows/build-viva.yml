@@ -1,0 +1,22 @@
+# 构建并推送 golang + viva 变体镜像
+# 由根 .gitlab-ci.yml 的 include 引入；workflow / stages / variables / default 都在根文件里。
+# 基础镜像 ${CI_REGISTRY_IMAGE}:<go 版本> 必须已经由 build-golang 作业推好；
+# viva 建议排在 nsgo 之后 1 小时（cron 02:05 UTC），距基座 16:05 UTC 已过十小时；
+# 脚本按常规最多等 5 分钟，仍然不存在就报错退出。
+build-viva:
+  resource_group: build-viva
+  stage: variants
+  timeout: 120m
+  script:
+    - |
+      set -eu
+      export version="${VERSION:-}"
+      export viva_version="${VIVA_VERSION:-}"
+      . ./.gitlab/scripts/build-viva.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - .gitlab/annotation-viva.json
+  rules:
+    - if: '$TARGET == "" || $TARGET == "viva"'

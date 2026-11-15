@@ -6,6 +6,8 @@ include:
   - .cnb/workflows/build-fyne.yml
   - .cnb/workflows/build-mygo.yml
   - .cnb/workflows/build-gio.yml
+  - .cnb/workflows/build-nsgo.yml
+  - .cnb/workflows/build-viva.yml
   - .cnb/workflows/cnb-sechook.yml
   - .cnb/workflows/code-review.yml
   - .cnb/workflows/code-security-config.yml
@@ -15,7 +17,7 @@ include:
 
 main:
   # 每天 00:05（Asia/Shanghai）构建 golang 基础镜像：
-  #   <registry>/<repo> → golang（不含 fnpack）
+  #   <registry>/<repo>     → golang（不含 fnpack）
   # 基座用 Dockerfile 默认的 golang:1-trixie（自动跟随最新稳定 Go），构建脚本把实际
   # Go 版本解析出来（如 1.27.3），直接推 <实际版本> 标签，冒烟通过后才把 latest /
   # minor 提升到该 digest；同名标签每天被覆盖，回查某天的产物要靠 annotation 里的 digest。
@@ -70,11 +72,11 @@ main:
             type: ADD
             fromJsonFile: .cnb/annotation-fnpack.json
 
-  # 每天 06:05（Asia/Shanghai）构建 wails3 镜像：
+  # 每天 04:05（Asia/Shanghai）构建 wails3 镜像：
   #   <registry>/<repo>/wails3 → golang + GTK4/WebKitGTK + wails3 CLI
-  # 与上一条流水线再错开三小时，确保基础镜像 <go 版本> 标签已经推好；
-  # 脚本 FROM 那个标签，只追加 GTK4/WebKitGTK 与 wails3 CLI，不重复安装工具链。
-  'crontab: 5 6 * * *':
+  # 接在 fnpack（03:05）之后，与上一条流水线错开一小时，避免抢同一个 runner；
+  # 脚本 FROM 基础镜像 <go 版本> 标签，只追加 GTK4/WebKitGTK 与 wails3 CLI。
+  'crontab: 5 4 * * *':
     - name: build-wails3
       runner:
         tags: cnb:arch:amd64
@@ -93,10 +95,10 @@ main:
             type: ADD
             fromJsonFile: .cnb/annotation-wails3.json
 
-  # 每天 09:05（Asia/Shanghai）构建 wails2 镜像：
+  # wails2 的定时任务暂时停用（旧版，仅按需手动构建）：
   #   <registry>/<repo>/wails2 → golang + GTK3/WebKit2GTK + wails CLI
-  # 与前面的多架构构建错开三小时，避免抢同一个 runner。
-  # 'crontab: 5 9 * * *':
+  # 需要恢复时取消下面注释即可，手动触发按钮仍然可用。
+  # 'crontab: 5 5 * * *':
   #   - name: build-wails2
   #     runner:
   #       tags: cnb:arch:amd64
@@ -115,10 +117,11 @@ main:
   #           type: ADD
   #           fromJsonFile: .cnb/annotation-wails2.json
 
-  # 每天 12:05（Asia/Shanghai）构建 fyne 镜像：
+  # 每天 06:05（Asia/Shanghai）构建 fyne 镜像：
   #   <registry>/<repo>/fyne → golang + OpenGL/X11/Wayland + fyne CLI
-  # 接在 wails2（09:05）之后，与前面的多架构构建错开三小时，避免抢同一个 runner。
-  'crontab: 5 12 * * *':
+  # 接在 wails3（04:05）之后，与上一条构建错开两小时，避免抢同一个 runner；
+  # 此时距基础镜像产出（00:05）已过六小时，基座一定就绪。
+  'crontab: 5 6 * * *':
     - name: build-fyne
       runner:
         tags: cnb:arch:amd64
@@ -137,10 +140,10 @@ main:
             type: ADD
             fromJsonFile: .cnb/annotation-fyne.json
 
-  # 每天 15:05（Asia/Shanghai）构建 mygo 镜像：
+  # 每天 07:05（Asia/Shanghai）构建 mygo 镜像：
   #   <registry>/<repo>/mygo → golang + GTK3/WebKitGTK4.1 + 无头运行库 + mygo CLI + bun
-  # 接在 fyne（12:05）之后，与前面的多架构构建错开三小时，避免抢同一个 runner。
-  'crontab: 5 15 * * *':
+  # 接在 fyne（06:05）之后，与前面的多架构构建错开一小时，避免抢同一个 runner。
+  'crontab: 5 7 * * *':
     - name: build-mygo
       runner:
         tags: cnb:arch:amd64
@@ -159,12 +162,12 @@ main:
             type: ADD
             fromJsonFile: .cnb/annotation-mygo.json
 
-  # 每天 18:05（Asia/Shanghai）构建 gio 镜像：
+  # 每天 08:05（Asia/Shanghai）构建 gio 镜像：
   #   <registry>/<repo>/gio → golang + EGL/GLES/X11/Wayland/Vulkan 开发包
   #                           + 无头运行库 + gogio CLI
-  # 接在 mygo（15:05）之后，与前面的多架构构建错开三小时，避免抢同一个 runner；
-  # 此时距基础镜像产出（00:05）已过十八小时，基座一定就绪。
-  'crontab: 5 18 * * *':
+  # 接在 mygo（07:05）之后，与前面的多架构构建错开一小时，避免抢同一个 runner；
+  # 此时距基础镜像产出（00:05）已过八小时，基座一定就绪。
+  'crontab: 5 8 * * *':
     - name: build-gio
       runner:
         tags: cnb:arch:amd64
@@ -182,3 +185,51 @@ main:
           settings:
             type: ADD
             fromJsonFile: .cnb/annotation-gio.json
+
+  # 每天 09:05（Asia/Shanghai）构建 nsgo 镜像：
+  #   <registry>/<repo>/nsgo → golang + GTK4/WebKitGTK 6.0/Pango/Cairo/GStreamer
+  #                           + 无头运行库 + nsgo CLI
+  # 接在 gio（08:05）之后，与前面的多架构构建错开一小时，避免抢同一个 runner；
+  # 此时距基础镜像产出（00:05）已过九小时，基座一定就绪。
+  'crontab: 5 9 * * *':
+    - name: build-nsgo
+      runner:
+        tags: cnb:arch:amd64
+      services:
+        - docker
+      imports:
+        - https://cnb.cool/dtapp/envs/-/blob/main/docker.yml
+        # 不要把 .cnb/scripts/build-nsgo.sh 放进 imports（${...} 会被改写）
+      stages:
+        - name: 构建并推送多架构镜像
+          script: |
+            source .cnb/scripts/build-nsgo.sh
+        - name: 写入镜像元数据
+          image: cnbcool/annotations:latest
+          settings:
+            type: ADD
+            fromJsonFile: .cnb/annotation-nsgo.json
+
+  # 每天 10:05（Asia/Shanghai）构建 viva 镜像：
+  #   <registry>/<repo>/viva → golang + XCB/Vulkan + GTK3/WebKit2GTK 4.1
+  #                           + 无头运行库 + viva CLI
+  # 接在 nsgo（09:05）之后，与前面的多架构构建错开一小时，避免抢同一个 runner；
+  # 此时距基础镜像产出（00:05）已过十小时，基座一定就绪，等待上限按常规 5 分钟。
+  'crontab: 5 10 * * *':
+    - name: build-viva
+      runner:
+        tags: cnb:arch:amd64
+      services:
+        - docker
+      imports:
+        - https://cnb.cool/dtapp/envs/-/blob/main/docker.yml
+        # 不要把 .cnb/scripts/build-viva.sh 放进 imports（${...} 会被改写）
+      stages:
+        - name: 构建并推送多架构镜像
+          script: |
+            source .cnb/scripts/build-viva.sh
+        - name: 写入镜像元数据
+          image: cnbcool/annotations:latest
+          settings:
+            type: ADD
+            fromJsonFile: .cnb/annotation-viva.json

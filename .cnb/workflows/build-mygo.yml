@@ -2,8 +2,8 @@
   # 自定义按钮可触发的事件：web_trigger_build_mygo
   # 用 docker buildx 一次构建 amd64 + arm64，推送 <registry>/<repo>/mygo。
   # 基础镜像 <registry>/<repo>:<go 版本> 由 build-golang.yml 产出，这里只追加
-  # GTK3/WebKitGTK4.1 开发包、无头运行库、mygo CLI 与 bun；定时任务给基础镜像
-  # 留了十五小时（00:05 → 15:05）。
+  # GTK3/WebKitGTK4.1 开发包、无头运行库、mygo CLI 与 bun；定时任务排在 fyne（06:05）
+  # 之后 1 小时，即 07:05（距基础镜像 00:05 已过七小时）。
   #
   # mygo 版本默认跟随上游最新稳定版（Dockerfile 的 MYGO_VERSION=latest，
   # 脚本构建前解析成具体 tag 再传进 build-arg，层缓存才跟得上版本）；

@@ -8,7 +8,7 @@
 #
 # 本脚本不构建基础镜像：它要求 <registry>/<repo>:<go 版本> 已由 build-golang
 # 流水线推好，直接 FROM 那个 manifest list，只追加 cgo 依赖、无头运行库与
-# gogio CLI。定时任务给 build-golang 留了十八小时（00:05 → 18:05）。
+# gogio CLI。定时任务排在 mygo（07:05）之后 1 小时，即 08:05。
 #
 # CNB 侧独立实现，与 .github/scripts/build-gio.sh 各自维护、不互相引用。
 # 标签规则、冒烟断言与 GitHub 侧保持一致。
@@ -321,7 +321,7 @@ docker buildx version || die "docker buildx 不可用"
 docker buildx inspect >/dev/null || die "buildx builder 不可用"
 
 # ---------- 7. 等基础镜像就绪 ----------
-# 定时任务里 build-golang 先跑（00:05），gio 后跑（18:05）；
+# 定时任务里 build-golang 先跑（00:05），gio 后跑（08:05）；
 # 手动触发时要求基础镜像已经存在。
 attempt=0
 while [ "${attempt}" -lt "${BASE_WAIT_ATTEMPTS}" ]; do

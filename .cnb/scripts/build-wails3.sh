@@ -7,7 +7,7 @@
 #
 # 本脚本不构建基础镜像：它要求 <registry>/<repo>:<go 版本> 已由 build-golang
 # 流水线推好，直接 FROM 那个 manifest list，只追加 GTK4/WebKitGTK 开发包与
-# wails3 CLI。定时任务给 build-golang 留了六小时（00:05 → 06:05）。
+# wails3 CLI。定时任务排在 fnpack（03:05）之后 1 小时，即 04:05。
 #
 # CNB 侧独立实现，与 .github/scripts/build-wails3.sh 各自维护、不互相引用。
 # 标签规则、冒烟断言与 GitHub 侧保持一致。
@@ -298,7 +298,7 @@ docker buildx version || die "docker buildx 不可用"
 docker buildx inspect >/dev/null || die "buildx builder 不可用"
 
 # ---------- 7. 等基础镜像就绪 ----------
-# 定时任务里 build-golang 先跑（00:05），wails3 后跑（06:05）；
+# 定时任务里 build-golang 先跑（00:05），wails3 后跑（04:05）；
 # 手动触发时要求基础镜像已经存在。
 attempt=0
 while [ "${attempt}" -lt "${BASE_WAIT_ATTEMPTS}" ]; do

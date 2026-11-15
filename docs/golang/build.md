@@ -70,6 +70,30 @@ docker build -f .github/docker/Dockerfile.gio \
 
 > 变体名叫 gio，CLI 却叫 `gogio`（模块 `gioui.org/cmd`），镜像里没有 `gio` 二进制。`gogio` 是打包工具（android / ios / tvos / js / windows / macos），没有 linux 目标，也没有 `version` 子命令；Linux 桌面程序就是普通 `go build` + cgo。这个镜像的重点是把 cgo 需要的 EGL/GLES、X11、Wayland、Vulkan 开发包装齐（Dockerfile 第 1 层用 `pkg-config` 逐个断言 `.pc` 存在）。
 
+### nsgo 镜像
+
+nsgo 镜像同样继承上一步的工具链，`GOLANG_IMAGE` 必须指向刚构建的 golang 镜像：
+
+```bash
+docker build -f .github/docker/Dockerfile.nsgo \
+  --build-arg GOLANG_IMAGE=golang:local \
+  -t golang-nsgo:local .
+```
+
+不传 `GOLANG_IMAGE` 时默认 `golang:1-trixie`，只会得到「上游基座 + GTK4/WebKitGTK 6.0/Pango/Cairo/GStreamer 开发包 + 无头运行库 + nsgo」，没有本仓库预装的工具链。`NSGO_VERSION` 同样默认 `latest`；上游没有发 tag，需要钉版本时用 `--build-arg` 传入伪版本（如 `NSGO_VERSION=v0.0.0-20251115000000-abcdef123456`）。
+
+### viva 镜像
+
+viva 镜像同样继承上一步的工具链，`GOLANG_IMAGE` 必须指向刚构建的 golang 镜像：
+
+```bash
+docker build -f .github/docker/Dockerfile.viva \
+  --build-arg GOLANG_IMAGE=golang:local \
+  -t golang-viva:local .
+```
+
+不传 `GOLANG_IMAGE` 时默认 `golang:1-trixie`，只会得到「上游基座 + XCB/Vulkan、GTK3/WebKit2GTK 4.1 开发包 + 无头运行库 + viva」，没有本仓库预装的工具链。`VIVA_VERSION` 同样默认 `latest`，需要钉版本时用 `--build-arg` 传入（如 `VIVA_VERSION=v0.6.4`）。
+
 ### 快速验证
 
 ```bash
@@ -108,6 +132,20 @@ docker run --rm golang-gio:local sh -c '
   gcc --version | head -1
   gogio 2>&1 | head -5   # 没有 version 子命令，无参数会打 usage 到 stderr
 '
+
+docker run --rm golang-nsgo:local sh -c '
+  go version
+  pkg-config --exists gtk4 && pkg-config --exists webkitgtk-6.0 && pkg-config --exists gstreamer-video-1.0
+  gst-inspect-1.0 avdec_h264 >/dev/null
+  nsgo --help 2>&1 | head -5
+'
+
+docker run --rm golang-viva:local sh -c '
+  go version
+  pkg-config --exists xcb && pkg-config --exists vulkan && pkg-config --exists webkit2gtk-4.1
+  find /usr/share/vulkan/icd.d -name "*.json" -print -quit
+  viva --version
+'
 ```
 
 ## 多架构构建
@@ -124,7 +162,7 @@ arm64 在 amd64 机器上依赖 QEMU/binfmt；GitHub workflow 用 `docker/setup-
 
 ## CI 构建流程
 
-七个镜像由七个脚本分别发布。基础镜像先跑，fnpack / wails3 / wails2 / fyne / mygo / gio 再各自 `FROM` 它。
+九个镜像由九个脚本分别发布。基础镜像先跑，fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 再各自 `FROM` 它。
 
 基础镜像（`.cnb/scripts/build-golang.sh` / `.github/scripts/build-golang.sh` / `.gitlab/scripts/build-golang.sh`）：
 
@@ -201,6 +239,30 @@ gio 镜像（`.cnb/scripts/build-gio.sh` / `.github/scripts/build-gio.sh` / `.gi
 8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 gio 的对应标签。
 9. 写 gio 元数据（含 `gio_version`）。
 
+nsgo 镜像（`.cnb/scripts/build-nsgo.sh` / `.github/scripts/build-nsgo.sh` / `.gitlab/scripts/build-nsgo.sh`）与 gio 同构：
+
+1. 解析同一个 `<go 版本>` 标签。
+2. 确定 `NSGO_VERSION`：输入优先；留空时先用 `go list -m github.com/nsgo-dev/nsgo@latest` 解析最新版本（走基座镜像的 GOPROXY；上游无 tag，得到的是伪版本），解析不到才回退 `latest`。
+3. 等 `golang:<go 版本>` 在 registry 出现，并读取它的 index digest。
+4. 构建并推送 `golang/nsgo:<go 版本>`（`GOLANG_IMAGE` 指向基础镜像标签，`NSGO_VERSION` 以 `--build-arg` 传入）。
+5. 派生 nsgo 的单平台标签。
+6. amd64 冒烟（见下）。
+7. 校验 OCI `version` 标签。
+8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 nsgo 的对应标签。
+9. 写 nsgo 元数据（含 `nsgo_version`）。
+
+viva 镜像（`.cnb/scripts/build-viva.sh` / `.github/scripts/build-viva.sh` / `.gitlab/scripts/build-viva.sh`）与 gio 同构：
+
+1. 解析同一个 `<go 版本>` 标签。
+2. 确定 `VIVA_VERSION`：输入优先；留空时先用 `go list -m github.com/vivaui/viva@latest` 解析最新稳定 tag（走基座镜像的 GOPROXY），解析不到才回退 `latest`。
+3. 等 `golang:<go 版本>` 在 registry 出现，并读取它的 index digest（最多等 5 分钟）。
+4. 构建并推送 `golang/viva:<go 版本>`（`GOLANG_IMAGE` 指向基础镜像标签，`VIVA_VERSION` 以 `--build-arg` 传入）。
+5. 派生 viva 的单平台标签。
+6. amd64 冒烟（见下）。
+7. 校验 OCI `version` 标签。
+8. 只有基础镜像的 `<major.minor>` / `latest` 也指向本次版本时，才提升 viva 的对应标签。
+9. 写 viva 元数据（含 `viva_version`）。
+
 ### 冒烟断言
 
 golang 镜像：
@@ -261,6 +323,26 @@ gio 镜像：
 - `gogio` 在 `PATH` 里，且 `go version -m "$(command -v gogio)"` 读到的 `gioui.org/cmd` 模块版本等于本次目标版本（回退 `latest` 时只验证可执行）；`gogio` **没有 `version` 子命令**，无参数运行会打 usage 到 stderr 且非零退出，脚本里必须 `|| true`
 - `fnpack` / `wails3` / `wails` / `fyne` / `mygo` / `bun` 都**不存在**（这是 golang + gio，不是别的变体）
 
+nsgo 镜像：
+
+- `go version` 与解析出的版本一致
+- `go node npm pnpm sqlc golangci-lint gcc pkg-config Xvfb gst-inspect-1.0 nsgo` 都存在（证明继承成功，且 GTK4/媒体/无头运行依赖齐全）
+- `pkg-config --exists` 对 `gtk4` / `webkitgtk-6.0` / `glib-2.0` / `gobject-2.0` / `gio-2.0` / `pango` / `pangocairo` / `cairo` / `cairo-gobject` / `fontconfig` / `gdk-pixbuf-2.0` / `gstreamer-1.0` / `gstreamer-app-1.0` / `gstreamer-video-1.0` 全部成立
+- `ldconfig -p` 能查到 `libgtk-4.so.1` / `libwebkitgtk-6.0.so.4` / `libgstreamer-1.0.so.0` / `libgstapp-1.0.so.0` / `libgstvideo-1.0.so.0` 等 13 个运行库（purego 运行期 `dlopen`，编译期装了不等于运行期能加载）
+- `gst-inspect-1.0 avdec_h264` 与 `gst-inspect-1.0 avdec_aac` 都能列出（H.264 / AAC 解码可用）
+- `nsgo` 在 `PATH` 里，且 `go version -m` 读到的 `github.com/nsgo-dev/nsgo` 模块版本等于本次目标版本（回退 `latest` 时只验证可执行）；`nsgo --help` 能打出输出
+- `fnpack` / `wails3` / `wails` / `fyne` / `mygo` / `bun` / `gogio` / `viva` 都**不存在**（这是 golang + nsgo，不是别的变体）
+
+viva 镜像：
+
+- `go version` 与解析出的版本一致
+- `go node npm pnpm sqlc golangci-lint gcc pkg-config Xvfb viva` 都存在（证明继承成功，且 XCB/无头运行依赖齐全）
+- `pkg-config --exists` 对 `xcb` / `xcb-randr` / `xcb-sync` / `xcb-cursor` / `x11` / `x11-xcb` / `xkbcommon` / `xkbcommon-x11` / `vulkan` / `fontconfig` / `glib-2.0` / `gobject-2.0` / `gio-2.0` / `pango` / `pangocairo` / `cairo` / `gdk-pixbuf-2.0` / `gtk+-3.0` / `webkit2gtk-4.1` 全部成立
+- `ldconfig -p` 能查到 `libxcb.so.1` / `libxcb-randr.so.0` / `libvulkan.so.1` / `libgtk-3.so.0` / `libwebkit2gtk-4.1.so.0` 等 21 个运行库（purego 运行期 `dlopen`）
+- `/usr/share/vulkan/icd.d` 下至少有一个 `*.json`（Vulkan 加载器能找到 ICD 驱动）
+- `viva` 在 `PATH` 里，且 `go version -m` 读到的 `github.com/vivaui/viva` 模块版本等于本次目标版本（回退 `latest` 时只验证可执行）；`viva --version` 能打出输出
+- `fnpack` / `wails3` / `wails` / `fyne` / `mygo` / `bun` / `gogio` / `nsgo` 都**不存在**（这是 golang + viva，不是别的变体）
+
 ### 缓存
 
 三侧都启用 **buildx 层缓存**，写到 `<镜像>:buildcache`（CNB 制品库 / GHCR / GitLab Registry 各一份），`mode=min`：单阶段构建，每一层都在最终镜像里，min 已覆盖整条链，而且不会产生没人引用的孤儿 blob。
@@ -291,16 +373,22 @@ CACHE=off source .cnb/scripts/build-golang.sh
 | CNB    | fyne   | 仓库页面按钮「打包 Golang + fyne 镜像」                   | 同上 + `fyne_version`                 |
 | CNB    | mygo   | 仓库页面按钮「打包 Golang + mygo 镜像」                   | 同上 + `mygo_version` / `bun_version` |
 | CNB    | gio    | 仓库页面按钮「打包 Golang + gio 镜像」                    | 同上 + `gio_version`                  |
+| CNB    | nsgo   | 仓库页面按钮「打包 Golang + nsgo 镜像」                   | 同上 + `nsgo_version`                 |
+| CNB    | viva   | 仓库页面按钮「打包 Golang + viva 镜像」                   | 同上 + `viva_version`                 |
 | GitHub | golang | Actions → build-golang → Run workflow                     | 同上                                  |
 | GitHub | fnpack | Actions → build-fnpack → Run workflow（需基础镜像已存在） | 同上                                  |
 | GitHub | fyne   | Actions → build-fyne → Run workflow（需基础镜像已存在）   | 同上 + `fyne_version`                 |
 | GitHub | mygo   | Actions → build-mygo → Run workflow（需基础镜像已存在）   | 同上 + `mygo_version` / `bun_version` |
 | GitHub | gio    | Actions → build-gio → Run workflow（需基础镜像已存在）    | 同上 + `gio_version`                  |
+| GitHub | nsgo   | Actions → build-nsgo → Run workflow（需基础镜像已存在）   | 同上 + `nsgo_version`                 |
+| GitHub | viva   | Actions → build-viva → Run workflow（需基础镜像已存在）   | 同上 + `viva_version`                 |
 | GitLab | 任意   | CI/CD → Pipelines → Run pipeline                          | `TARGET` 选镜像；`VERSION` 同上       |
 | GitLab | golang | 定时 schedule，`TARGET=golang`                            | `VERSION`：留空 / 1.27 / 1.27.3       |
 | GitLab | fnpack | 定时 schedule，`TARGET=fnpack`（需基础镜像已存在）        | 同上 + `FNPACK_VERSION`               |
 | GitLab | fyne   | 定时 schedule，`TARGET=fyne`（需基础镜像已存在）          | 同上 + `FYNE_VERSION`                 |
 | GitLab | mygo   | 定时 schedule，`TARGET=mygo`（需基础镜像已存在）          | 同上 + `MYGO_VERSION` / `BUN_VERSION` |
 | GitLab | gio    | 定时 schedule，`TARGET=gio`（需基础镜像已存在）           | 同上 + `GIO_VERSION`                  |
+| GitLab | nsgo   | 定时 schedule，`TARGET=nsgo`（需基础镜像已存在）          | 同上 + `NSGO_VERSION`                 |
+| GitLab | viva   | 定时 schedule，`TARGET=viva`（需基础镜像已存在）          | 同上 + `VIVA_VERSION`                 |
 
 留空表示使用 Dockerfile 的默认值：`golang:1-trixie` 自动跟随最新稳定 Go。填 `1.27` 会跟随该 minor 的最新补丁，填 `1.27.3` 精确到补丁版本。标签里的版本始终是解析后的实际版本。

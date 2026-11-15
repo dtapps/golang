@@ -4,7 +4,7 @@
 
 在 [Golang 构建环境镜像](../golang/README.md) 之上做两件事：装 GTK3 / WebKit2GTK 4.1 开发包，再 `go install` 一份 `wails` CLI。用于在 CI / 容器里编译 [Wails v2](https://github.com/wailsapp/wails) 桌面应用（Linux 侧 webview 走 GTK3 + WebKit2GTK 4.1）。
 
-> **定时构建已停用**：wails2 是旧版，仓库已有新版 wails3 镜像，新旧并存时没必要每天跟踪旧版上游；三侧均改为按需手动触发，已发布的镜像与 Dockerfile / 构建脚本都保留。原因与手动触发方式见 [维护 — 日常构建](../golang/maintenance.md)。
+> **定时构建暂时停用**：wails2 是旧版，仓库已有新版 wails3 镜像，新旧并存时没必要每天跟踪旧版上游；三侧均改为按需手动触发，已发布的镜像与 Dockerfile / 构建脚本都保留。原因与手动触发方式见 [维护 — 日常构建](../golang/maintenance.md)。
 
 > **本目录的分工**：wails2 镜像 = 基座镜像 + GTK3/WebKit2GTK 4.1 + `wails` 二进制，所以这里只收 wails2 专属的内容（版本策略、build tag、构建用法、元数据）。构建、CI、标签、镜像源、维护、排错等共用机制都在 [`docs/golang/`](../golang/index.md)，不在这里重复。文档与实现冲突时，以三份 `Dockerfile.wails2` 与三份 `build-wails2.sh` 为准。
 
@@ -103,9 +103,9 @@ docker pull ghcr.io/dtapps/golang/wails2@sha256:<wails2_digest>
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-wails2.yml`，定时已停用，仅用「打包 Golang + wails2 镜像（多架构 amd64 + arm64）」按钮手动触发，可填 `version` / `wails2_version`。
-- GitHub：`.github/workflows/build-wails2.yml`，定时已停用，仅 `workflow_dispatch` 手动触发，同样可填 `version` / `wails2_version`。
-- GitLab：`.gitlab/workflows/build-wails2.yml`，`TARGET=wails2` 的 schedule 已停用，仅在需要时手动 Run pipeline 填 `TARGET=wails2`，可再填 `VERSION` / `WAILS2_VERSION`，见 [../gitlab.md](../gitlab.md)。
+- CNB：`.cnb/workflows/build-wails2.yml`，定时暂时停用，仅用「打包 Golang + wails2 镜像（多架构 amd64 + arm64）」按钮手动触发，可填 `version` / `wails2_version`。
+- GitHub：`.github/workflows/build-wails2.yml`，定时暂时停用，仅 `workflow_dispatch` 手动触发，同样可填 `version` / `wails2_version`。
+- GitLab：`.gitlab/workflows/build-wails2.yml`，`TARGET=wails2` 的 schedule 暂时停用，仅在需要时手动 Run pipeline 填 `TARGET=wails2`，可再填 `VERSION` / `WAILS2_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 脚本先等 `golang:<go 版本>` 就绪（等不到直接失败），再从它构建、派生单平台标签、跑冒烟、提升移动标签。冒烟断言：
 
@@ -167,7 +167,7 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 - 徽章显示灰色 `unknown` 通常意味着：这次构建失败（`cnbcool/annotations` 那步没跑）、key 从未写入，或体积解析拿到了非镜像清单。
 - GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact `wails2-annotation`（保留 30 天）。GitLab 侧同样不写 commit 注解，JSON 作为 job artifact 保留 30 天。跨平台核对以 artifact 为准。
 
-## 七个镜像的关系
+## 九个镜像的关系
 
 同一 `<go 版本>` 下：
 
@@ -179,9 +179,11 @@ golang/wails2:1.27.3 = golang:1.27.3 + GTK3/WebKit2GTK 4.1 + wails
 golang/fyne:1.27.3   = golang:1.27.3 + OpenGL/X11/Wayland + fyne
 golang/mygo:1.27.3   = golang:1.27.3 + GTK3/WebKitGTK 4.1 + 无头运行库 + mygo + bun
 golang/gio:1.27.3    = golang:1.27.3 + EGL/GLES/X11/Wayland/Vulkan 开发包 + 无头运行库 + gogio
+golang/nsgo:1.27.3   = golang:1.27.3 + GTK4/WebKitGTK 6.0/GStreamer + 无头运行库 + nsgo
+golang/viva:1.27.3   = golang:1.27.3 + XCB/Vulkan + GTK3/WebKit2GTK 4.1 + 无头运行库 + viva
 ```
 
-fnpack、wails3、wails2、fyne、mygo 与 gio 是六个**平级**的变体，互不包含：需要打包 `.fpk` 用 `fnpack`，编译 Wails v3 应用用 `wails3`，编译 Wails v2 应用用本镜像，编译 Fyne 桌面应用用 `fyne`，编译 MyGo 桌面应用用 `mygo`，用 cgo 编译 Gio 桌面应用用 `gio`；都要就在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个。
+fnpack、wails3、wails2、fyne、mygo、gio、nsgo 与 viva 是八个**平级**的变体，互不包含：需要打包 `.fpk` 用 `fnpack`，编译 Wails v3 应用用 `wails3`，编译 Wails v2 应用用本镜像，编译 Fyne 桌面应用用 `fyne`，编译 MyGo 桌面应用用 `mygo`，用 cgo 编译 Gio 桌面应用用 `gio`，编译 nsgo 应用用 `nsgo`，编译 viva 应用用 `viva`；都要就在自己的 Dockerfile 里 `FROM golang:latest` 再各装一个。
 
 wails3 与本镜像走的是同一套 webview 路线但 GTK 大版本不同（GTK4 / WebKitGTK 6.0 对 GTK3 / WebKit2GTK 4.1），`wails3` 与 `wails` 是两个不同 CLI，编译参数也不同，不能互相替代。
 

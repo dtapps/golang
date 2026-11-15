@@ -11,7 +11,7 @@
 # 无头运行库与 gogio CLI。这样七个镜像的 Go 工具链完全一致。
 #
 # 触发方式（见 build-gio.yml）：
-#   schedule → 每天固定时间跑（比 build-mygo 晚 3 小时）
+#   schedule → 每天固定时间跑（比 build-mygo 晚 1 小时）
 #   web      → 手动 Run pipeline，需要基础镜像标签已存在（脚本会等待并给出提示）
 #              可传 version / gio_version 覆盖默认版本
 #

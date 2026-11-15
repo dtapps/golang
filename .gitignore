@@ -7,6 +7,8 @@
 .cnb/annotation-fyne.json
 .cnb/annotation-mygo.json
 .cnb/annotation-gio.json
+.cnb/annotation-nsgo.json
+.cnb/annotation-viva.json
 # CI 生成物：GitHub Actions 构建写入的镜像元数据，供 Step Summary / artifact 读取
 .github/annotation.json
 .github/annotation-fnpack.json
@@ -15,6 +17,8 @@
 .github/annotation-fyne.json
 .github/annotation-mygo.json
 .github/annotation-gio.json
+.github/annotation-nsgo.json
+.github/annotation-viva.json
 # CI 生成物：GitLab CI 构建写入的镜像元数据，随 job artifacts 保留
 .gitlab/annotation.json
 .gitlab/annotation-fnpack.json
@@ -23,3 +27,5 @@
 .gitlab/annotation-fyne.json
 .gitlab/annotation-mygo.json
 .gitlab/annotation-gio.json
+.gitlab/annotation-nsgo.json
+.gitlab/annotation-viva.json

@@ -76,8 +76,8 @@ docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-wails3.yml`，每天 06:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05 之后）；也可用「打包 Golang + wails3 镜像（多架构）」按钮手动触发，可填 `version` / `wails3_version`。
-- GitHub：`.github/workflows/build-wails3.yml`，每天 22:05 UTC（北京 06:05）定时触发（基座 16:05 UTC、fnpack 19:05 UTC 之后）；手动触发同样可填 `version` / `wails3_version`。
+- CNB：`.cnb/workflows/build-wails3.yml`，每天 04:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05 之后）；也可用「打包 Golang + wails3 镜像（多架构）」按钮手动触发，可填 `version` / `wails3_version`。
+- GitHub：`.github/workflows/build-wails3.yml`，每天 20:05 UTC（北京 04:05）定时触发（基座 16:05 UTC、fnpack 19:05 UTC 之后）；手动触发同样可填 `version` / `wails3_version`。
 - GitLab：`.gitlab/workflows/build-wails3.yml`，在 UI / API 建 `TARGET=wails3` 的 schedule 定时触发（基座先构建）；手动 Run pipeline 时填 `TARGET=wails3`，可再填 `VERSION` / `WAILS3_VERSION`，见 [../gitlab.md](../gitlab.md)。
 
 脚本先等 `golang:<go 版本>` 就绪（等不到直接失败），再从它构建、派生单平台标签、跑冒烟、提升移动标签。冒烟断言：
@@ -140,7 +140,7 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 - 徽章显示灰色 `unknown` 通常意味着：这次构建失败（`cnbcool/annotations` 那步没跑）、key 从未写入，或体积解析拿到了非镜像清单（日志里会有「体积解析失败」警告）。
 - GitHub 侧不写 commit 注解：同样的 JSON 写进 Step Summary，并上传 artifact `wails3-annotation`（保留 30 天）。GitLab 侧同样不写 commit 注解，JSON 作为 job artifact 保留 30 天。跨平台核对以 artifact 为准。
 
-## 七个镜像的关系
+## 九个镜像的关系
 
 同一 `<go 版本>` 下：
 
@@ -152,6 +152,8 @@ golang/wails2:1.27.3 = golang:1.27.3 + GTK3/WebKit2GTK 4.1 + wails
 golang/fyne:1.27.3   = golang:1.27.3 + OpenGL/X11/Wayland + fyne
 golang/mygo:1.27.3   = golang:1.27.3 + GTK3/WebKitGTK 4.1 + 无头运行库 + mygo + bun
 golang/gio:1.27.3    = golang:1.27.3 + EGL/GLES/X11/Wayland/Vulkan 开发包 + 无头运行库 + gogio
+golang/nsgo:1.27.3   = golang:1.27.3 + GTK4/WebKitGTK 6.0/GStreamer + 无头运行库 + nsgo
+golang/viva:1.27.3   = golang:1.27.3 + XCB/Vulkan + GTK3/WebKit2GTK 4.1 + 无头运行库 + viva
 ```
 
-fnpack、wails3、wails2、fyne、mygo 与 gio 是六个**平级**的变体，互不包含：需要打包 `.fpk` 用 `fnpack`，需要编译 Wails v3 应用用 `wails3`，编译 Wails v2 应用用 `wails2`，编译 Fyne 桌面应用用 `fyne`，编译 MyGo 桌面应用用 `mygo`，用 cgo 编译 Gio 桌面应用用 `gio`；都要就在自己 Dockerfile 里 `FROM golang:latest` 再各装一个。
+fnpack、wails3、wails2、fyne、mygo、gio、nsgo 与 viva 是八个**平级**的变体，互不包含：需要打包 `.fpk` 用 `fnpack`，需要编译 Wails v3 应用用 `wails3`，编译 Wails v2 应用用 `wails2`，编译 Fyne 桌面应用用 `fyne`，编译 MyGo 桌面应用用 `mygo`，用 cgo 编译 Gio 桌面应用用 `gio`，编译 nsgo 应用用 `nsgo`，编译 viva 应用用 `viva`；都要就在自己 Dockerfile 里 `FROM golang:latest` 再各装一个。

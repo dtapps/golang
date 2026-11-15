@@ -6,12 +6,12 @@
 
 GitLab 侧不 `source` CNB / GitHub 的脚本，也不与它们共用 Dockerfile：
 
-| 职责       | CNB 侧                                                                                                                                                 | GitHub 侧                                                                                                                                                 | GitLab 侧                                                                                                                                                 |
-|------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Dockerfile | `.cnb/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio` | `.github/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio` | `.gitlab/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio` |
-| 构建脚本   | `.cnb/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`              | `.github/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`              | `.gitlab/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`              |
-| 流水线     | `.cnb.yml` + `.cnb/workflows/`                                                                                                                         | `.github/workflows/`                                                                                                                                      | `.gitlab-ci.yml` + `.gitlab/workflows/`                                                                                                                   |
-| 元数据     | `.cnb/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio}.json`                                                                                      | `.github/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio}.json`                                                                                      | `.gitlab/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio}.json`（job artifacts）                                                                     |
+| 职责       | CNB 侧                                                                                                                                                                                       | GitHub 侧                                                                                                                                                                                       | GitLab 侧                                                                                                                                                                                       |
+|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Dockerfile | `.cnb/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio`、`Dockerfile.nsgo`、`Dockerfile.viva` | `.github/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio`、`Dockerfile.nsgo`、`Dockerfile.viva` | `.gitlab/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio`、`Dockerfile.nsgo`、`Dockerfile.viva` |
+| 构建脚本   | `.cnb/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`、`build-nsgo.sh`、`build-viva.sh`                  | `.github/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`、`build-nsgo.sh`、`build-viva.sh`                  | `.gitlab/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`、`build-nsgo.sh`、`build-viva.sh`                  |
+| 流水线     | `.cnb.yml` + `.cnb/workflows/`                                                                                                                                                               | `.github/workflows/`                                                                                                                                                                            | `.gitlab-ci.yml` + `.gitlab/workflows/`                                                                                                                                                         |
+| 元数据     | `.cnb/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio,-nsgo,-viva}.json`                                                                                                                | `.github/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio,-nsgo,-viva}.json`                                                                                                                | `.gitlab/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio,-nsgo,-viva}.json`（job artifacts）                                                                                               |
 
 三侧独立而不是共用的原因：标签规则、冒烟断言是同构的，但平台胶水完全不同——CNB 读 `CNB_*` 变量、用 `##[set-output]`、写 commit annotation；GitHub 读 Actions 上下文、写 Step Summary / artifact、用 QEMU + buildx；GitLab 读 `CI_*` 变量、用 job artifacts、 同样用 QEMU + buildx。
 
@@ -30,6 +30,8 @@ GitLab 侧不写死地址，全部从 `CI_REGISTRY_IMAGE` 派生。本仓库在 
 | Golang 构建环境 + fyne   | `registry.gitlab.com/dtapps/golang/fyne`   | `ghcr.io/dtapps/golang/fyne`   |
 | Golang 构建环境 + mygo   | `registry.gitlab.com/dtapps/golang/mygo`   | `ghcr.io/dtapps/golang/mygo`   |
 | Golang 构建环境 + gio    | `registry.gitlab.com/dtapps/golang/gio`    | `ghcr.io/dtapps/golang/gio`    |
+| Golang 构建环境 + nsgo   | `registry.gitlab.com/dtapps/golang/nsgo`   | `ghcr.io/dtapps/golang/nsgo`   |
+| Golang 构建环境 + viva   | `registry.gitlab.com/dtapps/golang/viva`   | `ghcr.io/dtapps/golang/viva`   |
 
 `CI_REGISTRY_IMAGE` 由 GitLab 自动给出，值形如 `registry.gitlab.com/<group>/<project>`（本仓库即 `registry.gitlab.com/dtapps/golang`）。 fork 或改名后自动跟着变，不需要改脚本。
 
@@ -44,6 +46,8 @@ GitLab 侧不写死地址，全部从 `CI_REGISTRY_IMAGE` 派生。本仓库在 
 | `FYNE_IMAGE`     | `IMAGE` + `/fyne`      | fyne 镜像全名         |
 | `MYGO_IMAGE`     | `IMAGE` + `/mygo`      | mygo 镜像全名         |
 | `GIO_IMAGE`      | `IMAGE` + `/gio`       | gio 镜像全名          |
+| `NSGO_IMAGE`     | `IMAGE` + `/nsgo`      | nsgo 镜像全名         |
+| `VIVA_IMAGE`     | `IMAGE` + `/viva`      | viva 镜像全名         |
 | `REGISTRY_USER`  | `CI_REGISTRY_USER`     | `docker login` 用户名 |
 | `REGISTRY_TOKEN` | `CI_REGISTRY_PASSWORD` | `docker login` 密码   |
 | `REVISION`       | `CI_COMMIT_SHA`        | OCI `revision`        |
@@ -53,7 +57,7 @@ GitLab 侧不写死地址，全部从 `CI_REGISTRY_IMAGE` 派生。本仓库在 
 
 ## 流水线结构
 
-根 `.gitlab-ci.yml` 只放全局配置，七个镜像各自一个 include 文件：
+根 `.gitlab-ci.yml` 只放全局配置，九个镜像各自一个 include 文件：
 
 ```text
 .gitlab-ci.yml
@@ -64,11 +68,13 @@ GitLab 侧不写死地址，全部从 `CI_REGISTRY_IMAGE` 派生。本仓库在 
 ├── .gitlab/workflows/build-wails2.yml   stage: variants
 ├── .gitlab/workflows/build-fyne.yml     stage: variants
 ├── .gitlab/workflows/build-mygo.yml     stage: variants
-└── .gitlab/workflows/build-gio.yml      stage: variants
+├── .gitlab/workflows/build-gio.yml      stage: variants
+├── .gitlab/workflows/build-nsgo.yml     stage: variants
+└── .gitlab/workflows/build-viva.yml     stage: variants
 ```
 
-- `golang` 在前，`variants` 在后。一次 Run pipeline 构建全部七个镜像时，变体作业会等 基础镜像作业成功后才开始；只重建某个变体时，`golang` 作业被 `rules` 过滤掉， `variants` 直接开始（脚本仍会最多等 5 分钟基础镜像标签）。
-- 六个变体在同一 stage 内并行，各自有自己的 `docker:dind`，互不干扰。
+- `golang` 在前，`variants` 在后。一次 Run pipeline 构建全部九个镜像时，变体作业会等 基础镜像作业成功后才开始；只重建某个变体时，`golang` 作业被 `rules` 过滤掉， `variants` 直接开始（脚本仍会最多等 5 分钟基础镜像标签）。
+- 八个变体在同一 stage 内并行，各自有自己的 `docker:dind`，互不干扰。
 
 ### 触发：定时与手动
 
@@ -76,34 +82,40 @@ GitLab 的 cron 不在 YAML 里，定时任务要建在 **CI/CD → Schedules**�
 
 > GitLab 的 Pipeline schedule 创建时可选 cron 时区。**推荐把时区选成 `Asia/Shanghai`，直接照抄下表的 cron，零换算**；若用默认 `UTC`，则按右侧 UTC 一列填。
 
-| 镜像   | 建议 cron（Asia/Shanghai） | 对应 UTC（cron 选 UTC 时用） | 变量            | 对应 GitHub |
-|--------|----------------------------|------------------------------|-----------------|-------------|
-| golang | `5 0 * * *`  （00:05）     | `5 16 * * *`（16:05 UTC）    | `TARGET=golang` | 16:05 UTC   |
-| fnpack | `5 3 * * *`  （03:05）     | `5 19 * * *`（19:05 UTC）    | `TARGET=fnpack` | 19:05 UTC   |
-| wails3 | `5 6 * * *`  （06:05）     | `5 22 * * *`（22:05 UTC）    | `TARGET=wails3` | 22:05 UTC   |
-| wails2 | 已停用（仅手动）           | 已停用                       | `TARGET=wails2` | 已停用      |
-| fyne   | `5 12 * * *` （12:05）     | `5 4 * * *`（04:05 UTC）     | `TARGET=fyne`   | 04:05 UTC   |
-| mygo   | `5 15 * * *` （15:05）     | `5 7 * * *`（07:05 UTC）     | `TARGET=mygo`   | 07:05 UTC   |
-| gio    | `5 18 * * *` （18:05）     | `5 10 * * *`（10:05 UTC）    | `TARGET=gio`    | 10:05 UTC   |
+| 镜像   | 建议 cron（Asia/Shanghai）       | 对应 UTC（cron 选 UTC 时用）        | 变量            | 对应 GitHub |
+|--------|----------------------------------|-------------------------------------|-----------------|-------------|
+| golang | `5 0 * * *`  （00:05）           | `5 16 * * *`（16:05 UTC）           | `TARGET=golang` | 16:05 UTC   |
+| fnpack | `5 3 * * *`  （03:05）           | `5 19 * * *`（19:05 UTC）           | `TARGET=fnpack` | 19:05 UTC   |
+| wails3 | `5 4 * * *`  （04:05）           | `5 20 * * *`（20:05 UTC）           | `TARGET=wails3` | 20:05 UTC   |
+| wails2 | `5 5 * * *`  （05:05，暂时停用） | `5 21 * * *`（21:05 UTC，暂时停用） | `TARGET=wails2` | 暂时停用    |
+| fyne   | `5 6 * * *`  （06:05）           | `5 22 * * *`（22:05 UTC）           | `TARGET=fyne`   | 22:05 UTC   |
+| mygo   | `5 7 * * *`  （07:05）           | `5 23 * * *`（23:05 UTC）           | `TARGET=mygo`   | 23:05 UTC   |
+| gio    | `5 8 * * *`  （08:05）           | `5 0 * * *`（00:05 UTC）            | `TARGET=gio`    | 00:05 UTC   |
+| nsgo   | `5 9 * * *`  （09:05）           | `5 1 * * *`（01:05 UTC）            | `TARGET=nsgo`   | 01:05 UTC   |
+| viva   | `5 10 * * *` （10:05）           | `5 2 * * *`（02:05 UTC）            | `TARGET=viva`   | 02:05 UTC   |
 
-> wails2 的定时已停用：旧版无需每天跟踪上游（已有新版 wails3），见 [维护 — 日常构建](golang/maintenance.md)。GitLab 的 cron 在 UI / API 里，需把 `TARGET=wails2` 那条 Pipeline schedule 设为 inactive（或删除）；只停定时任务本身不会影响已推送的镜像和手动 Run pipeline。
+> 基座到 fnpack 留 3 小时，之后各变体依次排在 04:05 至 10:05；变体脚本等基础镜像 5 分钟即可，viva 作为最后一个变体距基座已过十小时。
 
-也可以只建一条每天一次的 schedule，不填 `TARGET`——七个镜像会按 `golang → variants` 的顺序在一条流水线里全部构建。这样总时长更长，但配置更少。**注意**这种全量 schedule 下 wails2 仍会被构建（`build-wails2.yml` 的 rules 匹配空 `TARGET`），要彻底排除需收紧该 rules。
+> wails2 的定时任务暂时停用（05:05 / 21:05 UTC 当前没有定时任务运行）：旧版无需每天跟踪上游（已有新版 wails3），见 [维护 — 日常构建](golang/maintenance.md)。GitLab 的 cron 在 UI / API 里，需把 `TARGET=wails2` 那条 Pipeline schedule 设为 inactive（或删除）；只停定时任务本身不会影响已推送的镜像和手动 Run pipeline。
+
+也可以只建一条每天一次的 schedule，不填 `TARGET`——九个镜像会按 `golang → variants` 的顺序在一条流水线里全部构建（`golang` stage 先完成，变体脚本的 5 分钟等待只是兜底）。这样总时长更长，但配置更少。**注意**这种全量 schedule 下 wails2 仍会被构建（`build-wails2.yml` 的 rules 匹配空 `TARGET`），要彻底排除需收紧该 rules。
 
 手动发布：**CI/CD → Pipelines → Run pipeline**，在表单里填：
 
-| 变量             | 说明                                                                                          | 对应 GitHub 输入 |
-|------------------|-----------------------------------------------------------------------------------------------|------------------|
-| `TARGET`         | 留空 = 七个都构建；也可填 `golang` / `fnpack` / `wails3` / `wails2` / `fyne` / `mygo` / `gio` | —                |
-| `VERSION`        | Go 版本；留空 = Dockerfile 的 `GO_VERSION`；可填 `1.27` / `1.27.3`                            | `version`        |
-| `FNPACK_VERSION` | fnpack 版本；留空 = Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`）                            | `fnpack_version` |
-| `WAILS3_VERSION` | wails3 版本；留空 = 解析上游最新稳定 tag                                                      | `wails3_version` |
-| `WAILS2_VERSION` | wails2 版本；留空 = 解析上游最新稳定 tag                                                      | `wails2_version` |
-| `FYNE_VERSION`   | fyne CLI 版本；留空 = 解析上游最新稳定 tag（如 `v1.7.4`）                                     | `fyne_version`   |
-| `MYGO_VERSION`   | mygo CLI 版本；留空 = 解析上游最新稳定 tag（如 `v0.8.1`）                                     | `mygo_version`   |
-| `BUN_VERSION`    | bun 版本（mygo 前端模板用）；留空 = 解析 npm 上最新稳定版（如 `1.4.4`）                       | `bun_version`    |
-| `GIO_VERSION`    | gogio CLI 版本（模块 `gioui.org/cmd`）；留空 = 解析上游最新稳定 tag（如 `v0.10.3`）           | `gio_version`    |
-| `CACHE`          | `on` / `off`；`off` = 关闭 buildx 层缓存并强制全量重建                                        | —                |
+| 变量             | 说明                                                                                                            | 对应 GitHub 输入 |
+|------------------|-----------------------------------------------------------------------------------------------------------------|------------------|
+| `TARGET`         | 留空 = 九个都构建；也可填 `golang` / `fnpack` / `wails3` / `wails2` / `fyne` / `mygo` / `gio` / `nsgo` / `viva` | —                |
+| `VERSION`        | Go 版本；留空 = Dockerfile 的 `GO_VERSION`；可填 `1.27` / `1.27.3`                                              | `version`        |
+| `FNPACK_VERSION` | fnpack 版本；留空 = Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`）                                              | `fnpack_version` |
+| `WAILS3_VERSION` | wails3 版本；留空 = 解析上游最新稳定 tag                                                                        | `wails3_version` |
+| `WAILS2_VERSION` | wails2 版本；留空 = 解析上游最新稳定 tag                                                                        | `wails2_version` |
+| `FYNE_VERSION`   | fyne CLI 版本；留空 = 解析上游最新稳定 tag（如 `v1.7.4`）                                                       | `fyne_version`   |
+| `MYGO_VERSION`   | mygo CLI 版本；留空 = 解析上游最新稳定 tag（如 `v0.8.1`）                                                       | `mygo_version`   |
+| `BUN_VERSION`    | bun 版本（mygo 前端模板用）；留空 = 解析 npm 上最新稳定版（如 `1.4.4`）                                         | `bun_version`    |
+| `GIO_VERSION`    | gogio CLI 版本（模块 `gioui.org/cmd`）；留空 = 解析上游最新稳定 tag（如 `v0.10.3`）                             | `gio_version`    |
+| `NSGO_VERSION`   | nsgo 版本（模块 `github.com/nsgo-dev/nsgo`）；留空 = 解析上游最新版本（无 tag，为伪版本）                       | `nsgo_version`   |
+| `VIVA_VERSION`   | viva 版本（模块 `github.com/vivaui/viva`）；留空 = 解析上游最新稳定 tag（如 `v0.6.4`）                          | `viva_version`   |
+| `CACHE`          | `on` / `off`；`off` = 关闭 buildx 层缓存并强制全量重建                                                          | —                |
 
 只重建变体时，要保证对应 `<go 版本>` 的基础镜像已经存在于 registry；否则脚本等 5 分钟 后报错退出，不会自己重复装一遍工具链。
 
@@ -112,11 +124,11 @@ GitLab 的 cron 不在 YAML 里，定时任务要建在 **CI/CD → Schedules**�
 每个作业用 `resource_group: build-<镜像>`：
 
 - 同一个镜像的多次触发串行等待，不取消正在运行的旧流水线（与 GitHub 的 `cancel-in-progress: false` 同语义）。
-- 七个 `resource_group` 各不相同，golang / fnpack / wails3 / wails2 / fyne / mygo / gio **彼此不互斥**； 它们之间的先后顺序仍靠定时任务错开，或同一条流水线里的 stage 顺序保证。
+- 九个 `resource_group` 各不相同，golang / fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva **彼此不互斥**； 它们之间的先后顺序仍靠定时任务错开，或同一条流水线里的 stage 顺序保证。
 
 ## Runner 要求
 
-七个作业都用 `docker:cli` + `docker:dind`，并需要：
+九个作业都用 `docker:cli` + `docker:dind`，并需要：
 
 1. **允许 privileged 容器**：`docker:dind` 本身要求 runner 的 `privileged = true`； runner 没开时 `docker info` 会一直失败，`before_script` 30 秒后报错。
 2. **跨架构 QEMU**：`before_script` 分别探测 `linux/amd64` 与 `linux/arm64`； 缺哪个就用 `tonistiigi/binfmt --install <arch>` 注册（同样需要 privileged）。这样 amd64 runner 能构建 arm64，arm64 runner 也能构建 amd64。
@@ -156,6 +168,14 @@ export bun_version="${BUN_VERSION:-}"
 # build-gio.yml
 export version="${VERSION:-}"
 export gio_version="${GIO_VERSION:-}"
+
+# build-nsgo.yml
+export version="${VERSION:-}"
+export nsgo_version="${NSGO_VERSION:-}"
+
+# build-viva.yml
+export version="${VERSION:-}"
+export viva_version="${VIVA_VERSION:-}"
 ```
 
 其余由脚本从 `CI_*` 派生。`CI_REGISTRY_PASSWORD` 是 GitLab 自动注入的临时令牌， 不要写进项目变量。
@@ -172,7 +192,7 @@ latest                    latest
 <go 版本>-linux-arm64     1.27.3-linux-arm64
 ```
 
-各变体镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升； fnpack / wails3 / wails2 / fyne / mygo / gio 只在基础镜像对应标签也指向本次版本时才提升。
+各变体镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升； fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 只在基础镜像对应标签也指向本次版本时才提升。
 
 ## 缓存
 
@@ -182,7 +202,7 @@ latest                    latest
 
 ## 元数据
 
-七个脚本分别写：
+九个脚本分别写：
 
 ```text
 .gitlab/annotation.json
@@ -192,6 +212,8 @@ latest                    latest
 .gitlab/annotation-fyne.json
 .gitlab/annotation-mygo.json
 .gitlab/annotation-gio.json
+.gitlab/annotation-nsgo.json
+.gitlab/annotation-viva.json
 ```
 
 每个 job 用 `artifacts:paths` 保留 30 天；构建失败时也会尽量保留（`when: always`）。 GitLab 没有 GitHub Step Summary 那种专门的运行摘要，元数据同时会打印在 job 日志里。
@@ -215,7 +237,7 @@ latest                    latest
 - **`docker info` 30 秒超时**：runner 没开 privileged，或 `docker:dind` 服务没起来。 先看 job 日志里 dind service 的输出。
 - **`could not create a builder instance with TLS data loaded from environment`**：`before_script` 少了把 dind 的 TLS 环境固化成 docker context 这一步。 buildx 不接受直接从 `DOCKER_HOST` / `DOCKER_TLS_*` 建 builder，先 `docker context create tls-environment`， 再把 context 作为 `docker buildx create` 的 endpoint。后面那句 `failed to find instance` 是同一原因导致的连带报错。
 - **`exec format error` / 跨架构构建失败**：QEMU binfmt 没注册成功。确认 `tonistiigi/binfmt --install amd64,arm64` 能跑（需要 privileged），或让 runner 预装 binfmt。
-- **`no space left on device`**：dind 的磁盘在 runner 上，基础镜像 + 六个变体同时构建时 容易满；给 runner 留足空间，或把七个镜像拆到不同 schedule / runner。
+- **`no space left on device`**：dind 的磁盘在 runner 上，基础镜像 + 八个变体同时构建时 容易满；给 runner 留足空间，或把九个镜像拆到不同 schedule / runner。
 - **`manifest unknown`**：变体作业找不到基础镜像 `<go 版本>`。先跑 `TARGET=golang`， 或等定时任务里的 golang 作业完成。
 - **推送 403**：确认 `CI_REGISTRY_PASSWORD` 没有被项目变量覆盖成只读 token； GitLab 自动注入的 `CI_JOB_TOKEN` / `CI_REGISTRY_PASSWORD` 才有写权限。
 - **镜像里没有最新工具**：检查 `<镜像>:buildcache` 是否存在、`CACHE` 是否为 `off`； 上游没发新版时全命中缓存是预期行为。
