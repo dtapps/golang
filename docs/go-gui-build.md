@@ -12,13 +12,13 @@
 
 ## 它做什么、不做什么
 
-| 做                                                            | 不做                                                                                                |
-|---------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| 做                                                            | 不做                                                                                                  |
+|---------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | 按 `framework` 选镜像变体、拼默认命令                         | 不安装任何系统依赖、不动软件源——依赖清单只存在于 Dockerfile；**也不装 Go**（有就用，缺失/太旧报错） |
-| Linux：`docker run` 在变体镜像内构建                          | 不做「全 Linux 交叉编译发版」：交叉产出的 macOS 二进制未签名，不适合发布链路                        |
-| macOS / Windows：原生执行**同一份**命令串，产物可签名、可打包 | 不处理 GHCR 登录（公开镜像无需登录；私有才由调用方登录）                                            |
-| `package=true` 时把打包命令串进 build，产物按 `bin-dir` 上传  | 不做 macOS 公证 / Windows signtool（需要证书 secrets，调用方后续步骤）                              |
-| 镜像引用支持 tag 与 digest                                    | 不做 docker-in-docker 交叉编译（`wails3 task setup:docker` / fyne-cross 是调用方扩展点）            |
+| Linux：`docker run` 在变体镜像内构建                          | 不做「全 Linux 交叉编译发版」：交叉产出的 macOS 二进制未签名，不适合发布链路                          |
+| macOS / Windows：原生执行**同一份**命令串，产物可签名、可打包 | 不处理 GHCR 登录（公开镜像无需登录；私有才由调用方登录）                                              |
+| `package=true` 时把打包命令串进 build，产物按 `bin-dir` 上传  | 不做 macOS 公证 / Windows signtool（需要证书 secrets，调用方后续步骤）                                |
+| 镜像引用支持 tag 与 digest                                    | 不做 docker-in-docker 交叉编译（`wails3 task setup:docker` / fyne-cross 是调用方扩展点）              |
 
 只做这一个通用 action，不做七个、不造合并镜像；只服务 GitHub 侧（默认 ghcr.io）， CNB / GitLab 各自维护自己的调用胶水（见 [github.md](github.md) 的「三份独立实现」）。
 
@@ -102,7 +102,7 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
 
 | framework        | build            | install（仅原生执行）                                     | package          |
 |------------------|------------------|-----------------------------------------------------------|------------------|
-| `wails3`         | `wails3 build`   | `go install …/v3/cmd/wails3@<pin>`                        | `wails3 package` |
+| `wails3`         | `wails3 build`   | `go install …/v3/cmd/wails3@<pin>`                       | `wails3 package` |
 | `wails2`         | `wails build`    | `go install github.com/wailsapp/wails/v2/cmd/wails@<pin>` | `wails package`  |
 | `fyne`           | `go build ./...` | `go install fyne.io/tools/cmd/fyne@<pin>`                 | `fyne package`   |
 | `mygo`           | `go build ./...` | `go install github.com/egoist/mygo/cmd/mygo@<pin>`        | 空               |
@@ -144,12 +144,12 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
 - **setup-only（示例默认）**：只装 CLI，后续步骤自己跑命令，不需要 Docker；
 - **构建模式（不传 setup-only）**：action 内构建 / 打包 / 上传，命令默认值见下表。
 
-| framework | 镜像变体  | 构建模式默认命令                                                    | `bin-dir`   |
-|-----------|-----------|---------------------------------------------------------------------|-------------|
+| framework | 镜像变体  | 构建模式默认命令                                                     | `bin-dir`   |
+|-----------|-----------|----------------------------------------------------------------------|-------------|
 | `golang`  | 根镜像    | `go build ./...` 不落盘 → `go build -o bin/app ./cmd/app`           | `bin`       |
-| `fnpack`  | `/fnpack` | 同上落盘到 `dist`；打 `.fpk` 用 `fnpack build` 覆盖 package         | `dist`      |
-| `wails3`  | `/wails3` | `wails3 build` / `wails3 package` 直接用                            | `build/bin` |
-| `wails2`  | `/wails2` | `wails build` / `wails package` 直接用（可选 `-tags`）              | `build/bin` |
+| `fnpack`  | `/fnpack` | 同上落盘到 `dist`；打 `.fpk` 用 `fnpack build` 覆盖 package          | `dist`      |
+| `wails3`  | `/wails3` | `wails3 build` / `wails3 package` 直接用                             | `build/bin` |
+| `wails2`  | `/wails2` | `wails build` / `wails package` 直接用（可选 `-tags`）               | `build/bin` |
 | `fyne`    | `/fyne`   | `go build ./...` 不落盘 → `go build -o bin/app ...`；`fyne package` | `bin`       |
 | `gio`     | `/gio`    | `go build ./...` 不落盘 → `go build -o bin/app .`                   | `bin`       |
 | `mygo`    | `/mygo`   | `go build ./...` 只做编译检查 → `mygo build`                        | 按项目      |
@@ -290,13 +290,13 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
 
 ## 执行流程
 
-| 步骤                | Linux（`runner.os == 'Linux'`）                                                                                                                                        | macOS / Windows（`runner.os != 'Linux'`）                                                                                                                                                                                                                                                                                                                                                                                                         |
-|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1. Resolve commands | 解析 framework → build / install / package + 镜像仓库引用                                                                                                              | 同左                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| 2. 容器构建         | `docker run --rm`：`$GITHUB_WORKSPACE` 挂到 `/workspace`，`-w` = `/workspace` + working-directory，`-e CGO_ENABLED=1`，`--entrypoint` 覆盖镜像 ENTRYPOINT 后执行命令串 | —                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| 3. 原生构建         | —                                                                                                                                                                      | `Check Go`（有 Go 就继续，没有直接报错；**不安装、不校验版本**）→ `Cache CLI binaries`（`cache=true` 才跑）→ install 非空且缓存未命中才跑 → `Export CLI path` → `Cache NSIS`（仅 Windows、`tools` 含 `nsis`、`cache=true`）→ `Install NSIS`（同上条件，命中缓存则跳过下载，脚本 `scripts/install-nsis.ps1`）→ `Print CLI versions`（把实际版本打进日志）→ 在 working-directory 下执行同一份 build 命令串（shell = native-shell，`CGO_ENABLED=1`） |
-| 4. artifact 计算    | 名称 = `artifact-name` 或 `<framework>-<OS>`                                                                                                                           | 同左                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| 5. 上传产物         | `actions/upload-artifact`：path = working-directory/bin-dir，`if-no-files-found: error`                                                                                | 同左                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 步骤                | Linux（`runner.os == 'Linux'`）                                                                                                                                        | macOS / Windows（`runner.os != 'Linux'`）                                                                                                                                                                                                                                                                                                                                                                                                                |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1. Resolve commands | 解析 framework → build / install / package + 镜像仓库引用                                                                                                             | 同左                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 2. 容器构建         | `docker run --rm`：`$GITHUB_WORKSPACE` 挂到 `/workspace`，`-w` = `/workspace` + working-directory，`-e CGO_ENABLED=1`，`--entrypoint` 覆盖镜像 ENTRYPOINT 后执行命令串 | —                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 3. 原生构建         | —                                                                                                                                                                     | `Check Go`（有 Go 就继续，没有直接报错；**不安装、不校验版本**）→ `Cache CLI binaries`（`cache=true` 才跑）→ install 非空且缓存未命中才跑 → `Export CLI path` → `Cache NSIS`（仅 Windows、`tools` 含 `nsis`、`cache=true`）→ `Install NSIS`（同上条件，命中缓存则跳过下载，脚本 `scripts/install-nsis.ps1`）→ `Print CLI versions`（把实际版本打进日志）→ 在 working-directory 下执行同一份 build 命令串（shell = native-shell，`CGO_ENABLED=1`） |
+| 4. artifact 计算    | 名称 = `artifact-name` 或 `<framework>-<OS>`                                                                                                                           | 同左                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 5. 上传产物         | `actions/upload-artifact`：path = working-directory/bin-dir，`if-no-files-found: error`                                                                                | 同左                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 实现细节：
 
@@ -368,10 +368,10 @@ steps:
 | 示例文件                                                     | framework | 模式       | 后续步骤                          |
 |--------------------------------------------------------------|-----------|------------|-----------------------------------|
 | [golang.yml](../../.github/examples/go-gui-build/golang.yml) | `golang`  | setup-only | `go build -o bin/app ./cmd/app`   |
-| [fnpack.yml](../../.github/examples/go-gui-build/fnpack.yml) | `fnpack`  | setup-only | `go build …` + `fnpack build`     |
+| [fnpack.yml](../../.github/examples/go-gui-build/fnpack.yml) | `fnpack`  | setup-only | `go build …` + `fnpack build`    |
 | [wails3.yml](../../.github/examples/go-gui-build/wails3.yml) | `wails3`  | setup-only | `wails3 build` / `wails3 package` |
 | [wails2.yml](../../.github/examples/go-gui-build/wails2.yml) | `wails2`  | setup-only | `wails build` / `wails package`   |
-| [fyne.yml](../../.github/examples/go-gui-build/fyne.yml)     | `fyne`    | setup-only | `go build …` / `fyne package`     |
+| [fyne.yml](../../.github/examples/go-gui-build/fyne.yml)     | `fyne`    | setup-only | `go build …` / `fyne package`    |
 | [gio.yml](../../.github/examples/go-gui-build/gio.yml)       | `gio`     | setup-only | `go build -o bin/app .`           |
 | [mygo.yml](../../.github/examples/go-gui-build/mygo.yml)     | `mygo`    | setup-only | `mygo build`                      |
 

@@ -7,13 +7,13 @@
 | GitHub Release（UPX）              | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`           |
 | GitHub Release Atom（UPX 版本号）  | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`（同域名） |
 | Node.js 官方 tar.xz 与版本索引     | 直连 `nodejs.org`               | `https://files.m.daocloud.io/nodejs.org/...`           |
-| nfpm 与各 Go 工具（`go install`）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
+| nfpm 与各 Go 工具（`go install`）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
 | fnpack                             | 直连 `static2.fnnas.com`        | 直连 `static2.fnnas.com`                               |
-| wails3（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
-| wails2（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
-| fyne（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
-| mygo（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
-| gio（`go install` 与版本解析）     | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
+| wails3（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
+| wails2（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
+| fyne（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
+| mygo（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
+| gio（`go install` 与版本解析）     | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
 | bun（`npm install -g` 与版本解析） | npm 官方 `registry.npmjs.org`   | `mirrors.cloud.tencent.com/npm/`                       |
 | Debian APT                         | 默认 `deb.debian.org`           | `mirrors.cloud.tencent.com`                            |
 | npm / pnpm registry                | 默认 `registry.npmjs.org`       | `mirrors.cloud.tencent.com/npm/`                       |

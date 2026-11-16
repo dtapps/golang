@@ -7,7 +7,7 @@
 # 另两侧刻意不设 GOPROXY，用 Go 默认代理。
 #
 # 镜像内容：
-#   Go 工具链 + UPX + nfpm + Node.js/pnpm
+#   Go 工具链 + UPX + nfpm + GoReleaser + Node.js/pnpm
 #   + sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt
 #   + gojq / sql-formatter / gotestsum / markdownfmt
 #   + gocover-cobertura / gcov2lcov（覆盖率报告转换）
@@ -66,11 +66,13 @@ ARG NODE_MIRROR=""
 #              无 60 次/小时限速，且 DaoCloud 直接镜像该路径）
 #   Node       ${NODE_BASE}/index.json 第一个非预发布版本（过滤 -alpha/-rc）
 #   nfpm       go install @latest（走 GOPROXY；钉版本格式 vX.Y.Z）
+#   GoReleaser go install @latest（v2 模块路径含 /v2；钉版本格式 v2.X.Y）
 #   Go 工具链  go install @latest（模块路径含 /v2、/v3，不会自动跳 major）
 #   pnpm       npm registry 的 pnpm@latest
 #
 # https://github.com/upx/upx/releases
 # https://github.com/goreleaser/nfpm/releases
+# https://github.com/goreleaser/goreleaser/releases
 # https://github.com/nodejs/node/releases
 # https://github.com/pnpm/pnpm/releases
 # https://github.com/ent/ent/releases
@@ -89,6 +91,7 @@ ARG NODE_MIRROR=""
 # ==========================================
 ARG UPX_VERSION=latest
 ARG NFPM_VERSION=latest
+ARG GORELEASER_VERSION=latest
 ARG NODE_VERSION=latest
 ARG PNPM_VERSION=latest
 ARG ENT_VERSION=latest
@@ -232,7 +235,7 @@ RUN set -eux; \
 # 变体镜像（FROM 本镜像）自动继承这个脚本，wails2/wails3 等也能直接用。
 COPY --chmod=0755 .cnb/docker/install-tool.sh /usr/local/bin/install-tool
 
-# 6. 安装 Go 工具链（含 nfpm）
+# 6. 安装 Go 工具链（含 nfpm / GoReleaser）
 # 每个工具先试官方二进制 install-tool <名> <版本>，失败再 go install（走 GOPROXY 编译）。
 # 按工具分组拆层 + BuildKit 缓存挂载：
 #   · 拆层：某个工具发版时只重建它所在的那一层，不用所有工具全部重装；
@@ -244,6 +247,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     install-tool nfpm "${NFPM_VERSION}" \
     || go install -v github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION}; \
     echo "[${TARGETPLATFORM:-unknown}] ==> nfpm 安装完成 (${NFPM_VERSION})"; \
+    install-tool goreleaser "${GORELEASER_VERSION}" \
+    || go install -v github.com/goreleaser/goreleaser/v2/cmd/goreleaser@${GORELEASER_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> goreleaser 安装完成 (${GORELEASER_VERSION})"; \
     install-tool sqlc "${SQLC_VERSION}" \
     || go install -v github.com/sqlc-dev/sqlc/cmd/sqlc@${SQLC_VERSION}; \
     echo "[${TARGETPLATFORM:-unknown}] ==> sqlc 安装完成 (${SQLC_VERSION})"
@@ -332,7 +338,7 @@ LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.version="${IMAGE_VERSION}" \
-    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、task、wixl、gocover-cobertura、gcov2lcov" \
+    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + GoReleaser + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、task、wixl、gocover-cobertura、gcov2lcov" \
     org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.base.name="golang:${GO_VERSION}-${DEBIAN_VERSION}" \
     org.opencontainers.image.base.digest="${BASE_DIGEST}"

@@ -55,29 +55,29 @@ VIVA_IMAGE="${IMAGE}/viva"                                         # golang/viva
 
 ## 触发矩阵
 
-| 事件                                | 定义位置                                                            | 产物                                                                                   |
-|-------------------------------------|---------------------------------------------------------------------|----------------------------------------------------------------------------------------|
-| `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang；不传 version                                                   |
-| `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack（用 00:05 的基础镜像）                                          |
-| `'crontab: 5 4 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 04:05 构建 wails3（用 00:05 的基础镜像）                                          |
+| 事件                                | 定义位置                                                            | 产物                                                                                    |
+|-------------------------------------|---------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang；不传 version                                                    |
+| `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack（用 00:05 的基础镜像）                                           |
+| `'crontab: 5 4 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 04:05 构建 wails3（用 00:05 的基础镜像）                                           |
 | wails2 定时（暂时停用）             | `.cnb.yml` 的 `main`（注释块）                                      | wails2 的定时任务暂时停用，仅手动按钮触发，见 [维护 — 日常构建](golang/maintenance.md) |
-| `'crontab: 5 6 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 06:05 构建 fyne（用 00:05 的基础镜像）                                            |
-| `'crontab: 5 7 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 07:05 构建 mygo（用 00:05 的基础镜像）                                            |
-| `'crontab: 5 8 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 08:05 构建 gio（用 00:05 的基础镜像）                                             |
-| `'crontab: 5 9 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 09:05 构建 nsgo（用 00:05 的基础镜像）                                            |
-| `'crontab: 5 10 * * *'`             | `.cnb.yml` 的 `main`                                                | 每天 10:05 构建 viva（用 00:05 的基础镜像）                                            |
-| `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                                                        |
-| `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version`                                     |
-| `web_trigger_build_wails3`          | `.cnb/workflows/build-wails3.yml`                                   | 手动构建 wails3，可传 `version` / `wails3_version`                                     |
-| `web_trigger_build_wails2`          | `.cnb/workflows/build-wails2.yml`                                   | 手动构建 wails2，可传 `version` / `wails2_version`                                     |
-| `web_trigger_build_fyne`            | `.cnb/workflows/build-fyne.yml`                                     | 手动构建 fyne，可传 `version` / `fyne_version`                                         |
-| `web_trigger_build_mygo`            | `.cnb/workflows/build-mygo.yml`                                     | 手动构建 mygo，可传 `version` / `mygo_version` / `bun_version`                         |
-| `web_trigger_build_gio`             | `.cnb/workflows/build-gio.yml`                                      | 手动构建 gio，可传 `version` / `gio_version`                                           |
-| `web_trigger_build_nsgo`            | `.cnb/workflows/build-nsgo.yml`                                     | 手动构建 nsgo，可传 `version` / `nsgo_version`                                         |
-| `web_trigger_build_viva`            | `.cnb/workflows/build-viva.yml`                                     | 手动构建 viva，可传 `version` / `viva_version`                                         |
-| `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                                                                   |
-| `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验                                                        |
-| `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                                                              |
+| `'crontab: 5 6 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 06:05 构建 fyne（用 00:05 的基础镜像）                                             |
+| `'crontab: 5 7 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 07:05 构建 mygo（用 00:05 的基础镜像）                                             |
+| `'crontab: 5 8 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 08:05 构建 gio（用 00:05 的基础镜像）                                              |
+| `'crontab: 5 9 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 09:05 构建 nsgo（用 00:05 的基础镜像）                                             |
+| `'crontab: 5 10 * * *'`             | `.cnb.yml` 的 `main`                                                | 每天 10:05 构建 viva（用 00:05 的基础镜像）                                             |
+| `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                                                         |
+| `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version`                                      |
+| `web_trigger_build_wails3`          | `.cnb/workflows/build-wails3.yml`                                   | 手动构建 wails3，可传 `version` / `wails3_version`                                      |
+| `web_trigger_build_wails2`          | `.cnb/workflows/build-wails2.yml`                                   | 手动构建 wails2，可传 `version` / `wails2_version`                                      |
+| `web_trigger_build_fyne`            | `.cnb/workflows/build-fyne.yml`                                     | 手动构建 fyne，可传 `version` / `fyne_version`                                          |
+| `web_trigger_build_mygo`            | `.cnb/workflows/build-mygo.yml`                                     | 手动构建 mygo，可传 `version` / `mygo_version` / `bun_version`                          |
+| `web_trigger_build_gio`             | `.cnb/workflows/build-gio.yml`                                      | 手动构建 gio，可传 `version` / `gio_version`                                            |
+| `web_trigger_build_nsgo`            | `.cnb/workflows/build-nsgo.yml`                                     | 手动构建 nsgo，可传 `version` / `nsgo_version`                                          |
+| `web_trigger_build_viva`            | `.cnb/workflows/build-viva.yml`                                     | 手动构建 viva，可传 `version` / `viva_version`                                          |
+| `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                                                                    |
+| `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验                                                         |
+| `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                                                               |
 
 定时任务只在 `main` 顶层键下声明，所以只对默认分支生效；时间按 `Asia/Shanghai` 解释。
 

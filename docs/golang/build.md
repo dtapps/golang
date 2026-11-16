@@ -366,15 +366,15 @@ CACHE=off source .cnb/scripts/build-golang.sh
 
 ## 手动触发
 
-| 平台   | 镜像   | 入口                                                      | 输入                                  |
-|--------|--------|-----------------------------------------------------------|---------------------------------------|
-| CNB    | golang | 仓库页面按钮「打包 Golang 镜像」                          | `version`：留空 / 1.27 / 1.27.3       |
-| CNB    | fnpack | 仓库页面按钮「打包 Golang + fnpack 镜像」                 | 同上                                  |
-| CNB    | fyne   | 仓库页面按钮「打包 Golang + fyne 镜像」                   | 同上 + `fyne_version`                 |
-| CNB    | mygo   | 仓库页面按钮「打包 Golang + mygo 镜像」                   | 同上 + `mygo_version` / `bun_version` |
-| CNB    | gio    | 仓库页面按钮「打包 Golang + gio 镜像」                    | 同上 + `gio_version`                  |
-| CNB    | nsgo   | 仓库页面按钮「打包 Golang + nsgo 镜像」                   | 同上 + `nsgo_version`                 |
-| CNB    | viva   | 仓库页面按钮「打包 Golang + viva 镜像」                   | 同上 + `viva_version`                 |
+| 平台   | 镜像   | 入口                                                        | 输入                                  |
+|--------|--------|-------------------------------------------------------------|---------------------------------------|
+| CNB    | golang | 仓库页面按钮「打包 Golang 镜像」                            | `version`：留空 / 1.27 / 1.27.3       |
+| CNB    | fnpack | 仓库页面按钮「打包 Golang + fnpack 镜像」                   | 同上                                  |
+| CNB    | fyne   | 仓库页面按钮「打包 Golang + fyne 镜像」                     | 同上 + `fyne_version`                 |
+| CNB    | mygo   | 仓库页面按钮「打包 Golang + mygo 镜像」                     | 同上 + `mygo_version` / `bun_version` |
+| CNB    | gio    | 仓库页面按钮「打包 Golang + gio 镜像」                      | 同上 + `gio_version`                  |
+| CNB    | nsgo   | 仓库页面按钮「打包 Golang + nsgo 镜像」                     | 同上 + `nsgo_version`                 |
+| CNB    | viva   | 仓库页面按钮「打包 Golang + viva 镜像」                     | 同上 + `viva_version`                 |
 | GitHub | golang | Actions → build-golang → Run workflow                     | 同上                                  |
 | GitHub | fnpack | Actions → build-fnpack → Run workflow（需基础镜像已存在） | 同上                                  |
 | GitHub | fyne   | Actions → build-fyne → Run workflow（需基础镜像已存在）   | 同上 + `fyne_version`                 |
@@ -383,12 +383,12 @@ CACHE=off source .cnb/scripts/build-golang.sh
 | GitHub | nsgo   | Actions → build-nsgo → Run workflow（需基础镜像已存在）   | 同上 + `nsgo_version`                 |
 | GitHub | viva   | Actions → build-viva → Run workflow（需基础镜像已存在）   | 同上 + `viva_version`                 |
 | GitLab | 任意   | CI/CD → Pipelines → Run pipeline                          | `TARGET` 选镜像；`VERSION` 同上       |
-| GitLab | golang | 定时 schedule，`TARGET=golang`                            | `VERSION`：留空 / 1.27 / 1.27.3       |
-| GitLab | fnpack | 定时 schedule，`TARGET=fnpack`（需基础镜像已存在）        | 同上 + `FNPACK_VERSION`               |
-| GitLab | fyne   | 定时 schedule，`TARGET=fyne`（需基础镜像已存在）          | 同上 + `FYNE_VERSION`                 |
-| GitLab | mygo   | 定时 schedule，`TARGET=mygo`（需基础镜像已存在）          | 同上 + `MYGO_VERSION` / `BUN_VERSION` |
-| GitLab | gio    | 定时 schedule，`TARGET=gio`（需基础镜像已存在）           | 同上 + `GIO_VERSION`                  |
-| GitLab | nsgo   | 定时 schedule，`TARGET=nsgo`（需基础镜像已存在）          | 同上 + `NSGO_VERSION`                 |
-| GitLab | viva   | 定时 schedule，`TARGET=viva`（需基础镜像已存在）          | 同上 + `VIVA_VERSION`                 |
+| GitLab | golang | 定时 schedule，`TARGET=golang`                              | `VERSION`：留空 / 1.27 / 1.27.3       |
+| GitLab | fnpack | 定时 schedule，`TARGET=fnpack`（需基础镜像已存在）          | 同上 + `FNPACK_VERSION`               |
+| GitLab | fyne   | 定时 schedule，`TARGET=fyne`（需基础镜像已存在）            | 同上 + `FYNE_VERSION`                 |
+| GitLab | mygo   | 定时 schedule，`TARGET=mygo`（需基础镜像已存在）            | 同上 + `MYGO_VERSION` / `BUN_VERSION` |
+| GitLab | gio    | 定时 schedule，`TARGET=gio`（需基础镜像已存在）             | 同上 + `GIO_VERSION`                  |
+| GitLab | nsgo   | 定时 schedule，`TARGET=nsgo`（需基础镜像已存在）            | 同上 + `NSGO_VERSION`                 |
+| GitLab | viva   | 定时 schedule，`TARGET=viva`（需基础镜像已存在）            | 同上 + `VIVA_VERSION`                 |
 
 留空表示使用 Dockerfile 的默认值：`golang:1-trixie` 自动跟随最新稳定 Go。填 `1.27` 会跟随该 minor 的最新补丁，填 `1.27.3` 精确到补丁版本。标签里的版本始终是解析后的实际版本。

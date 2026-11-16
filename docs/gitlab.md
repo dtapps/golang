@@ -104,7 +104,7 @@ GitLab 的 cron 不在 YAML 里，定时任务要建在 **CI/CD → Schedules**�
 
 | 变量             | 说明                                                                                                            | 对应 GitHub 输入 |
 |------------------|-----------------------------------------------------------------------------------------------------------------|------------------|
-| `TARGET`         | 留空 = 九个都构建；也可填 `golang` / `fnpack` / `wails3` / `wails2` / `fyne` / `mygo` / `gio` / `nsgo` / `viva` | —                |
+| `TARGET`         | 留空 = 九个都构建；也可填 `golang` / `fnpack` / `wails3` / `wails2` / `fyne` / `mygo` / `gio` / `nsgo` / `viva` | —               |
 | `VERSION`        | Go 版本；留空 = Dockerfile 的 `GO_VERSION`；可填 `1.27` / `1.27.3`                                              | `version`        |
 | `FNPACK_VERSION` | fnpack 版本；留空 = Dockerfile 的 `FNPACK_VERSION`（当前 `1.2.3`）                                              | `fnpack_version` |
 | `WAILS3_VERSION` | wails3 版本；留空 = 解析上游最新稳定 tag                                                                        | `wails3_version` |
@@ -115,7 +115,7 @@ GitLab 的 cron 不在 YAML 里，定时任务要建在 **CI/CD → Schedules**�
 | `GIO_VERSION`    | gogio CLI 版本（模块 `gioui.org/cmd`）；留空 = 解析上游最新稳定 tag（如 `v0.10.3`）                             | `gio_version`    |
 | `NSGO_VERSION`   | nsgo 版本（模块 `github.com/nsgo-dev/nsgo`）；留空 = 解析上游最新版本（无 tag，为伪版本）                       | `nsgo_version`   |
 | `VIVA_VERSION`   | viva 版本（模块 `github.com/vivaui/viva`）；留空 = 解析上游最新稳定 tag（如 `v0.6.4`）                          | `viva_version`   |
-| `CACHE`          | `on` / `off`；`off` = 关闭 buildx 层缓存并强制全量重建                                                          | —                |
+| `CACHE`          | `on` / `off`；`off` = 关闭 buildx 层缓存并强制全量重建                                                          | —               |
 
 只重建变体时，要保证对应 `<go 版本>` 的基础镜像已经存在于 registry；否则脚本等 5 分钟 后报错退出，不会自己重复装一遍工具链。
 

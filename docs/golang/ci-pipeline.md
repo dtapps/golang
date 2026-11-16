@@ -20,29 +20,29 @@ fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 镜像都 `FROM` 同�
 
 ### CNB
 
-| 事件                                | 定义位置                                                            | 产物 / 行为                                                                 |
-|-------------------------------------|---------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang 基础镜像；不传 version                               |
-| `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack 镜像；使用 00:05 产出的基础镜像                      |
-| `'crontab: 5 4 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 04:05 构建 wails3 镜像；使用 00:05 产出的基础镜像                      |
+| 事件                                | 定义位置                                                            | 产物 / 行为                                                                  |
+|-------------------------------------|---------------------------------------------------------------------|------------------------------------------------------------------------------|
+| `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang 基础镜像；不传 version                                |
+| `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack 镜像；使用 00:05 产出的基础镜像                       |
+| `'crontab: 5 4 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 04:05 构建 wails3 镜像；使用 00:05 产出的基础镜像                       |
 | wails2 定时（暂时停用）             | `.cnb.yml` 的 `main`（注释块）                                      | wails2 的定时任务暂时停用，仅手动触发，见 [维护 — 日常构建](maintenance.md) |
-| `'crontab: 5 6 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 06:05 构建 fyne 镜像；使用 00:05 产出的基础镜像                        |
-| `'crontab: 5 7 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 07:05 构建 mygo 镜像；使用 00:05 产出的基础镜像                        |
-| `'crontab: 5 8 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 08:05 构建 gio 镜像；使用 00:05 产出的基础镜像                         |
-| `'crontab: 5 9 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 09:05 构建 nsgo 镜像；使用 00:05 产出的基础镜像                        |
-| `'crontab: 5 10 * * *'`             | `.cnb.yml` 的 `main`                                                | 每天 10:05 构建 viva 镜像；使用 00:05 产出的基础镜像                        |
-| `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                                             |
-| `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version`                          |
-| `web_trigger_build_wails3`          | `.cnb/workflows/build-wails3.yml`                                   | 手动构建 wails3，可传 `version` / `wails3_version`                          |
-| `web_trigger_build_wails2`          | `.cnb/workflows/build-wails2.yml`                                   | 手动构建 wails2，可传 `version` / `wails2_version`                          |
-| `web_trigger_build_fyne`            | `.cnb/workflows/build-fyne.yml`                                     | 手动构建 fyne，可传 `version` / `fyne_version`                              |
-| `web_trigger_build_mygo`            | `.cnb/workflows/build-mygo.yml`                                     | 手动构建 mygo，可传 `version` / `mygo_version` / `bun_version`              |
-| `web_trigger_build_gio`             | `.cnb/workflows/build-gio.yml`                                      | 手动构建 gio，可传 `version` / `gio_version`                                |
-| `web_trigger_build_nsgo`            | `.cnb/workflows/build-nsgo.yml`                                     | 手动构建 nsgo，可传 `version` / `nsgo_version`                              |
-| `web_trigger_build_viva`            | `.cnb/workflows/build-viva.yml`                                     | 手动构建 viva，可传 `version` / `viva_version`                              |
-| `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                                                        |
-| `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验                                             |
-| `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                                                   |
+| `'crontab: 5 6 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 06:05 构建 fyne 镜像；使用 00:05 产出的基础镜像                         |
+| `'crontab: 5 7 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 07:05 构建 mygo 镜像；使用 00:05 产出的基础镜像                         |
+| `'crontab: 5 8 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 08:05 构建 gio 镜像；使用 00:05 产出的基础镜像                          |
+| `'crontab: 5 9 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 09:05 构建 nsgo 镜像；使用 00:05 产出的基础镜像                         |
+| `'crontab: 5 10 * * *'`             | `.cnb.yml` 的 `main`                                                | 每天 10:05 构建 viva 镜像；使用 00:05 产出的基础镜像                         |
+| `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                                              |
+| `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version`                           |
+| `web_trigger_build_wails3`          | `.cnb/workflows/build-wails3.yml`                                   | 手动构建 wails3，可传 `version` / `wails3_version`                           |
+| `web_trigger_build_wails2`          | `.cnb/workflows/build-wails2.yml`                                   | 手动构建 wails2，可传 `version` / `wails2_version`                           |
+| `web_trigger_build_fyne`            | `.cnb/workflows/build-fyne.yml`                                     | 手动构建 fyne，可传 `version` / `fyne_version`                               |
+| `web_trigger_build_mygo`            | `.cnb/workflows/build-mygo.yml`                                     | 手动构建 mygo，可传 `version` / `mygo_version` / `bun_version`               |
+| `web_trigger_build_gio`             | `.cnb/workflows/build-gio.yml`                                      | 手动构建 gio，可传 `version` / `gio_version`                                 |
+| `web_trigger_build_nsgo`            | `.cnb/workflows/build-nsgo.yml`                                     | 手动构建 nsgo，可传 `version` / `nsgo_version`                               |
+| `web_trigger_build_viva`            | `.cnb/workflows/build-viva.yml`                                     | 手动构建 viva，可传 `version` / `viva_version`                               |
+| `push`                              | `.cnb/workflows/{sca,knowledge-base}.yml`                           | SCA 报告、知识库索引                                                         |
+| `pull_request`                      | `.cnb/workflows/{code-review,cnb-sechook,code-security-config}.yml` | PR 评论、敏感信息统计、配置校验                                              |
+| `tag_push` / `web_trigger_codewiki` | `.cnb/workflows/codewiki.yml`                                       | Code Wiki                                                                    |
 
 定时任务按 00:05 的 golang、03:05 的 fnpack、04:05 的 wails3、06:05 的 fyne、07:05 的 mygo、08:05 的 gio、09:05 的 nsgo、10:05 的 viva 依次执行，第一段留 3 小时给基座；变体都要求 00:05 推好的 `<go 版本>` 标签已经存在。
 
@@ -56,7 +56,7 @@ fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 镜像都 `FROM` 同�
 | `build-fnpack` | `workflow_dispatch`                            | 手动构建，可传 `version` / `fnpack_version`（要求基础镜像已存在）               |
 | `build-wails3` | `schedule` 每天 `5 20 * * *` UTC（北京 04:05） | 构建并推送 wails3（要求基础镜像已存在）                                         |
 | `build-wails3` | `workflow_dispatch`                            | 手动构建，可传 `version` / `wails3_version`（要求基础镜像已存在）               |
-| `build-wails2` | `schedule`（暂时停用，`5 21` UTC 注释待恢复）  | 旧版不每天跟踪上游，见 [维护 — 日常构建](maintenance.md)                        |
+| `build-wails2` | `schedule`（暂时停用，`5 21` UTC 注释待恢复）  | 旧版不每天跟踪上游，见 [维护 — 日常构建](maintenance.md)                       |
 | `build-wails2` | `workflow_dispatch`                            | 手动构建，可传 `version` / `wails2_version`（要求基础镜像已存在）               |
 | `build-fyne`   | `schedule` 每天 `5 22 * * *` UTC（北京 06:05） | 构建并推送 fyne（要求基础镜像已存在）                                           |
 | `build-fyne`   | `workflow_dispatch`                            | 手动构建，可传 `version` / `fyne_version`（要求基础镜像已存在）                 |
@@ -77,17 +77,17 @@ GitHub 也按同样的节奏跑：16:05 UTC 的 golang、19:05 UTC 的 fnpack（
 
 GitLab 的 cron 不在 YAML 里，要在 **CI/CD → Schedules**（或 API）建定时流水线，用变量 `TARGET` 选镜像：
 
-| 镜像   | 建议 cron（UTC）         | 变量            | 行为                                                                     |
-|--------|--------------------------|-----------------|--------------------------------------------------------------------------|
-| golang | `5 16 * * *`             | `TARGET=golang` | 构建并推送 golang 基础镜像                                               |
-| fnpack | `5 19 * * *`             | `TARGET=fnpack` | 构建并推送 fnpack（要求基础镜像已存在）                                  |
-| wails3 | `5 20 * * *`             | `TARGET=wails3` | 构建并推送 wails3（要求基础镜像已存在）                                  |
+| 镜像   | 建议 cron（UTC）         | 变量            | 行为                                                                      |
+|--------|--------------------------|-----------------|---------------------------------------------------------------------------|
+| golang | `5 16 * * *`             | `TARGET=golang` | 构建并推送 golang 基础镜像                                                |
+| fnpack | `5 19 * * *`             | `TARGET=fnpack` | 构建并推送 fnpack（要求基础镜像已存在）                                   |
+| wails3 | `5 20 * * *`             | `TARGET=wails3` | 构建并推送 wails3（要求基础镜像已存在）                                   |
 | wails2 | `5 21 * * *`（暂时停用） | `TARGET=wails2` | 定时任务暂时停用，旧版按需手动构建，见 [维护 — 日常构建](maintenance.md) |
-| fyne   | `5 22 * * *`             | `TARGET=fyne`   | 构建并推送 fyne（要求基础镜像已存在）                                    |
-| mygo   | `5 23 * * *`             | `TARGET=mygo`   | 构建并推送 mygo（要求基础镜像已存在）                                    |
-| gio    | `5 0 * * *`              | `TARGET=gio`    | 构建并推送 gio（要求基础镜像已存在）                                     |
-| nsgo   | `5 1 * * *`              | `TARGET=nsgo`   | 构建并推送 nsgo（要求基础镜像已存在）                                    |
-| viva   | `5 2 * * *`              | `TARGET=viva`   | 构建并推送 viva（要求基础镜像已存在）                                    |
+| fyne   | `5 22 * * *`             | `TARGET=fyne`   | 构建并推送 fyne（要求基础镜像已存在）                                     |
+| mygo   | `5 23 * * *`             | `TARGET=mygo`   | 构建并推送 mygo（要求基础镜像已存在）                                     |
+| gio    | `5 0 * * *`              | `TARGET=gio`    | 构建并推送 gio（要求基础镜像已存在）                                      |
+| nsgo   | `5 1 * * *`              | `TARGET=nsgo`   | 构建并推送 nsgo（要求基础镜像已存在）                                     |
+| viva   | `5 2 * * *`              | `TARGET=viva`   | 构建并推送 viva（要求基础镜像已存在）                                     |
 
 > wails2 的定时任务暂时停用：已有新版 wails3，旧版没必要每天跟踪上游；需把 UI / API 里 `TARGET=wails2` 那条 schedule 设为 inactive（或删除），镜像定义与手动触发入口仍然可用，见 [维护 — 日常构建](maintenance.md)。
 
@@ -118,7 +118,7 @@ GitLab 的 **Run pipeline** 表单只暴露根 `.gitlab-ci.yml` 里带 `descript
 
 | 变量             | 等价 GitHub 输入 | 说明                                                                                                            |
 |------------------|------------------|-----------------------------------------------------------------------------------------------------------------|
-| `TARGET`         | —                | 留空 = 九个都构建；也可填 `golang` / `fnpack` / `wails3` / `wails2` / `fyne` / `mygo` / `gio` / `nsgo` / `viva` |
+| `TARGET`         | —               | 留空 = 九个都构建；也可填 `golang` / `fnpack` / `wails3` / `wails2` / `fyne` / `mygo` / `gio` / `nsgo` / `viva` |
 | `VERSION`        | `version`        | Go 版本；留空 = Dockerfile 的 `GO_VERSION`                                                                      |
 | `FNPACK_VERSION` | `fnpack_version` | fnpack 版本；留空 = Dockerfile 的 `FNPACK_VERSION`                                                              |
 | `WAILS3_VERSION` | `wails3_version` | wails3 版本；留空 = 解析上游最新稳定 tag                                                                        |
@@ -129,7 +129,7 @@ GitLab 的 **Run pipeline** 表单只暴露根 `.gitlab-ci.yml` 里带 `descript
 | `GIO_VERSION`    | `gio_version`    | gogio CLI 版本（模块 `gioui.org/cmd`）；留空 = 解析上游最新稳定 tag                                             |
 | `NSGO_VERSION`   | `nsgo_version`   | nsgo 版本（模块 `github.com/nsgo-dev/nsgo`）；留空 = 解析上游最新版本（无 tag，为伪版本）                       |
 | `VIVA_VERSION`   | `viva_version`   | viva 版本（模块 `github.com/vivaui/viva`）；留空 = 解析上游最新稳定 tag                                         |
-| `CACHE`          | —                | `on` / `off`；`off` = 关闭 buildx 层缓存并强制全量重建                                                          |
+| `CACHE`          | —               | `on` / `off`；`off` = 关闭 buildx 层缓存并强制全量重建                                                          |
 
 ## imports 的坑
 

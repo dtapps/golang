@@ -48,6 +48,10 @@ case "${tool}" in
     repo=goreleaser/nfpm
     file="nfpm_${v}_Linux_${deb}.tar.gz"
     ;;
+  goreleaser)
+    repo=goreleaser/goreleaser
+    file="goreleaser_Linux_${deb}.tar.gz"
+    ;;
   sqlc)
     repo=sqlc-dev/sqlc
     file="sqlc_${v}_linux_${arch}.tar.gz"

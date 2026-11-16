@@ -174,6 +174,7 @@ NPM_REGISTRY="https://registry.npmjs.org/"
 # 新增 Go 工具时这里和 Dockerfile 都要改，下面的自检会拦住漏登记。
 GO_TOOL_MODULES="
 NFPM_VERSION=github.com/goreleaser/nfpm/v2
+GORELEASER_VERSION=github.com/goreleaser/goreleaser/v2
 SQLC_VERSION=github.com/sqlc-dev/sqlc
 ENT_VERSION=entgo.io/ent
 GOLANGCI_LINT_VERSION=github.com/golangci/golangci-lint/v2
@@ -193,6 +194,7 @@ TASK_VERSION=github.com/go-task/task/v3
 # 版本变量 → 二进制名：元数据里的版本以镜像里实际装上的为准（读二进制而不是靠解析）
 TOOL_BINS="
 NFPM_VERSION=nfpm
+GORELEASER_VERSION=goreleaser
 SQLC_VERSION=sqlc
 ENT_VERSION=ent
 GOLANGCI_LINT_VERSION=golangci-lint
@@ -569,7 +571,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     got="$(go version | cut -d" " -f3 | sed "s/^go//")"
     [ "$got" = "$EXPECT_GO" ] || fail="$fail go-version($got)"
     for b in go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm \
-      sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
+      goreleaser sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
       sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task wixl; do
       command -v "$b" >/dev/null 2>&1 || fail="$fail bin:$b"
     done
@@ -578,7 +580,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     # 版本命令实际跑一遍：工具默认 @latest 自动追新后，只查 presence
     # 挡不住装坏的二进制。--version / version / -v 逐个兜底，
     # 输出丢弃，仅以退出码计 fail。
-    for b in node npm pnpm upx nfpm sqlc golangci-lint gojq shfmt gotestsum task wixl; do
+    for b in node npm pnpm upx nfpm goreleaser sqlc golangci-lint gojq shfmt gotestsum task wixl; do
       command -v "$b" >/dev/null 2>&1 || continue
       "$b" --version >/dev/null 2>&1 \
         || "$b" version >/dev/null 2>&1 \
@@ -589,7 +591,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     if [ -n "$fail" ]; then printf "FAIL%s" "$fail"; exit 1; fi
     # 真实版本：从二进制里的模块信息读（go version -m），比解析 --version 输出可靠。
     # 供元数据使用：CI 解析失败回退 latest 时，这里仍能给出实际装上的版本号。
-    for b in nfpm sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
+    for b in nfpm goreleaser sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
       sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task; do
       v="$(go version -m "$(command -v "$b")" 2>/dev/null \
         | sed -n "s/^[[:space:]]*mod[[:space:]][^[:space:]]*[[:space:]]\([^[:space:]]*\).*/\1/p" \
