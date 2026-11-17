@@ -39,11 +39,11 @@
 
 两组 base 键与 golang 侧的 `base_image` / `base_digest` 名字相近、含义不同，别混：
 
-|                     | golang 元数据                 | fnpack 元数据                         |
-|---------------------|-------------------------------|---------------------------------------|
+|                     | golang 元数据                 | fnpack 元数据                       |
+|---------------------|-------------------------------|-------------------------------------|
 | `base_image`        | 上游 `golang:<版本>-trixie`   | ——（fnpack 用 `fnpack_base_image`） |
-| `fnpack_base_image` | ——                          | 本仓库的 `golang:<go 版本>`           |
-| digest 指向         | Docker Hub 的上游 golang 镜像 | 本仓库构建并推送的 golang 镜像        |
+| `fnpack_base_image` | ——                            | 本仓库的 `golang:<go 版本>`         |
+| digest 指向         | Docker Hub 的上游 golang 镜像 | 本仓库构建并推送的 golang 镜像      |
 
 `image_version` / `golang_version` / `built_at` / `source_date` 是两个脚本都写的同名键，值相同（同一天、同一个 Go 版本），`cnbcool/annotations` 的 `type: ADD` 覆盖也无所谓；fnpack 专属信息全部走 `fnpack_` 前缀。
 

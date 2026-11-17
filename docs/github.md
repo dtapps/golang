@@ -11,7 +11,7 @@ GitHub 侧不 `source` CNB / GitLab 的脚本，也不与它们共用 Dockerfile
 | Dockerfile | `.cnb/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio`、`Dockerfile.nsgo`、`Dockerfile.viva` | `.github/docker/Dockerfile.golang`、`Dockerfile.fnpack`、`Dockerfile.wails3`、`Dockerfile.wails2`、`Dockerfile.fyne`、`Dockerfile.mygo`、`Dockerfile.gio`、`Dockerfile.nsgo`、`Dockerfile.viva` |
 | 构建脚本   | `.cnb/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`、`build-nsgo.sh`、`build-viva.sh`                  | `.github/scripts/build-golang.sh`、`build-fnpack.sh`、`build-wails3.sh`、`build-wails2.sh`、`build-fyne.sh`、`build-mygo.sh`、`build-gio.sh`、`build-nsgo.sh`、`build-viva.sh`                  |
 | 流水线     | `.cnb.yml` + `.cnb/workflows/`                                                                                                                                                               | `.github/workflows/`                                                                                                                                                                            |
-| 元数据     | `.cnb/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio,-nsgo,-viva}.json`                                                                                                                | `.github/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio,-nsgo,-viva}.json`                                                                                                                |
+| 元数据     | `.cnb/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio,-nsgo,-viva,-asuka}.json`                                                                                                         | `.github/annotation{,-fnpack,-wails3,-wails2,-fyne,-mygo,-gio,-nsgo,-viva,-asuka}.json`                                                                                                         |
 
 GitLab 侧的同构清单（以及三侧完整对照表）见 [gitlab.md](gitlab.md)，本页不再重复。
 
@@ -160,7 +160,7 @@ concurrency:
 `queue` 默认是 `single`（只留 1 个 pending，后来的 run 顶掉早先的 pending），这正是「连续触发时旧运行被取消」的来源；`max` 是 GitHub 2026-05 起支持的值。两条约束：
 
 - `queue: max` 不能与 `cancel-in-progress: true` 组合，否则 workflow 校验失败。
-- 排队只发生在「同一个 workflow、同一个分支」的多次触发之间。各变体镜像的先后顺序仍只靠定时任务保证（基座到 fnpack 3 小时，之后各变体按 04:05 至 10:05 依次错开）；手动同时触发各 workflow 时会并行，各变体依旧靠脚本里那 5 分钟等基础镜像标签。
+- 排队只发生在「同一个 workflow、同一个分支」的多次触发之间。各变体镜像的先后顺序仍只靠定时任务保证（基座到 fnpack 3 小时，之后各变体按 04:05 至 11:05 依次错开）；手动同时触发各 workflow 时会并行，各变体依旧靠脚本里那 5 分钟等基础镜像标签。
 
 参考：[GitHub Docs — Control the concurrency of workflows and jobs](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/control-the-concurrency-of-workflows-and-jobs)。
 
@@ -239,7 +239,7 @@ permissions:
   2. `--cache-to type=registry` 写 `<镜像>:buildcache` 缓存清单；
   3. `docker buildx imagetools create` 派生 `<版本>-linux-{amd64,arm64}`，冒烟通过后提升 `<major.minor>` / `latest`。
 
-  `write` 隐含 `read`：fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 还要 `imagetools inspect` 读基座 manifest digest。
+  `write` 隐含 `read`：fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 还要 `imagetools inspect` 读基座 manifest digest。
 
 不需要 `id-token: write` / `attestations: write`（`--provenance=mode=min` 由 buildx 本地生成），也不需要 `actions: read`（`queue: max` 是平台层能力，`upload-artifact` 走 `ACTIONS_RUNTIME_TOKEN`）。
 
@@ -247,15 +247,15 @@ permissions:
 
 ## 与 CNB 的差异
 
-| 维度          | CNB                                                                                                               | GitHub                                                                                                  |
-|---------------|-------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE`                                                                 | `ghcr.io` + `GITHUB_REPOSITORY`                                                                         |
-| 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`                                                                               | `GITHUB_ACTOR` / `GITHUB_TOKEN`                                                                         |
-| 定时任务      | golang 00:05、fnpack 03:05、wails3 04:05、fyne 06:05、mygo 07:05、gio 08:05、nsgo 09:05、viva 10:05 Asia/Shanghai | golang 16:05、fnpack 19:05、wails3 20:05、fyne 22:05、mygo 23:05、gio 00:05、nsgo 01:05、viva 02:05 UTC |
-| 多架构        | docker 服务自带                                                                                                   | `setup-qemu-action` + `setup-buildx-action`                                                             |
-| GitHub 下载源 | `https://files.m.daocloud.io`                                                                                     | 直连 `github.com` / `nodejs.org`                                                                        |
-| 元数据        | commit annotation                                                                                                 | Step Summary + artifact                                                                                 |
-| 磁盘准备      | 无                                                                                                                | 删除预装 SDK，释放空间                                                                                  |
+| 维度          | CNB                                                                                                                            | GitHub                                                                                                               |
+|---------------|--------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| 镜像名来源    | `CNB_DOCKER_REGISTRY` + `CNB_REPO_SLUG_LOWERCASE`                                                                              | `ghcr.io` + `GITHUB_REPOSITORY`                                                                                      |
+| 登录          | `CNB_TOKEN_USER_NAME` / `CNB_TOKEN`                                                                                            | `GITHUB_ACTOR` / `GITHUB_TOKEN`                                                                                      |
+| 定时任务      | golang 00:05、fnpack 03:05、wails3 04:05、fyne 06:05、mygo 07:05、gio 08:05、nsgo 09:05、viva 10:05、asuka 11:05 Asia/Shanghai | golang 16:05、fnpack 19:05、wails3 20:05、fyne 22:05、mygo 23:05、gio 00:05、nsgo 01:05、viva 02:05、asuka 03:05 UTC |
+| 多架构        | docker 服务自带                                                                                                                | `setup-qemu-action` + `setup-buildx-action`                                                                          |
+| GitHub 下载源 | `https://files.m.daocloud.io`                                                                                                  | 直连 `github.com` / `nodejs.org`                                                                                     |
+| 元数据        | commit annotation                                                                                                              | Step Summary + artifact                                                                                              |
+| 磁盘准备      | 无                                                                                                                             | 删除预装 SDK，释放空间                                                                                               |
 
 GitLab 与 GitHub 的差异（镜像名来源、登录、定时任务、并发、元数据）见 [gitlab.md](gitlab.md#与-github-的差异)。
 
@@ -271,7 +271,7 @@ latest                    latest
 <go 版本>-linux-arm64     1.27.3-linux-arm64
 ```
 
-各变体镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 只在基础镜像对应标签也指向本次版本时才提升。
+各变体镜像使用同一组标签。golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升；fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 只在基础镜像对应标签也指向本次版本时才提升。
 
 ## 缓存
 
@@ -302,7 +302,7 @@ docker pull ghcr.io/dtapps/golang/nsgo@sha256:<nsgo_digest>
 docker pull ghcr.io/dtapps/golang/viva@sha256:<viva_digest>
 ```
 
-golang 的 digest 在 `golang-annotation` artifact / Step Summary 里；fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 分别在 `fnpack-annotation` / `wails3-annotation` / `wails2-annotation` / `fyne-annotation` / `mygo-annotation` / `gio-annotation` / `nsgo-annotation` / `viva-annotation` 里。
+golang 的 digest 在 `golang-annotation` artifact / Step Summary 里；fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 分别在 `fnpack-annotation` / `wails3-annotation` / `wails2-annotation` / `fyne-annotation` / `mygo-annotation` / `gio-annotation` / `nsgo-annotation` / `viva-annotation` 里。
 
 ## 常见问题
 

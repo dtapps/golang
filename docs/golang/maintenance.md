@@ -2,8 +2,8 @@
 
 ## 日常构建
 
-- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack（与基座间隔 3 小时），之后依次是 04:05 wails3、06:05 fyne、07:05 mygo、08:05 gio、09:05 nsgo、10:05 viva。
-- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack，之后依次是 20:05 UTC（北京 04:05）wails3、22:05 UTC（北京 06:05）fyne、23:05 UTC（北京 07:05）mygo、00:05 UTC（北京 08:05）gio、01:05 UTC（北京 09:05）nsgo、02:05 UTC（北京 10:05）viva。
+- CNB：每天 00:05（Asia/Shanghai）构建 golang 基础镜像，03:05 构建 fnpack（与基座间隔 3 小时），之后依次是 04:05 wails3、06:05 fyne、07:05 mygo、08:05 gio、09:05 nsgo、10:05 viva、11:05 asuka。
+- GitHub：每天 16:05 UTC（北京 00:05）构建 golang 基础镜像，19:05 UTC（北京 03:05）构建 fnpack，之后依次是 20:05 UTC（北京 04:05）wails3、22:05 UTC（北京 06:05）fyne、23:05 UTC（北京 07:05）mygo、00:05 UTC（北京 08:05）gio、01:05 UTC（北京 09:05）nsgo、02:05 UTC（北京 10:05）viva、03:05 UTC（北京 11:05）asuka。
 - GitLab：用 UI / API 里的 Pipeline schedules 触发，建议与 GitHub 对齐：16:05 UTC golang、19:05 UTC fnpack、20:05 UTC wails3、22:05 UTC fyne、23:05 UTC mygo、00:05 UTC gio、01:05 UTC nsgo、02:05 UTC viva，每个 schedule 用 `TARGET` 变量选镜像，见 [gitlab.md](../gitlab.md)。各变体脚本最多等基座 5 分钟。
 
 > **wails2 不再每天跟踪上游**：wails2 是旧版（Wails v2），仓库已有新版 wails3 镜像；旧版上游发版少、现有 v2 项目一般钉住版本，新旧两版并存时没必要每天跟踪旧版上游重建，因此三侧的 wails2 定时构建都暂时停用，改为**按需手动触发**。CNB / GitHub 的 cron 已在 `.cnb.yml` 与 `.github/workflows/build-wails2.yml` 里注释停用；GitLab 的 cron 在 UI / API 里，需把 `TARGET=wails2` 那条 Pipeline schedule 设为 inactive（或删除）。已推送的 `.../wails2` 镜像、三份 `Dockerfile.wails2` 与三份 `build-wails2.sh` 全部保留，需要新版本时手动触发即可（CNB 自定义按钮 / GitHub `workflow_dispatch` / GitLab Run pipeline 填 `TARGET=wails2`）。 两个注意点：① 若 GitLab 只建了一条不带 `TARGET` 的全量 schedule，`.gitlab/workflows/build-wails2.yml` 的 rules 是 `$TARGET == "" || $TARGET == "wails2"`，wails2 仍会被构建，这种部署方式要排除它得收紧 rules；② wails3 用的是 GTK4/WebKitGTK 6.0 + `wails3` CLI，wails2 用的是 GTK3/WebKit2GTK 4.1 + `wails` CLI（构建还要 `-tags webkit2_41`），两者不通用，编译 Wails v2 项目仍需要 wails2 镜像，所以只停定时、不删镜像定义。
@@ -178,13 +178,13 @@ viva 镜像只有一条版本线：手动触发 `build-viva` 并填 `viva_versio
 
 改镜像内容后：
 
-- [ ] `.cnb/docker/`、`.github/docker/`、`.gitlab/docker/` 下的九个 Dockerfile 内容一致（镜像源差异除外）
+- [ ] `.cnb/docker/`、`.github/docker/`、`.gitlab/docker/` 下的十个 Dockerfile 内容一致（镜像源差异除外）
 - [ ] 三份 `build-golang.sh` 的标签规则、冒烟断言一致
 - [ ] 三份 `build-golang.sh` 的 `GO_TOOL_MODULES` 覆盖 Dockerfile 里所有 `go install` 版本变量（脚本会自检）
 - [ ] 三份 `install-tool.sh` 内容一致，且表里的资产命名与各仓库实际 release 对得上（新增工具时用 `curl -I` 验证过 URL）
 - [ ] 三份 `build-fnpack.sh` 的标签规则、基础镜像检查、冒烟断言一致
 - [ ] 三份 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` / `build-nsgo.sh` / `build-viva.sh` 的标签规则、基础镜像检查、冒烟断言一致
-- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向九个镜像
+- [ ] GitLab 的定时任务与 `TARGET` 变量仍指向十个镜像
 - [ ] `make format` 通过
 - [ ] `make lint-shell` 通过
 
@@ -192,6 +192,6 @@ viva 镜像只有一条版本线：手动触发 `build-viva` 并填 `viva_versio
 
 - `<go 版本>` 每天可能被同名覆盖，不是固定点。
 - golang 的 `latest` / `<major.minor>` 在自身冒烟通过后提升。
-- fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 的 `latest` / `<major.minor>` 只在基础镜像对应标签也指向本次版本时提升。
+- fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 的 `latest` / `<major.minor>` 只在基础镜像对应标签也指向本次版本时提升。
 - 固定产物请用 annotation 里的 digest。
 - GHCR / CNB / GitLab Container Registry 可能有保留策略，长期归档请自行保存 digest 或复制到别处。

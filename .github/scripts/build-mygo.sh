@@ -522,7 +522,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
       [ "$bun_got" = "$EXPECT_BUN" ] || fail="$fail bun-version(${bun_got:-空})"
     fi
     # 基座里不该出现 fnpack / wails3 / wails / fyne：这个镜像是 golang + mygo
-    for other in fnpack wails3 wails fyne; do
+    for other in fnpack wails3 wails fyne asuka; do
       if command -v "$other" >/dev/null 2>&1; then fail="$fail $other-present"; fi
     done
     if [ -n "$fail" ]; then printf "FAIL%s" "$fail"; exit 1; fi

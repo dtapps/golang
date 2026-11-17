@@ -9,6 +9,7 @@
 .cnb/annotation-gio.json
 .cnb/annotation-nsgo.json
 .cnb/annotation-viva.json
+.cnb/annotation-asuka.json
 # CI 生成物：GitHub Actions 构建写入的镜像元数据，供 Step Summary / artifact 读取
 .github/annotation.json
 .github/annotation-fnpack.json
@@ -19,6 +20,7 @@
 .github/annotation-gio.json
 .github/annotation-nsgo.json
 .github/annotation-viva.json
+.github/annotation-asuka.json
 # CI 生成物：GitLab CI 构建写入的镜像元数据，随 job artifacts 保留
 .gitlab/annotation.json
 .gitlab/annotation-fnpack.json
@@ -29,3 +31,4 @@
 .gitlab/annotation-gio.json
 .gitlab/annotation-nsgo.json
 .gitlab/annotation-viva.json
+.gitlab/annotation-asuka.json

@@ -2,7 +2,7 @@
 
 [![定时构建](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/status/crontab)](https://cnb.cool/dtapp/golang/-/pipeline) [![流水线配置](https://cnb.cool/dtapp/golang/-/badge/git/latest/ci/pipeline-as-code)](https://cnb.cool/dtapp/golang/-/blob/main/.cnb.yml) [![漏洞扫描](https://cnb.cool/dtapp/golang/-/badge/security/vulnerability/full/latest)](https://cnb.cool/dtapp/golang/-/security) ![基础镜像](https://img.shields.io/badge/base-golang-00ADD8?logo=go&logoColor=white) ![架构](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-informational) ![镜像大小](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_size) ![arm64 大小](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_size_arm64) ![镜像摘要](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/golang_digest_short) ![镜像版本](https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/image_version)
 
-九个镜像共用一套 Go 工具链，区别只在于各自多装的 CLI：
+十个镜像共用一套 Go 工具链，区别只在于各自多装的 CLI：
 
 | 镜像            | 额外内容                                                         | 典型用途                                       |
 |-----------------|------------------------------------------------------------------|------------------------------------------------|
@@ -37,7 +37,7 @@
 | GitHub | `ghcr.io/dtapps/golang`             | `ghcr.io/dtapps/golang/fnpack`             | `ghcr.io/dtapps/golang/wails3`             | `ghcr.io/dtapps/golang/wails2`             | `ghcr.io/dtapps/golang/fyne`             | `ghcr.io/dtapps/golang/mygo`             | `ghcr.io/dtapps/golang/gio`             | `ghcr.io/dtapps/golang/nsgo`             | `ghcr.io/dtapps/golang/viva`             |
 | GitLab | `registry.gitlab.com/dtapps/golang` | `registry.gitlab.com/dtapps/golang/fnpack` | `registry.gitlab.com/dtapps/golang/wails3` | `registry.gitlab.com/dtapps/golang/wails2` | `registry.gitlab.com/dtapps/golang/fyne` | `registry.gitlab.com/dtapps/golang/mygo` | `registry.gitlab.com/dtapps/golang/gio` | `registry.gitlab.com/dtapps/golang/nsgo` | `registry.gitlab.com/dtapps/golang/viva` |
 
-九个镜像使用同一组标签：`1.27.3`、`1.27`、`latest`、`1.27.3-linux-amd64`、`1.27.3-linux-arm64`。完整契约见 [images-and-tags.md](images-and-tags.md)。
+十个镜像使用同一组标签：`1.27.3`、`1.27`、`latest`、`1.27.3-linux-amd64`、`1.27.3-linux-arm64`。完整契约见 [images-and-tags.md](images-and-tags.md)。
 
 ## 快速拉取
 
@@ -63,9 +63,9 @@ make format && make lint-shell   # 提交前
 
 CI 按平台和镜像拆开，每个镜像一条流水线：
 
-- CNB：`.cnb/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva}.yml`，每日由 `.cnb.yml` 的定时任务先后触发（00:05 golang、03:05 fnpack，之后依次 04:05 wails3、06:05 fyne、07:05 mygo、08:05 gio、09:05 nsgo、10:05 viva）。
-- GitHub：`.github/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva}.yml`，各自按定时任务触发（16:05 UTC golang、19:05 UTC fnpack，之后依次 20:05 wails3、22:05 fyne、23:05 mygo、00:05 gio、01:05 nsgo、02:05 viva UTC）。
-- GitLab：`.gitlab/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva}.yml`，由 Pipeline schedules 触发（与 GitHub 同样的时间表），`TARGET` 选镜像；wails2 那条暂时停用。
+- CNB：`.cnb/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`，每日由 `.cnb.yml` 的定时任务先后触发（00:05 golang、03:05 fnpack，之后依次 04:05 wails3、06:05 fyne、07:05 mygo、08:05 gio、09:05 nsgo、10:05 viva、11:05 asuka）。
+- GitHub：`.github/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`，各自按定时任务触发（16:05 UTC golang、19:05 UTC fnpack，之后依次 20:05 wails3、22:05 fyne、23:05 mygo、00:05 gio、01:05 nsgo、02:05 viva UTC）。
+- GitLab：`.gitlab/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`，由 Pipeline schedules 触发（与 GitHub 同样的时间表），`TARGET` 选镜像；wails2 那条暂时停用。
 
 本地构建见 [build.md](build.md)，事件矩阵见 [ci-pipeline.md](ci-pipeline.md)。
 

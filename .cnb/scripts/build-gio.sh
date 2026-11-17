@@ -502,7 +502,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     gogio_out="$(gogio 2>&1 || true)"
     [ -n "$gogio_out" ] || fail="$fail run:gogio"
     # 这个镜像是 golang + gio：别的变体 CLI 不该出现
-    for other in fnpack wails3 wails fyne mygo bun; do
+    for other in fnpack wails3 wails fyne mygo bun asuka; do
       if command -v "$other" >/dev/null 2>&1; then fail="$fail $other-present"; fi
     done
     if [ -n "$fail" ]; then printf "FAIL%s" "$fail"; exit 1; fi

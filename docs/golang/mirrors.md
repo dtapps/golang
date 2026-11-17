@@ -7,13 +7,13 @@
 | GitHub Release（UPX）              | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`           |
 | GitHub Release Atom（UPX 版本号）  | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`（同域名） |
 | Node.js 官方 tar.xz 与版本索引     | 直连 `nodejs.org`               | `https://files.m.daocloud.io/nodejs.org/...`           |
-| nfpm 与各 Go 工具（`go install`）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
+| nfpm 与各 Go 工具（`go install`）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
 | fnpack                             | 直连 `static2.fnnas.com`        | 直连 `static2.fnnas.com`                               |
-| wails3（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
-| wails2（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
-| fyne（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
-| mygo（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
-| gio（`go install` 与版本解析）     | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）   |
+| wails3（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
+| wails2（`go install` 与版本解析）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
+| fyne（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
+| mygo（`go install` 与版本解析）    | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
+| gio（`go install` 与版本解析）     | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |
 | bun（`npm install -g` 与版本解析） | npm 官方 `registry.npmjs.org`   | `mirrors.cloud.tencent.com/npm/`                       |
 | Debian APT                         | 默认 `deb.debian.org`           | `mirrors.cloud.tencent.com`                            |
 | npm / pnpm registry                | 默认 `registry.npmjs.org`       | `mirrors.cloud.tencent.com/npm/`                       |
@@ -44,7 +44,7 @@ NODE_BASE="${NODE_MIRROR%/}/nodejs.org/dist"  # nodejs.org
 
 fnpack 镜像只从 `https://static2.fnnas.com` 下载二进制，三个平台的 `build-fnpack.sh` 都不传镜像参数。
 
-wails3 / wails2 / fyne / mygo / gio / nsgo / viva 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧 `Dockerfile.golang` 已配成 Go module 多源回退，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` / `build-nsgo.sh` / `build-viva.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」用同一份 `GOPROXY` 配置。
+wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 镜像不新增开关：`go install` 与版本解析（`go list -m`）都走基座镜像的 `GOPROXY`，CNB 侧 `Dockerfile.golang` 已配成 Go module 多源回退，子镜像自动继承；GitHub / GitLab 侧用 Go 默认代理。三侧的 `build-wails3.sh` / `build-wails2.sh` / `build-fyne.sh` / `build-mygo.sh` / `build-gio.sh` / `build-nsgo.sh` / `build-viva.sh` 只把 `GOPROXY` 读出来传给解析用的一次性容器，保证「解析到的版本」和「实际安装的版本」用同一份 `GOPROXY` 配置。
 
 mygo 的 `bun` 走 npm：`npm install -g` 与版本解析（`npm view bun version`）都用基座镜像的 npm registry，CNB 侧即腾讯云、GitHub / GitLab 侧即官方默认，两边天然一致，`build-mygo.sh` 不需要额外传源参数。
 

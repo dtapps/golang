@@ -499,7 +499,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     nsgo_out="$(nsgo --help 2>&1 || true)"
     [ -n "$nsgo_out" ] || fail="$fail run:nsgo"
     # 这个镜像是 golang + nsgo：别的变体 CLI 不该出现
-    for other in fnpack wails3 wails fyne mygo bun gogio viva; do
+    for other in fnpack wails3 wails fyne mygo bun gogio viva asuka; do
       if command -v "$other" >/dev/null 2>&1; then fail="$fail $other-present"; fi
     done
     if [ -n "$fail" ]; then printf "FAIL%s" "$fail"; exit 1; fi

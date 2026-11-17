@@ -2,7 +2,7 @@ branch:
   - buttons:
       - name: 打包 Golang 镜像（多架构 amd64 + arm64）
         description: 构建并推送 golang 基础镜像（amd64 + arm64 多架构），产出版本、latest 与单平台标签；不含 fnpack / wails3 / wails2 / fyne / mygo / gio
-          / nsgo / viva
+          / nsgo / viva / asuka
         event: web_trigger_build_golang # 触发的 CI 事件名
         permissions:
           roles:
@@ -173,6 +173,25 @@ branch:
             default: ''
           viva_version:
             description: 选填。viva CLI 版本（模块 github.com/vivaui/viva）：留空 = 解析上游最新稳定 tag（如 v0.6.4）；也可填 v0.6.4 / 0.6.4
+            required: false
+            type: input
+            default: ''
+      - name: 打包 Golang + asuka 镜像（多架构 amd64 + arm64）
+        description: 基于已推送的 golang 基础镜像，构建并推送 golang/asuka（amd64 + arm64 多架构，含 GTK4 / libadwaita 开发包、无头运行库与 asuka CLI）
+        event: web_trigger_build_asuka # 触发的 CI 事件名
+        permissions:
+          roles:
+            - owner
+            - master
+            - developer
+        inputs:
+          version:
+            description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
+            required: false
+            type: input
+            default: ''
+          asuka_version:
+            description: 选填。asuka CLI 版本（模块 github.com/egoist/asuka）：留空 = 解析上游最新稳定 tag（如 v0.1.1）；也可填 v0.1.1 / 0.1.1
             required: false
             type: input
             default: ''

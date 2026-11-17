@@ -46,7 +46,7 @@ fork 或改名后自动跟着变，不需要改脚本。
 
 ## 标签契约
 
-九个镜像使用同一组标签，标签里的版本是**解析出来的实际 Go 版本**（不是 Dockerfile 里写的引用）。fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 自身的 CLI 版本不占标签，只记录在元数据里（mygo 镜像里的 `bun` 版本同样只记在 `bun_version`；gio 的 `gogio` 版本记在 `gio_version`，nsgo 无 tag 时记伪版本到 `nsgo_version`）。
+十个镜像使用同一组标签，标签里的版本是**解析出来的实际 Go 版本**（不是 Dockerfile 里写的引用）。fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 自身的 CLI 版本不占标签，只记录在元数据里（mygo 镜像里的 `bun` 版本同样只记在 `bun_version`；gio 的 `gogio` 版本记在 `gio_version`，nsgo 无 tag 时记伪版本到 `nsgo_version`）。
 
 | 标签                       | 含义                                    | 是否移动 |
 |----------------------------|-----------------------------------------|----------|
@@ -95,7 +95,7 @@ ghcr.io/dtapps/golang/viva:1.27.3-linux-arm64
 
 ## 发布顺序
 
-九个镜像由九条流水线分别发布：
+十个镜像由十条流水线分别发布：
 
 1. golang：构建并推送 `golang:<go 版本>` → 派生单平台标签 → 冒烟 → 提升 `golang:<major.minor>` / `golang:latest`。
 2. fnpack：等 `golang:<go 版本>` 存在 → 从它构建并推送 `golang/fnpack:<go 版本>` → 派生单平台标签 → 冒烟 → 提升 fnpack 的移动标签。
@@ -107,9 +107,9 @@ ghcr.io/dtapps/golang/viva:1.27.3-linux-arm64
 8. nsgo：同上，但产物是 `golang/nsgo:<go 版本>`（多装 GTK4、WebKitGTK 6.0、GStreamer 开发包、无头运行库与 nsgo CLI）。
 9. viva：同上，但产物是 `golang/viva:<go 版本>`（多装 XCB、Vulkan、GTK3/WebKit2GTK 4.1 开发包、无头运行库与 viva CLI）。
 
-fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva 的 `<major.minor>` / `latest` 只在基础镜像的对应标签也已指向本次版本时才提升。所以它们的 `latest` 不会跑到基础镜像前面，也不会出现「只有变体成功」的错位。失败时 `<go 版本>` 标签可能已经指向坏产物，但它不是移动标签，下游按 `latest` / `<major.minor>` 拉取不受影响。
+fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 的 `<major.minor>` / `latest` 只在基础镜像的对应标签也已指向本次版本时才提升。所以它们的 `latest` 不会跑到基础镜像前面，也不会出现「只有变体成功」的错位。失败时 `<go 版本>` 标签可能已经指向坏产物，但它不是移动标签，下游按 `latest` / `<major.minor>` 拉取不受影响。
 
-调度上，CNB 依次跑 00:05 的 golang、03:05 的 fnpack，之后依次是 04:05 的 wails3、06:05 的 fyne、07:05 的 mygo、08:05 的 gio、09:05 的 nsgo、10:05 的 viva；GitHub 依次跑 16:05 UTC 的 golang、19:05 UTC 的 fnpack、20:05 UTC 的 wails3、22:05 UTC 的 fyne、23:05 UTC 的 mygo、00:05 UTC 的 gio、01:05 UTC 的 nsgo、02:05 UTC 的 viva；GitLab 用 Pipeline schedules 配同样的时间，变量 `TARGET` 分别指向这八个镜像，也可以一条 schedule 不填 `TARGET` 一次构建全部（含 wails2）。wails2 的定时任务暂时停用：已有新版 wails3，旧版没必要每天跟踪上游，改为按需手动触发，见 [维护 — 日常构建](maintenance.md)。
+调度上，CNB 依次跑 00:05 的 golang、03:05 的 fnpack，之后依次是 04:05 的 wails3、06:05 的 fyne、07:05 的 mygo、08:05 的 gio、09:05 的 nsgo、10:05 的 viva、11:05 的 asuka；GitHub 依次跑 16:05 UTC 的 golang、19:05 UTC 的 fnpack、20:05 UTC 的 wails3、22:05 UTC 的 fyne、23:05 UTC 的 mygo、00:05 UTC 的 gio、01:05 UTC 的 nsgo、02:05 UTC 的 viva、03:05 UTC 的 asuka；GitLab 用 Pipeline schedules 配同样的时间，变量 `TARGET` 分别指向这十个镜像，也可以一条 schedule 不填 `TARGET` 一次构建全部（含 wails2）。wails2 的定时任务暂时停用：已有新版 wails3，旧版没必要每天跟踪上游，改为按需手动触发，见 [维护 — 日常构建](maintenance.md)。
 
 ## 固定某一份产物
 
@@ -127,7 +127,7 @@ docker pull ghcr.io/dtapps/golang/nsgo@sha256:<nsgo_digest>
 docker pull ghcr.io/dtapps/golang/viva@sha256:<viva_digest>
 ```
 
-构建元数据由九条流水线分别写入：
+构建元数据由十条流水线分别写入：
 
 - golang：`.cnb/annotation.json` / `.github/annotation.json` / `.gitlab/annotation.json`
 - fnpack：`.cnb/annotation-fnpack.json` / `.github/annotation-fnpack.json` / `.gitlab/annotation-fnpack.json`
@@ -219,13 +219,13 @@ CNB 侧也可以直接按工具名出徽章：`https://cnb.cool/dtapp/golang/-/b
 
 这些值是**镜像里实际装上的版本**，不是构建前解析出来的目标版本：冒烟容器里用 `go version -m <二进制>` 读模块版本（`node -v` / `pnpm -v` / `upx --version` 读 CLI），所以即使解析失败回退 `latest`、Dockerfile 装的是「构建当天最新」，元数据里写的仍是真实版本号。只有在镜像里也读不到时才会出现 `latest`。官方二进制的 `go version -m` 常常拿不到版本（报 `(devel)`）或带构建标记（`v1.13.0+dirty`），这类值会被剔除、退回解析出来的版本号，所以元数据里不会出现 `(devel)` / `+dirty`。
 
-九个镜像里凡是用 apt 装了系统包的（基座 + fyne / gio / mygo / wails2 / wails3 / nsgo / viva），都会再写一个 `apt_versions`：`包=版本` 用空格串成一行，包清单**从该镜像对应的 Dockerfile 自动提取**（`apt-get install` 那段，改 Dockerfile 后自动跟上），版本取自镜像内的 `dpkg` 数据库，查不到的包标 `absent`；完全没装 apt 包的镜像（fnpack）写成 `none`。基座保留构建期装的 `wget` / `xz-utils`（只清缓存、不卸载），两者都能读到实际版本。传递依赖不记，只记 Dockerfile 里显式列出的那一份。
+十个镜像里凡是用 apt 装了系统包的（基座 + fyne / gio / mygo / wails2 / wails3 / nsgo / viva / asuka），都会再写一个 `apt_versions`：`包=版本` 用空格串成一行，包清单**从该镜像对应的 Dockerfile 自动提取**（`apt-get install` 那段，改 Dockerfile 后自动跟上），版本取自镜像内的 `dpkg` 数据库，查不到的包标 `absent`；完全没装 apt 包的镜像（fnpack）写成 `none`。基座保留构建期装的 `wget` / `xz-utils`（只清缓存、不卸载），两者都能读到实际版本。传递依赖不记，只记 Dockerfile 里显式列出的那一份。
 
 wails2 的元数据键与上表同构，前缀换成 `wails2_`：`wails2_image` / `wails2_digest` / `wails2_digest_short` / `wails2_size` / `wails2_size_arm64` / `wails2_version` / `wails2_base_image` / `wails2_base_digest`。完整说明见 [../wails2/README.md](../wails2/README.md#元数据与徽章)。fyne 的键已列在上表（前缀 `fyne_`），完整说明见 [../fyne/README.md](../fyne/README.md#元数据与徽章)；mygo 的键已列在上表（前缀 `mygo_`，另有 `bun_version`），完整说明见 [../mygo/README.md](../mygo/README.md#元数据与徽章)；gio 的键已列在上表（前缀 `gio_`），完整说明见 [../gio/README.md](../gio/README.md#元数据与徽章)；nsgo 的键已列在上表（前缀 `nsgo_`），完整说明见 [../nsgo/README.md](../nsgo/README.md#元数据与徽章)；viva 的键已列在上表（前缀 `viva_`），完整说明见 [../viva/README.md](../viva/README.md#元数据与徽章)。
 
 CNB 侧从 `/-/badge/annotation/commit/latest/{key}` 读取；GitHub 侧写进 Step Summary 并上传 artifact（`golang-annotation` / `fnpack-annotation` / `wails3-annotation` / `wails2-annotation` / `fyne-annotation` / `mygo-annotation` / `gio-annotation` / `nsgo-annotation` / `viva-annotation`）；GitLab 侧写进 `.gitlab/annotation*.json`，随 job artifacts 保留 30 天。
 
-## 九个镜像的对应关系
+## 十个镜像的对应关系
 
 同一 `<go 版本>` 下：
 
@@ -241,4 +241,4 @@ golang/nsgo:1.27.3   = golang:1.27.3 + GTK4/WebKitGTK 6.0/GStreamer + 无头运�
 golang/viva:1.27.3   = golang:1.27.3 + XCB/Vulkan + GTK3/WebKit2GTK 4.1 + 无头运行库 + viva
 ```
 
-八个变体镜像的 `image_version` 与基础镜像相同；各自 CLI 的版本只记录在 `fnpack_version` / `wails3_version` / `wails2_version` / `fyne_version` / `mygo_version` / `bun_version` / `gio_version` / `nsgo_version` / `viva_version`，不单独占标签。fnpack、wails3、wails2、fyne、mygo、gio、nsgo 与 viva 是平级变体，互不包含。
+九个变体镜像的 `image_version` 与基础镜像相同；各自 CLI 的版本只记录在 `fnpack_version` / `wails3_version` / `wails2_version` / `fyne_version` / `mygo_version` / `bun_version` / `gio_version` / `nsgo_version` / `viva_version` / `asuka_version`，不单独占标签。fnpack、wails3、wails2、fyne、mygo、gio、nsgo、viva 与 asuka 是平级变体，互不包含。

@@ -500,7 +500,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     viva_out="$(viva --version 2>&1 || true)"
     [ -n "$viva_out" ] || fail="$fail run:viva"
     # 这个镜像是 golang + viva：别的变体 CLI 不该出现
-    for other in fnpack wails3 wails fyne mygo bun gogio nsgo; do
+    for other in fnpack wails3 wails fyne mygo bun gogio nsgo asuka; do
       if command -v "$other" >/dev/null 2>&1; then fail="$fail $other-present"; fi
     done
     if [ -n "$fail" ]; then printf "FAIL%s" "$fail"; exit 1; fi

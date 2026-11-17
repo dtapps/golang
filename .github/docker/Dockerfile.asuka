@@ -1,0 +1,107 @@
+# ===================================================================
+# Golang 构建环境镜像 + asuka
+#
+# 在 Dockerfile.golang 产出的镜像之上做两件事：
+#   1. 安装 asuka Linux 原生应用所需的系统依赖（GTK 4 / libadwaita 开发包、
+#      无头运行库）
+#   2. go install asuka CLI（模块 github.com/egoist/asuka，命令在 cmd/asuka）
+#
+# asuka 是 Go 跨平台应用框架：Linux 桌面端用 GTK 4 + libadwaita 渲染原生控件，
+# Web 端把 Go 编译成 WASM。本镜像只预装 Linux 桌面构建依赖；iOS / Android /
+# macOS / Windows 目标需要 Xcode / Android SDK / 对应平台工具链，不在范围内。
+# 基座 golang:1-trixie 提供的 GTK 4 / libadwaita 满足上游要求（GTK >= 4.14、
+# libadwaita >= 1.5）；装完立刻用 pkg-config 断言，避免 cgo 错误推迟到使用者。
+#
+# 三个平台各留一份：本文件（GitHub 侧）、.cnb/docker/Dockerfile.asuka（CNB 侧）与
+# .gitlab/docker/Dockerfile.asuka（GitLab 侧），各自维护、不互相引用。
+#
+# 构建脚本会把 GOLANG_IMAGE 指向上一步刚推好的 golang 镜像：
+#   GOLANG_IMAGE=<registry>/<repo>:<go 版本>
+# 单独构建本文件时默认使用上游 golang 镜像（不含本仓库预装的工具链）。
+# APT / GOPROXY 继承基座镜像，本文件没有额外的镜像源开关。
+#
+# asuka：https://github.com/egoist/asuka
+# ASUKA_VERSION 默认 latest；CI 会先解析成具体 tag 再传进来，裸 build 由 go install 解析。
+# ===================================================================
+
+ARG GOLANG_IMAGE=golang:1-trixie
+FROM ${GOLANG_IMAGE}
+
+# BuildKit 自动提供的目标平台（linux/amd64、linux/arm64 …）。多架构构建时同一个
+# RUN 会按架构各跑一遍，echo 带上它才能分清当前是哪个架构、不会误以为重复安装。
+ARG TARGETPLATFORM
+
+ARG GOLANG_IMAGE
+ARG ASUKA_VERSION=latest
+ARG IMAGE_VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=1970-01-01T00:00:00Z
+ARG BASE_DIGEST=unknown
+ARG IMAGE_SOURCE
+
+# 1. 安装 GTK 4 / libadwaita 开发包与无头运行库
+# libgtk-4-dev / libadwaita-1-dev 提供 gtk4.pc / libadwaita-1.pc：
+# asuka 的 Linux 后端在构建应用时要靠 pkg-config 找到这些头文件。
+# libglib2.0-dev / libpango1.0-dev / libcairo2-dev / libgraphene-1.0-dev /
+# libepoxy-dev 是 GTK4 / libadwaita 的底层编译依赖，显式声明以保证 .pc 可解析。
+# xvfb / mesa / 字体让 CI 里没有显示器也能跑 GUI 冒烟。
+# 这些是使用镜像时也要用的编译依赖，必须留在镜像里，不能在构建末尾卸载。
+RUN export DEBIAN_FRONTEND=noninteractive; \
+    apt_packages=" \
+    pkg-config \
+    libgtk-4-dev \
+    libadwaita-1-dev \
+    libglib2.0-dev \
+    libpango1.0-dev \
+    libcairo2-dev \
+    libfontconfig1-dev \
+    libgdk-pixbuf-2.0-dev \
+    libgraphene-1.0-dev \
+    libepoxy-dev \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
+    libegl-mesa0 \
+    xvfb \
+    xauth \
+    dbus-x11 \
+    shared-mime-info \
+    adwaita-icon-theme \
+    fonts-dejavu-core"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ${apt_packages}; \
+    rm -rf /var/lib/apt/lists/*; \
+    pkg-config --exists gtk4; \
+    pkg-config --exists libadwaita-1; \
+    pkg-config --exists glib-2.0; \
+    pkg-config --exists pango; \
+    pkg-config --exists cairo; \
+    echo "[${TARGETPLATFORM:-unknown}] --- apt 包版本 ---"; \
+    dpkg-query -W ${apt_packages}
+
+# 2. 安装 asuka CLI
+# 模块缓存与编译缓存挂在构建节点上，不进入镜像层。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    echo "[${TARGETPLATFORM:-unknown}] asuka 目标版本: ${ASUKA_VERSION}"; \
+    go install -v "github.com/egoist/asuka/cmd/asuka@${ASUKA_VERSION}"; \
+    test -x "${GOPATH}/bin/asuka"; \
+    echo "[${TARGETPLATFORM:-unknown}] --- asuka 安装的 ---"; \
+    asuka --help 2>&1 || true
+
+# -------------------------------------------------------------------
+# OCI 元数据标签
+# 放在最后：BUILD_DATE / VCS_REF / IMAGE_VERSION 每次构建都变，放在前面会让
+# apt 与 go install 这两层的缓存键跟着每次提交一起变，层缓存直接失效。
+# -------------------------------------------------------------------
+LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
+    org.opencontainers.image.url="${IMAGE_SOURCE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.version="${IMAGE_VERSION}" \
+    org.opencontainers.image.description="Golang 构建环境 + asuka：在 golang 镜像基础上增加 GTK4/libadwaita 开发包、无头运行库与 asuka CLI" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="${GOLANG_IMAGE}" \
+    org.opencontainers.image.base.digest="${BASE_DIGEST}"
+
+CMD ["bash"]
