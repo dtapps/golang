@@ -1,0 +1,29 @@
+# 示例：viva —— 两个步骤：准备环境 → 使用
+# 本仓库自测时把 uses 改成 ./；Linux 需自备 XCB / Vulkan 系统库
+# viva 默认 purego 后端不需要 cgo；要 WebView / GTK3 壳层时用 -tags vivagtk
+name: build-viva
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # 1) 准备环境：检查 Go + 安装 viva CLI
+      - name: 准备环境
+        uses: dtapps/golang@main
+        with:
+          framework: viva
+          setup-only: true
+
+      # 2) 使用：默认 purego 后端直接 go build
+      - name: 构建
+        run: go build -o bin/app .

@@ -26,11 +26,12 @@
 #   version        选填，Go 版本：留空 = Dockerfile 的 GO_VERSION；
 #                  也可填 1.27 / 1.27.3
 #   asuka_version 选填，asuka 版本：留空 / latest = 解析上游最新稳定 tag
-#                  （如 v0.1.1）；也可填 v0.1.1 / 0.1.1
+#                  （装不上时自动降一个 patch 版本重试一次，只降一次）；
+#                  也可填 v0.1.0 / 0.1.0
 #
 # 版本解析为什么要先做：层缓存按 build-arg 的值算缓存键。每天都传字符串
 # latest，缓存键永远不变，go install 那一层会一直命中第一次的产物，asuka
-# 再也不升级。所以构建前先在基础镜像里用 go list 把 latest 解析成 v0.1.1，
+# 再也不升级。所以构建前先在基础镜像里用 go list 把 latest 解析成具体 tag（如 v0.1.0），
 # 再以 --build-arg 传入：上游没发新版就全命中，发新版才重建那一层。
 #
 # 依赖：docker buildx（setup-buildx-action 提供）、jq 可选（体积精确求和）。
@@ -155,6 +156,23 @@ normalize_tag() (
   esac
 )
 
+# 上一个 patch 版本：v1.2.3 → v1.2.2。只减 patch、不跨 minor
+#（v1.2.0 没有可回退的版本，返回空）。
+previous_patch_version() (
+  case "$1" in
+    v[0-9]*.[0-9]*.[0-9]*) : ;;
+    *) return 1 ;;
+  esac
+  nums="$(printf '%s' "$1" | sed 's/^v//')"
+  major="$(printf '%s' "$nums" | cut -d. -f1)"
+  minor="$(printf '%s' "$nums" | cut -d. -f2)"
+  patch="$(printf '%s' "$nums" | cut -d. -f3 | sed 's/[^0-9].*$//')"
+  if [ -z "$patch" ] || [ "$patch" -le 0 ]; then
+    return 1
+  fi
+  printf 'v%s.%s.%s\n' "$major" "$minor" "$((patch - 1))"
+)
+
 # 在基础镜像里解析 asuka 的最新稳定版本。
 # 放在容器里跑：不依赖 runner 装了 go / curl，模块路径与 tag 对应关系也交给 go
 # （模块路径直接写在 go.mod 里，go list 会给出正确的 vX.Y.Z）。
@@ -167,6 +185,23 @@ resolve_asuka_latest() {
 set -eu
 go list -m -f '{{.Version}}' github.com/egoist/asuka@latest
 RESOLVE_EOF
+}
+
+# 探针：这个版本到底装不装得上？在基础镜像里真的装一次（只跑 linux/amd64，
+# arm64 交给后面的 buildx 阶段）。模块下载失败、编译失败（架构相关的编译
+# 错误）都会在这里暴露，脚本据此决定要不要降一个 patch 版本。
+probe_asuka_install() {
+  probe_version=$1
+  set -- --rm -i --platform linux/amd64
+  if [ -n "${DOCKERFILE_GOPROXY}" ]; then
+    set -- "$@" -e "GOPROXY=${DOCKERFILE_GOPROXY}"
+  fi
+  set -- "$@" -e "ASUKA_PROBE_VERSION=${probe_version}"
+  docker run "$@" "golang:${GO_REF}" sh -s <<'PROBE_EOF'
+set -eu
+go install "github.com/egoist/asuka/cmd/asuka@${ASUKA_PROBE_VERSION}"
+test -x "${GOPATH}/bin/asuka"
+PROBE_EOF
 }
 
 # ---------- 0. 环境检查与默认值 ----------
@@ -270,6 +305,9 @@ MINOR="$(printf '%s' "${GO_REAL}" | cut -d. -f1,2)"
 
 # ---------- 3.1 解析 asuka 版本（层缓存的前提） ----------
 DOCKERFILE_GOPROXY="$(read_env GOPROXY "$DOCKERFILE_GOLANG")"
+ASUKA_FALLBACK_VERSION="$(read_arg ASUKA_FALLBACK_VERSION "$DOCKERFILE_ASUKA")"
+[ -n "${ASUKA_FALLBACK_VERSION}" ] \
+  || die "无法从 ${DOCKERFILE_ASUKA} 解析 ARG ASUKA_FALLBACK_VERSION"
 case "$asuka_version" in
   '' | latest)
     # Dockerfile 默认值可能本身就是一个具体 tag（本地改过默认值时尊重它）
@@ -283,8 +321,8 @@ case "$asuka_version" in
         ASUKA_VERSION="${ASUKA_LATEST}"
         info "asuka_version 留空：解析到上游最新稳定版 ${ASUKA_VERSION}"
       else
-        ASUKA_VERSION="latest"
-        warn "无法解析 asuka 最新版本（得到：${ASUKA_LATEST:-空}），回退 latest：本次由 Dockerfile 在构建时解析，层缓存不生效"
+        ASUKA_VERSION="$(normalize_tag "${ASUKA_FALLBACK_VERSION}")"
+        warn "无法解析 asuka 最新版本（得到：${ASUKA_LATEST:-空}），回退到 ${ASUKA_VERSION}"
       fi
     fi
     ;;
@@ -293,6 +331,23 @@ case "$asuka_version" in
     info "asuka_version 入参 ${ASUKA_VERSION}"
     ;;
 esac
+
+# 探针 + 自动降级：候选版本装不上（模块下载失败 / 编译失败）就降一个 patch
+# 版本重试一次，只降一次。上游发出版本问题时流水线不会卡在 go install。
+if probe_asuka_install "${ASUKA_VERSION}"; then
+  info "asuka ${ASUKA_VERSION} 探针通过（linux/amd64 可安装）"
+else
+  PREV_VERSION="$(previous_patch_version "${ASUKA_VERSION}" || true)"
+  if [ -z "${PREV_VERSION}" ]; then
+    die "asuka ${ASUKA_VERSION} 安装失败，且没有可回退的上一个 patch 版本：请手动指定 asuka_version"
+  fi
+  warn "asuka ${ASUKA_VERSION} 安装失败（下载或编译），回退到 ${PREV_VERSION} 重试一次"
+  if ! probe_asuka_install "${PREV_VERSION}"; then
+    die "asuka ${ASUKA_VERSION} 与 ${PREV_VERSION} 都装不上（下载或编译失败）：请手动指定 asuka_version"
+  fi
+  ASUKA_VERSION="${PREV_VERSION}"
+  info "asuka 版本回退到 ${ASUKA_VERSION}"
+fi
 
 # ---------- 4. 时间戳与标签 ----------
 BUILD_DATE="$(git log -1 --format=%cI 2>/dev/null || true)"

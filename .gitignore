@@ -32,3 +32,6 @@
 .gitlab/annotation-nsgo.json
 .gitlab/annotation-viva.json
 .gitlab/annotation-asuka.json
+
+# Ai
+AGENTS.md

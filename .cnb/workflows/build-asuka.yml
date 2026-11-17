@@ -33,6 +33,7 @@
   #
   # asuka 版本默认跟随上游最新稳定版（Dockerfile 的 ASUKA_VERSION=latest，
   # 脚本构建前解析成具体 tag 再传进 build-arg，层缓存才跟得上版本）；
+  # 候选版本装不上（模块下载失败 / 编译失败）时自动降一个 patch 版本重试，只降一次；
   # 手动触发可以填 asuka_version 钉住。
   web_trigger_build_asuka:
     - *build_asuka

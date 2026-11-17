@@ -13,7 +13,9 @@
 #
 #   版本：asuka 默认跟随上游最新稳定版（Dockerfile 的 ASUKA_VERSION=latest，
 #         脚本构建前解析成具体 tag 再传进 build-arg，层缓存才跟得上版本）。
-#         手动触发可以填 asuka_version 钉住（如 v0.1.1 / 0.1.1）。
+#         候选版本装不上（模块下载失败 / 编译失败）时自动降一个 patch 版本重试，
+#         只降一次（v1.2.3 → v1.2.2），再失败就报错退出。
+#         手动触发可以填 asuka_version 钉住（如 v0.1.0 / 0.1.0）。
 # ===================================================================
 # https://github.com/actions/runner-images
 # https://github.com/actions/checkout
@@ -36,7 +38,7 @@ on:
         default: ''
         type: string
       asuka_version:
-        description: '选填：asuka 版本。留空 = 解析上游最新稳定 tag（如 v0.1.1）；也可填 v0.1.1 / 0.1.1'
+        description: '选填：asuka 版本。留空 = 解析上游最新稳定 tag（装不上时自动降一个 patch 版本）；也可填 v0.1.0 / 0.1.0'
         required: false
         default: ''
         type: string

@@ -1,12 +1,12 @@
 # go-gui-build：在 GitHub Actions 里构建 GUI 应用
 
-> [`action.yml`](../action.yml)（仓库根目录）的使用文档： 一个 composite action，Linux runner 上复用本仓库的 GUI 变体镜像（`docker run`）， macOS / Windows 上走原生 runner（检查 Go + 安装 CLI），把 Go GUI 应用的构建与打包 编排成一条流水线，产物上传为 artifact。本页只讲怎么用：输入契约、命令解析、七个 framework 各自的完整示例，以及一份可直接抄的三平台 workflow。 镜像里装了什么见 [golang/dockerfile.md](golang/dockerfile.md)， 标签与 digest 见 [golang/images-and-tags.md](golang/images-and-tags.md)。
+> [`action.yml`](../action.yml)（仓库根目录）的使用文档： 一个 composite action，Linux runner 上复用本仓库的 GUI 变体镜像（`docker run`）， macOS / Windows 上走原生 runner（检查 Go + 安装 CLI），把 Go GUI 应用的构建与打包 编排成一条流水线，产物上传为 artifact。本页只讲怎么用：输入契约、命令解析、十个 framework 各自的完整示例，以及一份可直接抄的三平台 workflow。 镜像里装了什么见 [golang/dockerfile.md](golang/dockerfile.md)， 标签与 digest 见 [golang/images-and-tags.md](golang/images-and-tags.md)。
 
 ## 为什么有它
 
-要解决的问题：CI 工作流里到处手写「装 wails3 / wails2 / fyne / gogio / mygo / fnpack」 ——每个应用仓库重复一遍，版本各不相同、装法各不相同，漂移了也看不出来。
+要解决的问题：CI 工作流里到处手写「装 wails3 / wails2 / fyne / gogio / mygo / fnpack / nsgo / viva / asuka」 ——每个应用仓库重复一遍，版本各不相同、装法各不相同，漂移了也看不出来。
 
-- **Linux**：环境来自镜像，CLI（wails3 / wails / fyne / gogio / mygo / fnpack）已经装好， 工作流**零安装**，只执行构建命令。
+- **Linux**：环境来自镜像，CLI（wails3 / wails / fyne / gogio / mygo / fnpack / nsgo / viva / asuka）已经装好， 工作流**零安装**，只执行构建命令。
 - **macOS / Windows**：Docker 只能跑 Linux 容器，GitHub 的 windows / macos runner 起不了 这个镜像；也没有 macOS / Windows 版镜像，也不能用交叉编译代替（产物未签名、不可打包）。 所以原生上「装 CLI」省不掉——但由 action 用固定 pin 统一装，应用仓库的 workflow 仍然不用写安装步骤。
 - 两条路径共用同一份 build 命令串和同一套产物上传规则，同一个应用在三平台的行为一致。
 
@@ -20,11 +20,11 @@
 | `package=true` 时把打包命令串进 build，产物按 `bin-dir` 上传  | 不做 macOS 公证 / Windows signtool（需要证书 secrets，调用方后续步骤）                              |
 | 镜像引用支持 tag 与 digest                                    | 不做 docker-in-docker 交叉编译（`wails3 task setup:docker` / fyne-cross 是调用方扩展点）            |
 
-只做这一个通用 action，不做七个、不造合并镜像；只服务 GitHub 侧（默认 ghcr.io）， CNB / GitLab 各自维护自己的调用胶水（见 [github.md](github.md) 的「三份独立实现」）。
+只做这一个通用 action，不做十个、不造合并镜像；只服务 GitHub 侧（默认 ghcr.io）， CNB / GitLab 各自维护自己的调用胶水（见 [github.md](github.md) 的「三份独立实现」）。
 
 ## 快速开始：第三方应用仓库怎么用
 
-这是给「别人」用的：action 在本仓库**根目录**（`action.yml`），你的应用仓库 **一行 `uses:` 直接引用**，不需要拷贝任何文件。引用名就是标准短名 `owner/repo@ref`（和 `actions/checkout@v4` 同一种形态）。本仓库是 Public， 任何人可引用。七个 framework 的可直接抄的示例文件在 [`.github/examples/go-gui-build/`](../../.github/examples/go-gui-build/)。
+这是给「别人」用的：action 在本仓库**根目录**（`action.yml`），你的应用仓库 **一行 `uses:` 直接引用**，不需要拷贝任何文件。引用名就是标准短名 `owner/repo@ref`（和 `actions/checkout@v4` 同一种形态）。本仓库是 Public， 任何人可引用。十个 framework 的可直接抄的示例文件在 [`.github/examples/go-gui-build/`](../../.github/examples/go-gui-build/)。
 
 在**你的应用仓库**的 workflow 里：
 
@@ -72,9 +72,9 @@ git push origin go-gui-build-v1
 
 必填：
 
-| 输入        | 说明                                                                                                                                   |
-|-------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| `framework` | 镜像变体与默认命令选择器：`wails3` \| `wails2` \| `fyne` \| `gio` \| `golang` \| `fnpack` \| `mygo`。不在枚举内打印 `::error::` 并退出 |
+| 输入        | 说明                                                                                                                                                                  |
+|-------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `framework` | 镜像变体与默认命令选择器：`wails3` \| `wails2` \| `fyne` \| `gio` \| `golang` \| `fnpack` \| `mygo` \| `nsgo` \| `viva` \| `asuka`。不在枚举内打印 `::error::` 并退出 |
 
 选填：
 
@@ -85,7 +85,7 @@ git push origin go-gui-build-v1
 | `working-directory` | `.`                     | `go.mod` / `Taskfile.yml` 所在目录，相对仓库根；绝对路径直接报错                                                                                                                                   |
 | `build-command`     | 空                      | 覆盖默认 build 命令（多条命令可 `&&` 串联）                                                                                                                                                        |
 | `install-command`   | 空                      | **覆盖**默认 CLI 安装命令；仅原生分支执行                                                                                                                                                          |
-| `tools`             | 空                      | 额外工具，逗号分隔的**枚举**：`task`（go-task，走通用安装器 `scripts/install-tool.sh`：二进制优先、`go install` 兜底）、`nsis`（仅 Windows，执行 `scripts/install-nsis.ps1`）；七个 framework 通用 |
+| `tools`             | 空                      | 额外工具，逗号分隔的**枚举**：`task`（go-task，走通用安装器 `scripts/install-tool.sh`：二进制优先、`go install` 兜底）、`nsis`（仅 Windows，执行 `scripts/install-nsis.ps1`）；十个 framework 通用 |
 | `nsis-version`      | `latest`                | NSIS 版本（`tools` 含 `nsis` 时使用，仅 Windows）：`latest` 用 SourceForge RSS 解析最新（约 1 秒），解析失败回退 `3.13`                                                                            |
 | `cache`             | `false`                 | 是否缓存已装的二进制：CLI（framework + `tools`）与 Windows 的 NSIS；开启后第二次起跳过安装 / 下载，默认关闭                                                                                        |
 | `package-command`   | 空                      | 覆盖默认打包命令                                                                                                                                                                                   |
@@ -100,14 +100,16 @@ git push origin go-gui-build-v1
 
 action 第一步按 framework 生成三组命令，**Linux 与原生分支共用同一份解析结果**， case 不写两遍：
 
-| framework        | build            | install（仅原生执行）                                     | package          |
-|------------------|------------------|-----------------------------------------------------------|------------------|
-| `wails3`         | `wails3 build`   | `go install …/v3/cmd/wails3@<pin>`                        | `wails3 package` |
-| `wails2`         | `wails build`    | `go install github.com/wailsapp/wails/v2/cmd/wails@<pin>` | `wails package`  |
-| `fyne`           | `go build ./...` | `go install fyne.io/tools/cmd/fyne@<pin>`                 | `fyne package`   |
-| `mygo`           | `go build ./...` | `go install github.com/egoist/mygo/cmd/mygo@<pin>`        | 空               |
-| `fnpack`         | `go build ./...` | 下载官方二进制（linux / darwin / windows）                | 空               |
-| `gio` / `golang` | `go build ./...` | 空                                                        | 空               |
+| framework        | build                         | install（仅原生执行）                                     | package          |
+|------------------|-------------------------------|-----------------------------------------------------------|------------------|
+| `wails3`         | `wails3 build`                | `go install …/v3/cmd/wails3@<pin>`                        | `wails3 package` |
+| `wails2`         | `wails build`                 | `go install github.com/wailsapp/wails/v2/cmd/wails@<pin>` | `wails package`  |
+| `fyne`           | `go build ./...`              | `go install fyne.io/tools/cmd/fyne@<pin>`                 | `fyne package`   |
+| `mygo`           | `go build ./...`              | `go install github.com/egoist/mygo/cmd/mygo@<pin>`        | 空               |
+| `fnpack`         | `go build ./...`              | 下载官方二进制（linux / darwin / windows）                | 空               |
+| `nsgo` / `viva`  | `go build ./...`              | `go install …/cmd/<nsgo                                   | viva>@<pin>`     |
+| `gio` / `golang` | `go build ./...`              | 空                                                        | 空               |
+| `asuka`          | `asuka build --platform <os>` | `go install …/cmd/asuka@<pin>`                            | 空               |
 
 覆盖与追加规则：
 
@@ -128,6 +130,9 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
 | `WAILS2_CLI_PIN` | `latest` | wails2 CLI                              |
 | `FYNE_CLI_PIN`   | `latest` | fyne CLI（`fyne.io/tools/cmd/fyne`）    |
 | `MYGO_CLI_PIN`   | `latest` | mygo CLI                                |
+| `NSGO_CLI_PIN`   | `latest` | nsgo CLI（上游无 tag，解析为伪版本）    |
+| `VIVA_CLI_PIN`   | `latest` | viva CLI（`github.com/vivaui/viva`）    |
+| `ASUKA_CLI_PIN`  | `latest` | asuka CLI（`github.com/egoist/asuka`）  |
 | `TASK_CLI_PIN`   | `latest` | `tools: task` 时安装的 go-task          |
 | `FNPACK_CLI_PIN` | `1.2.3`  | **例外**：官方下载 URL 必须带具体版本号 |
 
@@ -135,9 +140,9 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
 
 > fyne 的 install 走 `fyne.io/tools/cmd/fyne`：旧路径 `fyne.io/fyne/v2/cmd/fyne` 已迁出，只剩弃用提示桩，装出来执行不了 `fyne package`。与镜像 `Dockerfile.fyne` 保持一致。
 
-## 七个 framework 怎么用
+## 十个 framework 怎么用
 
-七个变体 = `golang` 基座 + `fnpack` / `wails3` / `wails2` / `fyne` / `mygo` / `gio` 六个变体。`uses:` 和参数结构完全一样，只换 `framework`（和构建模式的命令覆盖 / `bin-dir`）； `uses` 里的 `@main` 是 git ref（版本 tag 亦可）。
+十个变体 = `golang` 基座 + `fnpack` / `wails3` / `wails2` / `fyne` / `mygo` / `gio` / `nsgo` / `viva` / `asuka` 九个变体。`uses:` 和参数结构完全一样，只换 `framework`（和构建模式的命令覆盖 / `bin-dir`）； `uses` 里的 `@main` 是 git ref（版本 tag 亦可）。
 
 两种用法：
 
@@ -153,6 +158,9 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
 | `fyne`    | `/fyne`   | `go build ./...` 不落盘 → `go build -o bin/app ...`；`fyne package` | `bin`       |
 | `gio`     | `/gio`    | `go build ./...` 不落盘 → `go build -o bin/app .`                   | `bin`       |
 | `mygo`    | `/mygo`   | `go build ./...` 只做编译检查 → `mygo build`                        | 按项目      |
+| `nsgo`    | `/nsgo`   | `go build ./...` 只做编译检查 → `go build -o bin/app .`             | 按项目      |
+| `viva`    | `/viva`   | `go build ./...` 只做编译检查 → `go build -o bin/app .`             | 按项目      |
+| `asuka`   | `/asuka`  | `asuka build --platform linux/mac/windows`（按 runner 自动选）      | 按项目      |
 
 > 构建模式下有个共通的坑：默认 `go build ./...` 只做编译检查、不产出文件，而上传步骤是 `if-no-files-found: error`——这类 framework 必须用 `build-command` 带 `-o` 落盘， 或把 `bin-dir` 指向项目已有的产物目录。
 
@@ -288,6 +296,55 @@ action 第一步按 framework 生成三组命令，**Linux 与原生分支共用
   run: mygo build
 ```
 
+### nsgo
+
+- Linux 在 `golang/nsgo` 镜像里构建（GTK4 / WebKitGTK 6.0 / GStreamer 运行库齐全），macOS / Windows 原生分支由 action 装 CLI；
+- Linux 后端纯 Go、运行期 `dlopen`，编译应用不需要 build tag；上游无 tag，`@latest` 解析为伪版本，要复现请钉伪版本；
+- 完整示例：[nsgo.yml](../../.github/examples/go-gui-build/nsgo.yml)
+
+```yaml
+- name: 准备环境
+  uses: dtapps/golang@main
+  with:
+    framework: nsgo
+    setup-only: true
+- name: 构建
+  run: go build -o bin/app .
+```
+
+### viva
+
+- Linux 在 `golang/viva` 镜像里构建（XCB / Vulkan 与可选 GTK3 / WebKit2GTK 4.1 壳层），macOS / Windows 原生分支由 action 装 CLI；
+- 默认 purego 后端不需要 cgo；需要 WebView / GTK3 原生控件时在 `build-command` 里加 `-tags vivagtk`；
+- `viva --version` 可打印版本；完整示例：[viva.yml](../../.github/examples/go-gui-build/viva.yml)
+
+```yaml
+- name: 准备环境
+  uses: dtapps/golang@main
+  with:
+    framework: viva
+    setup-only: true
+- name: 构建
+  run: go build -o bin/app .
+```
+
+### asuka
+
+- Linux 在 `golang/asuka` 镜像里构建（已备 GTK4 / libadwaita 开发包与无头运行库），macOS / Windows 原生分支由 action 装 CLI 后构建；
+- 默认 `build` 按 runner 自动选 `--platform linux|mac|windows`（注意 macOS 写 `mac` 不是 `darwin`），要交叉编译其它目标请用 `build-command` 覆盖；
+- asuka 没有 `version` 子命令，`Print CLI versions` 步骤会提示用 `go version -m` 读取版本；
+- 完整示例：[asuka.yml](../../.github/examples/go-gui-build/asuka.yml)
+
+```yaml
+- name: 准备环境
+  uses: dtapps/golang@main
+  with:
+    framework: asuka
+    setup-only: true
+- name: 构建
+  run: asuka build --platform linux
+```
+
 ## 执行流程
 
 | 步骤                | Linux（`runner.os == 'Linux'`）                                                                                                                                        | macOS / Windows（`runner.os != 'Linux'`）                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -357,13 +414,13 @@ steps:
 | framework | 镜像                                |
 |-----------|-------------------------------------|
 | `golang`  | `ghcr.io/dtapps/golang`（根镜像）   |
-| 其余六个  | `ghcr.io/dtapps/golang/<framework>` |
+| 其余九个  | `ghcr.io/dtapps/golang/<framework>` |
 
 `image-tag` 传标签（如 `1.27.3`）时拼 `:tag`；也可以直接传 digest。 `latest` / `<major.minor>` 这类可变标签会随标签提升漂移，要严格复现时再用 digest； 标签契约见 [golang/images-and-tags.md](golang/images-and-tags.md)。
 
 ## 示例 workflow 文件
 
-七个 framework 各有一份完整、可直接抄的 workflow，放在 [`.github/examples/go-gui-build/`](../../.github/examples/go-gui-build/)（文件名 = framework）：
+十个 framework 各有一份完整、可直接抄的 workflow，放在 [`.github/examples/go-gui-build/`](../../.github/examples/go-gui-build/)（文件名 = framework）：
 
 | 示例文件                                                     | framework | 模式       | 后续步骤                          |
 |--------------------------------------------------------------|-----------|------------|-----------------------------------|
@@ -374,10 +431,13 @@ steps:
 | [fyne.yml](../../.github/examples/go-gui-build/fyne.yml)     | `fyne`    | setup-only | `go build …` / `fyne package`     |
 | [gio.yml](../../.github/examples/go-gui-build/gio.yml)       | `gio`     | setup-only | `go build -o bin/app .`           |
 | [mygo.yml](../../.github/examples/go-gui-build/mygo.yml)     | `mygo`    | setup-only | `mygo build`                      |
+| [nsgo.yml](../../.github/examples/go-gui-build/nsgo.yml)     | `nsgo`    | setup-only | `go build -o bin/app .`           |
+| [viva.yml](../../.github/examples/go-gui-build/viva.yml)     | `viva`    | setup-only | `go build -o bin/app .`           |
+| [asuka.yml](../../.github/examples/go-gui-build/asuka.yml)   | `asuka`   | setup-only | `asuka build --platform …`        |
 
 每个文件的公共结构：
 
-- 七个示例统一是两个 step：**准备环境**（`setup-only: true`，装 CLI）→ **使用**（`run:` 自己跑构建 / 打包），**不需要 Docker**；
+- 十个示例统一是两个 step：**准备环境**（`setup-only: true`，装 CLI）→ **使用**（`run:` 自己跑构建 / 打包），**不需要 Docker**；
 - `fnpack` 从官方地址下载二进制（linux / darwin / windows 都有），不走 `go install`；
 - Linux 需要自备 GUI 系统库（GTK / WebKit / GL），action 会在 Linux 上打 warning；
 - 在本仓库自测时把 `uses: dtapps/golang@main` 换成 `uses: ./`。
@@ -397,7 +457,7 @@ steps:
 ## 事实来源
 
 - action 实现：`action.yml`（仓库根目录）
-- 示例 workflow：`.github/examples/go-gui-build/{golang,fnpack,wails3,wails2,fyne,gio,mygo}.yml`
+- 示例 workflow：`.github/examples/go-gui-build/{golang,fnpack,wails3,wails2,fyne,gio,mygo,nsgo,viva,asuka}.yml`
 - 通用工具安装器：`scripts/install-tool.sh`（`tools: task` 等；内置工具表，二进制优先 + `go install` 兜底，新增工具在表里加一段）
 - NSIS 安装脚本：`scripts/install-nsis.ps1`（`tools: nsis`，仅 Windows）
 - 镜像内容与标签：`.github/docker/Dockerfile.*`、`.github/scripts/build-*.sh`（见 [golang/images-and-tags.md](golang/images-and-tags.md)）

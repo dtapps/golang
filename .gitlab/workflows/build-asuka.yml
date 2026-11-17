@@ -10,6 +10,8 @@ build-asuka:
     - |
       set -eu
       export version="${VERSION:-}"
+      # 留空 = 脚本解析上游最新稳定 tag；装不上（模块下载失败 / 编译失败）时
+      # 自动降一个 patch 版本重试，只降一次。
       export asuka_version="${ASUKA_VERSION:-}"
       . ./.gitlab/scripts/build-asuka.sh
   artifacts:

@@ -5,11 +5,11 @@
 #     uses: dtapps/golang@<ref>        # 版本 tag / 分支
 #   本仓库自己的 workflow 用相对路径：
 #     uses: ./                        # 先 actions/checkout
-#   使用文档：docs/go-gui-build.md（含七个 framework 示例与三平台 workflow）
+#   使用文档：docs/go-gui-build.md（含十个 framework 示例与三平台 workflow）
 #
-#   服务于本仓库的 7 个平级变体镜像（golang / fnpack / wails3 / wails2 /
-#   fyne / mygo / gio），只做这一个通用 action：framework 输入选变体与默认命令。
-#   不造合并镜像，不拆七个 action。
+#   服务于本仓库的 10 个平级变体镜像（golang / fnpack / wails3 / wails2 /
+#   fyne / mygo / gio / nsgo / viva / asuka），只做这一个通用 action：
+#   framework 输入选变体与默认命令。不造合并镜像，不拆十个 action。
 #
 #   分层契约（不要破坏）：
 #     · 镜像负责「环境」：系统库、CLI、Go 版本、软件源配置（见 .github/docker/）
@@ -55,7 +55,7 @@ branding:
 
 inputs:
   framework:
-    description: '镜像变体与默认命令选择器：wails3 | wails2 | fyne | gio | golang | fnpack | mygo'
+    description: '镜像变体与默认命令选择器：wails3 | wails2 | fyne | gio | golang | fnpack | mygo | nsgo | viva | asuka'
     required: true
   image-tag:
     description: '镜像标签（如 1.27.3、1.27、latest；也接受 digest）：仅构建模式的 Linux 分支使用，setup-only 不需要'
@@ -79,7 +79,7 @@ inputs:
     required: false
     default: ''
   tools:
-    description: '额外工具（逗号分隔，枚举）：task = go-task；七个 framework 通用，装好后在 PATH 里（Linux 镜像已自带，主要给 macOS / Windows 用）'
+    description: '额外工具（逗号分隔，枚举）：task = go-task；十个 framework 通用，装好后在 PATH 里（Linux 镜像已自带，主要给 macOS / Windows 用）'
     required: false
     default: ''
   cache:
@@ -153,6 +153,9 @@ runs:
         WAILS2_CLI_PIN="${WAILS2_CLI_PIN:-latest}"
         FYNE_CLI_PIN="${FYNE_CLI_PIN:-latest}"
         MYGO_CLI_PIN="${MYGO_CLI_PIN:-latest}"
+        ASUKA_CLI_PIN="${ASUKA_CLI_PIN:-latest}"
+        NSGO_CLI_PIN="${NSGO_CLI_PIN:-latest}"
+        VIVA_CLI_PIN="${VIVA_CLI_PIN:-latest}"
         # go-task：tools=task 时安装
         TASK_CLI_PIN="${TASK_CLI_PIN:-latest}"
         # fnpack 例外：官方 URL 里必须带具体版本号，没有 latest 这一档
@@ -212,13 +215,42 @@ runs:
             default_install='os=; exe=; case "$(uname -s)" in Linux*) os=linux ;; Darwin*) os=darwin ;; MINGW*|MSYS*|CYGWIN*) os=windows; exe=.exe ;; *) echo "::error::fnpack: 不支持的系统" >&2; exit 1 ;; esac; arch="$(go env GOARCH)"; dest="$(go env GOPATH)/bin/fnpack${exe}"; mkdir -p "$(go env GOPATH)/bin"; curl -fsSL --retry 2 -o "$dest" "https://static2.fnnas.com/fnpack/fnpack-'"${FNPACK_CLI_PIN}"'-${os}-${arch}" || curl -fsSL --retry 2 -o "$dest" "https://static2.fnnas.com/fnpack/fnpack-'"${FNPACK_CLI_PIN}"'-${os}-arm"; chmod +x "$dest"'
             default_package=""
             ;;
+          asuka)
+            # 与镜像 Dockerfile.asuka 一致：go install github.com/egoist/asuka/cmd/asuka。
+            # asuka 没有 version 子命令，版本从 `go version -m` 的内嵌模块信息读。
+            # --platform 按 README 示例显式传；macOS 的平台名是 mac（不是 darwin）。
+            # Linux 构建在变体镜像里跑，macOS / Windows 走原生 runner 用各自平台名。
+            case "${RUNNER_OS:-Linux}" in
+              Linux*)   _asuka_platform=linux ;;
+              macOS*)   _asuka_platform=mac ;;
+              Windows*) _asuka_platform=windows ;;
+              *)        _asuka_platform=linux ;;
+            esac
+            default_build="asuka build --platform ${_asuka_platform}"
+            default_install="go install github.com/egoist/asuka/cmd/asuka@${ASUKA_CLI_PIN}"
+            default_package=""
+            ;;
+          nsgo)
+            # 与镜像 Dockerfile.nsgo 一致：上游无 tag，@latest 解析为伪版本；
+            # Linux 后端纯 Go、运行期 dlopen，编译应用不需要 build tag。
+            default_build="go build ./..."
+            default_install="go install github.com/nsgo-dev/nsgo/cmd/nsgo@${NSGO_CLI_PIN}"
+            default_package=""
+            ;;
+          viva)
+            # 与镜像 Dockerfile.viva 一致：purego 后端不需要 cgo；
+            # 需要 GTK3 / WebView 壳层时在 build-command 里加 -tags vivagtk。
+            default_build="go build ./..."
+            default_install="go install github.com/vivaui/viva/cmd/viva@${VIVA_CLI_PIN}"
+            default_package=""
+            ;;
           gio | golang)
             default_build="go build ./..."
             default_install=""
             default_package=""
             ;;
           *)
-            echo "::error::framework 必须是 wails3 | wails2 | fyne | gio | golang | fnpack | mygo 之一，收到：${FRAMEWORK}"
+            echo "::error::framework 必须是 wails3 | wails2 | fyne | gio | golang | fnpack | mygo | nsgo | viva | asuka 之一，收到：${FRAMEWORK}"
             exit 1
             ;;
         esac
@@ -309,10 +341,10 @@ runs:
         # 否则缓存的二进制会把 latest 冻在第一次装到的版本上。
         tools_key="$(printf '%s' "${TOOLS}" | tr -c '[:alnum:]' '-')"
         week=""
-        case "${WAILS3_CLI_PIN}${WAILS2_CLI_PIN}${FYNE_CLI_PIN}${MYGO_CLI_PIN}${TASK_CLI_PIN}" in
+        case "${WAILS3_CLI_PIN}${WAILS2_CLI_PIN}${FYNE_CLI_PIN}${MYGO_CLI_PIN}${ASUKA_CLI_PIN}${NSGO_CLI_PIN}${VIVA_CLI_PIN}${TASK_CLI_PIN}" in
           *latest*) week="-$(date -u +%G-%V)" ;;
         esac
-        write_output cli_cache_key "${FRAMEWORK}-${WAILS3_CLI_PIN}-${WAILS2_CLI_PIN}-${FYNE_CLI_PIN}-${MYGO_CLI_PIN}-${FNPACK_CLI_PIN}-${TASK_CLI_PIN}-${tools_key}${week}"
+        write_output cli_cache_key "${FRAMEWORK}-${WAILS3_CLI_PIN}-${WAILS2_CLI_PIN}-${FYNE_CLI_PIN}-${MYGO_CLI_PIN}-${ASUKA_CLI_PIN}-${NSGO_CLI_PIN}-${VIVA_CLI_PIN}-${FNPACK_CLI_PIN}-${TASK_CLI_PIN}-${tools_key}${week}"
 
         echo "build:   ${build_cmd}"
         echo "install: ${install_cmd:-<空>}"
@@ -520,6 +552,10 @@ runs:
           fyne) show fyne ;;
           mygo) show mygo ;;
           fnpack) show fnpack ;;
+          # asuka 没有 version 子命令，show 的三个探测形式只会拿到 usage
+          asuka) echo '  asuka      无 version 子命令，版本用 go version -m 读取' ;;
+          nsgo) show nsgo ;;
+          viva) show viva ;;
           gio | golang) : ;;
         esac
         case ",${TOOLS}," in *,task,*) show task ;; esac

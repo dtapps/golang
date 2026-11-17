@@ -22,6 +22,7 @@
 #
 # asuka：https://github.com/egoist/asuka
 # ASUKA_VERSION 默认 latest；CI 会先解析成具体 tag 再传进来，裸 build 由 go install 解析。
+# CI 在构建前会探针一次（真的装一次）：装不上就自动降一个 patch 版本重试，只降一次。
 # ===================================================================
 
 ARG GOLANG_IMAGE=golang:1-trixie
@@ -33,6 +34,9 @@ ARG TARGETPLATFORM
 
 ARG GOLANG_IMAGE
 ARG ASUKA_VERSION=latest
+# 解析上游最新 tag 失败（GOPROXY 网络问题）时的兜底版本。正常路径不走这里：
+# 脚本先探针（真的装一次），装不上就自动降一个 patch 版本重试一次。
+ARG ASUKA_FALLBACK_VERSION=v0.1.0
 ARG IMAGE_VERSION=dev
 ARG VCS_REF=unknown
 ARG BUILD_DATE=1970-01-01T00:00:00Z

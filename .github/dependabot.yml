@@ -19,6 +19,7 @@ updates:
       - 'dependencies'
       - 'docker'
 
+  # CNB 依赖（分别扫描三侧 .cnb/docker 下的 FROM / ARG 镜像标签）
   - package-ecosystem: 'docker'
     directory: '/.cnb/docker'
     schedule:
@@ -27,6 +28,7 @@ updates:
       - 'dependencies'
       - 'docker'
 
+  # GitLab CI 依赖（分别扫描三侧 .gitlab/docker 下的 FROM / ARG 镜像标签）
   - package-ecosystem: 'docker'
     directory: '/.gitlab/docker'
     schedule:
