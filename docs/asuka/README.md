@@ -76,7 +76,7 @@ docker run --rm -v "$PWD":/src -w /src ghcr.io/dtapps/golang/asuka:latest xvfb-r
 
 ## CI 触发
 
-- CNB：`.cnb/workflows/build-asuka.yml`，每天 **11:05** 由 `.cnb.yml` 的 `crontab: 5 11 * * *` 定时触发，排在 viva（10:05）之后 1 小时；也可用「打包 Golang + asuka 镜像（多架构）」按钮手动触发，可填 `version` / `asuka_version`。
+- CNB：`.cnb/workflows/build-asuka.yml`，每天 **11:05** 由该文件内的 `crontab: 5 11 * * *` 定时触发，排在 viva（10:05）之后 1 小时；也可用「打包 Golang + asuka 镜像（多架构）」按钮手动触发，可填 `version` / `asuka_version`。
 - GitHub：`.github/workflows/build-asuka.yml`，每天 **03:05 UTC（北京 11:05）** 定时触发，对应 cron `5 3 * * *`，排在 build-viva（02:05 UTC）之后 1 小时；手动触发同样可填 `version` / `asuka_version`。
 - GitLab：`.gitlab/workflows/build-asuka.yml` 由根 `.gitlab-ci.yml` include；建议 schedule 变量 `TARGET=asuka`，cron 选 `Asia/Shanghai` 时填 `5 11 * * *`，选 UTC 时填 `5 3 * * *`（GitLab 的 cron 建在 UI / API，不写在 YAML 里）。
 

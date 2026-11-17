@@ -130,7 +130,7 @@ GUI 需要显示环境：容器里没有显示器时用镜像自带的 `Xvfb`（
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-nsgo.yml`，每天 09:05 由 `.cnb.yml` 定时触发（在 gio 08:05 之后，给基座 00:05 留了九小时）；也可用「打包 Golang + nsgo 镜像（多架构）」按钮手动触发，可填 `version` / `nsgo_version`。
+- CNB：`.cnb/workflows/build-nsgo.yml`，每天 09:05 由该文件内的 crontab 定时触发（在 gio 08:05 之后，给基座 00:05 留了九小时）；也可用「打包 Golang + nsgo 镜像（多架构）」按钮手动触发，可填 `version` / `nsgo_version`。
 - GitHub：`.github/workflows/build-nsgo.yml`，每天 01:05 UTC（北京 09:05）定时触发（在 build-gio 的 00:05 UTC 之后）；手动触发同样可填 `version` / `nsgo_version`。
 - GitLab：`.gitlab/workflows/build-nsgo.yml`，在 UI / API 建 `TARGET=nsgo` 的 schedule 定时触发（基座先构建）；手动 Run pipeline 时填 `TARGET=nsgo`，可再填 `VERSION` / `NSGO_VERSION`，见 [../gitlab.md](../gitlab.md)。
 

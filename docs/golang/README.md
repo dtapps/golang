@@ -63,7 +63,7 @@ make format && make lint-shell   # 提交前
 
 CI 按平台和镜像拆开，每个镜像一条流水线：
 
-- CNB：`.cnb/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`，每日由 `.cnb.yml` 的定时任务先后触发（00:05 golang、03:05 fnpack，之后依次 04:05 wails3、06:05 fyne、07:05 mygo、08:05 gio、09:05 nsgo、10:05 viva、11:05 asuka）。
+- CNB：`.cnb/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`，每日由各 workflow 内的 crontab 先后触发（00:05 golang、03:05 fnpack，之后依次 04:05 wails3、06:05 fyne、07:05 mygo、08:05 gio、09:05 nsgo、10:05 viva、11:05 asuka）。
 - GitHub：`.github/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`，各自按定时任务触发（16:05 UTC golang、19:05 UTC fnpack，之后依次 20:05 wails3、22:05 fyne、23:05 mygo、00:05 gio、01:05 nsgo、02:05 viva UTC）。
 - GitLab：`.gitlab/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`，由 Pipeline schedules 触发（与 GitHub 同样的时间表），`TARGET` 选镜像；wails2 那条暂时停用。
 

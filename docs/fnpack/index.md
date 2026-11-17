@@ -26,13 +26,13 @@
 
 ## 事实来源
 
-| 事实                       | 来源                                                                                                                                                            |
-|----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| fnpack 怎么装              | `.cnb/docker/Dockerfile.fnpack`、`.github/docker/Dockerfile.fnpack`、`.gitlab/docker/Dockerfile.fnpack`                                                         |
-| fnpack 版本                | Dockerfile 的 `ARG FNPACK_VERSION`（三份各一的默认值）；手动触发可用 `fnpack_version` 覆盖，上游没有 latest 查询接口                                            |
-| 标签、等待基座、冒烟、提升 | `.cnb/scripts/build-fnpack.sh`、`.github/scripts/build-fnpack.sh`、`.gitlab/scripts/build-fnpack.sh`                                                            |
-| 谁触发                     | `.cnb.yml`（03:05 cron）、`.cnb/workflows/build-fnpack.yml`、`.github/workflows/build-fnpack.yml`、`.gitlab/workflows/build-fnpack.yml`、`.cnb/web_trigger.yml` |
-| 构建元数据                 | `.cnb/annotation-fnpack.json`、`.github/annotation-fnpack.json`、`.gitlab/annotation-fnpack.json`（CI 生成，不入库）                                            |
+| 事实                       | 来源                                                                                                                                                                                   |
+|----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| fnpack 怎么装              | `.cnb/docker/Dockerfile.fnpack`、`.github/docker/Dockerfile.fnpack`、`.gitlab/docker/Dockerfile.fnpack`                                                                                |
+| fnpack 版本                | Dockerfile 的 `ARG FNPACK_VERSION`（三份各一的默认值）；手动触发可用 `fnpack_version` 覆盖，上游没有 latest 查询接口                                                                   |
+| 标签、等待基座、冒烟、提升 | `.cnb/scripts/build-fnpack.sh`、`.github/scripts/build-fnpack.sh`、`.gitlab/scripts/build-fnpack.sh`                                                                                   |
+| 谁触发                     | `.cnb/workflows/build-fnpack.yml`（03:05 cron）、`.cnb/workflows/build-fnpack.yml`、`.github/workflows/build-fnpack.yml`、`.gitlab/workflows/build-fnpack.yml`、`.cnb/web_trigger.yml` |
+| 构建元数据                 | `.cnb/annotation-fnpack.json`、`.github/annotation-fnpack.json`、`.gitlab/annotation-fnpack.json`（CI 生成，不入库）                                                                   |
 
 ## 维护约定
 

@@ -22,16 +22,16 @@ fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 镜像都 `FR
 
 | 事件                                | 定义位置                                                            | 产物 / 行为                                                                 |
 |-------------------------------------|---------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| `'crontab: 5 0 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 00:05 构建 golang 基础镜像；不传 version                               |
-| `'crontab: 5 3 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 03:05 构建 fnpack 镜像；使用 00:05 产出的基础镜像                      |
-| `'crontab: 5 4 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 04:05 构建 wails3 镜像；使用 00:05 产出的基础镜像                      |
-| wails2 定时（暂时停用）             | `.cnb.yml` 的 `main`（注释块）                                      | wails2 的定时任务暂时停用，仅手动触发，见 [维护 — 日常构建](maintenance.md) |
-| `'crontab: 5 6 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 06:05 构建 fyne 镜像；使用 00:05 产出的基础镜像                        |
-| `'crontab: 5 7 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 07:05 构建 mygo 镜像；使用 00:05 产出的基础镜像                        |
-| `'crontab: 5 8 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 08:05 构建 gio 镜像；使用 00:05 产出的基础镜像                         |
-| `'crontab: 5 9 * * *'`              | `.cnb.yml` 的 `main`                                                | 每天 09:05 构建 nsgo 镜像；使用 00:05 产出的基础镜像                        |
-| `'crontab: 5 10 * * *'`             | `.cnb.yml` 的 `main`                                                | 每天 10:05 构建 viva 镜像；使用 00:05 产出的基础镜像                        |
-| `'crontab: 5 11 * * *'`             | `.cnb.yml` 的 `main`                                                | 每天 11:05 构建 asuka 镜像；使用 00:05 产出的基础镜像                       |
+| `'crontab: 5 0 * * *'`              | `.cnb/workflows/build-golang.yml` 的 `main`                         | 每天 00:05 构建 golang 基础镜像；不传 version                               |
+| `'crontab: 5 3 * * *'`              | `.cnb/workflows/build-fnpack.yml` 的 `main`                         | 每天 03:05 构建 fnpack 镜像；使用 00:05 产出的基础镜像                      |
+| `'crontab: 5 4 * * *'`              | `.cnb/workflows/build-wails3.yml` 的 `main`                         | 每天 04:05 构建 wails3 镜像；使用 00:05 产出的基础镜像                      |
+| wails2 定时（暂时停用）             | `.cnb/workflows/build-wails2.yml` 的注释块                          | wails2 的定时任务暂时停用，仅手动触发，见 [维护 — 日常构建](maintenance.md) |
+| `'crontab: 5 6 * * *'`              | `.cnb/workflows/build-fyne.yml` 的 `main`                           | 每天 06:05 构建 fyne 镜像；使用 00:05 产出的基础镜像                        |
+| `'crontab: 5 7 * * *'`              | `.cnb/workflows/build-mygo.yml` 的 `main`                           | 每天 07:05 构建 mygo 镜像；使用 00:05 产出的基础镜像                        |
+| `'crontab: 5 8 * * *'`              | `.cnb/workflows/build-gio.yml` 的 `main`                            | 每天 08:05 构建 gio 镜像；使用 00:05 产出的基础镜像                         |
+| `'crontab: 5 9 * * *'`              | `.cnb/workflows/build-nsgo.yml` 的 `main`                           | 每天 09:05 构建 nsgo 镜像；使用 00:05 产出的基础镜像                        |
+| `'crontab: 5 10 * * *'`             | `.cnb/workflows/build-viva.yml` 的 `main`                           | 每天 10:05 构建 viva 镜像；使用 00:05 产出的基础镜像                        |
+| `'crontab: 5 11 * * *'`             | `.cnb/workflows/build-asuka.yml` 的 `main`                          | 每天 11:05 构建 asuka 镜像；使用 00:05 产出的基础镜像                       |
 | `web_trigger_build_golang`          | `.cnb/workflows/build-golang.yml`                                   | 手动构建 golang，可传 `version`                                             |
 | `web_trigger_build_fnpack`          | `.cnb/workflows/build-fnpack.yml`                                   | 手动构建 fnpack，可传 `version` / `fnpack_version`                          |
 | `web_trigger_build_wails3`          | `.cnb/workflows/build-wails3.yml`                                   | 手动构建 wails3，可传 `version` / `wails3_version`                          |

@@ -4,100 +4,101 @@
 
 ## 文件地图
 
-| 文件                                 | 职责                               | 注意事项                               |
-|--------------------------------------|------------------------------------|----------------------------------------|
-| `.cnb/docker/Dockerfile.golang`      | CNB 侧：基座、工具链、镜像源开关   | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.fnpack`      | CNB 侧：在 golang 镜像上加 fnpack  | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.wails3`      | CNB 侧：在 golang 镜像上加 wails3  | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.wails2`      | CNB 侧：在 golang 镜像上加 wails2  | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.fyne`        | CNB 侧：在 golang 镜像上加 fyne    | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.mygo`        | CNB 侧：在 golang 镜像上加 mygo    | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.gio`         | CNB 侧：在 golang 镜像上加 gio     | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.nsgo`        | CNB 侧：在 golang 镜像上加 nsgo    | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.viva`        | CNB 侧：在 golang 镜像上加 viva    | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.cnb/docker/Dockerfile.asuka`       | CNB 侧：在 golang 镜像上加 asuka   | 与 `.github/`、`.gitlab/` 同名文件同步 |
-| `.github/docker/Dockerfile.golang`   | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.fnpack`   | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.wails3`   | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.wails2`   | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.fyne`     | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.mygo`     | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.gio`      | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.nsgo`     | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.viva`     | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.github/docker/Dockerfile.asuka`    | GitHub 侧：同上                    | 与 `.cnb/`、`.gitlab/` 同步            |
-| `.gitlab/docker/Dockerfile.golang`   | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.fnpack`   | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.wails3`   | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.wails2`   | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.fyne`     | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.mygo`     | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.gio`      | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.nsgo`     | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.viva`     | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.gitlab/docker/Dockerfile.asuka`    | GitLab 侧：同上                    | 与 `.cnb/`、`.github/` 同步            |
-| `.cnb/scripts/build-golang.sh`       | CNB 侧：构建并发布 golang 基础镜像 | POSIX `sh`；失败要显式退出             |
-| `.cnb/scripts/build-fnpack.sh`       | CNB 侧：基于基础镜像发布 fnpack    | 与另外两侧标签/冒烟同步                |
-| `.cnb/scripts/build-wails3.sh`       | CNB 侧：基于基础镜像发布 wails3    | 与另外两侧标签/冒烟同步                |
-| `.cnb/scripts/build-wails2.sh`       | CNB 侧：基于基础镜像发布 wails2    | 与另外两侧标签/冒烟同步                |
-| `.cnb/scripts/build-fyne.sh`         | CNB 侧：基于基础镜像发布 fyne      | 与另外两侧标签/冒烟同步                |
-| `.cnb/scripts/build-mygo.sh`         | CNB 侧：基于基础镜像发布 mygo      | 与另外两侧标签/冒烟同步                |
-| `.cnb/scripts/build-gio.sh`          | CNB 侧：基于基础镜像发布 gio       | 与另外两侧标签/冒烟同步                |
-| `.cnb/scripts/build-nsgo.sh`         | CNB 侧：基于基础镜像发布 nsgo      | 与另外两侧标签/冒烟同步                |
-| `.cnb/scripts/build-viva.sh`         | CNB 侧：基于基础镜像发布 viva      | 与另外两侧标签/冒烟同步                |
-| `.cnb/scripts/build-asuka.sh`        | CNB 侧：基于基础镜像发布 asuka     | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-golang.sh`    | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-fnpack.sh`    | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-wails3.sh`    | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-wails2.sh`    | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-fyne.sh`      | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-mygo.sh`      | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-gio.sh`       | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-nsgo.sh`      | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-viva.sh`      | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.github/scripts/build-asuka.sh`     | GitHub 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-golang.sh`    | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-fnpack.sh`    | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-wails3.sh`    | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-wails2.sh`    | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-fyne.sh`      | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-mygo.sh`      | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-gio.sh`       | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-nsgo.sh`      | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-viva.sh`      | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.gitlab/scripts/build-asuka.sh`     | GitLab 侧：同上                    | 与另外两侧标签/冒烟同步                |
-| `.cnb/workflows/build-golang.yml`    | CNB 触发器（golang）               | 按钮事件                               |
-| `.cnb/workflows/build-fnpack.yml`    | CNB 触发器（fnpack）               | 依赖基础镜像已推送                     |
-| `.cnb/workflows/build-wails3.yml`    | CNB 触发器（wails3）               | 依赖基础镜像已推送                     |
-| `.cnb/workflows/build-wails2.yml`    | CNB 触发器（wails2）               | 依赖基础镜像已推送                     |
-| `.cnb/workflows/build-fyne.yml`      | CNB 触发器（fyne）                 | 依赖基础镜像已推送                     |
-| `.cnb/workflows/build-mygo.yml`      | CNB 触发器（mygo）                 | 依赖基础镜像已推送                     |
-| `.cnb/workflows/build-gio.yml`       | CNB 触发器（gio）                  | 依赖基础镜像已推送                     |
-| `.cnb/workflows/build-nsgo.yml`      | CNB 触发器（nsgo）                 | 依赖基础镜像已推送                     |
-| `.cnb/workflows/build-viva.yml`      | CNB 触发器（viva）                 | 独立定时，排在 nsgo 之后 1 小时        |
-| `.cnb/workflows/build-asuka.yml`     | CNB 触发器（asuka）                | 独立定时，排在 viva 之后 1 小时        |
-| `.github/workflows/build-golang.yml` | GitHub 触发器（golang）            | QEMU、Step Summary                     |
-| `.github/workflows/build-fnpack.yml` | GitHub 触发器（fnpack）            | 独立定时                               |
-| `.github/workflows/build-wails3.yml` | GitHub 触发器（wails3）            | 独立定时                               |
-| `.github/workflows/build-wails2.yml` | GitHub 触发器（wails2）            | 定时任务暂时停用                       |
-| `.github/workflows/build-fyne.yml`   | GitHub 触发器（fyne）              | 独立定时                               |
-| `.github/workflows/build-mygo.yml`   | GitHub 触发器（mygo）              | 独立定时                               |
-| `.github/workflows/build-gio.yml`    | GitHub 触发器（gio）               | 独立定时                               |
-| `.github/workflows/build-nsgo.yml`   | GitHub 触发器（nsgo）              | 独立定时                               |
-| `.github/workflows/build-viva.yml`   | GitHub 触发器（viva）              | 独立定时，排在 nsgo 之后 1 小时        |
-| `.github/workflows/build-asuka.yml`  | GitHub 触发器（asuka）             | 独立定时，排在 viva 之后 1 小时        |
-| `.gitlab/workflows/build-golang.yml` | GitLab 触发器（golang）            | dind、QEMU、buildx                     |
-| `.gitlab/workflows/build-fnpack.yml` | GitLab 触发器（fnpack）            | 依赖基础镜像已推送                     |
-| `.gitlab/workflows/build-wails3.yml` | GitLab 触发器（wails3）            | 依赖基础镜像已推送                     |
-| `.gitlab/workflows/build-wails2.yml` | GitLab 触发器（wails2）            | 依赖基础镜像已推送                     |
-| `.gitlab/workflows/build-fyne.yml`   | GitLab 触发器（fyne）              | 依赖基础镜像已推送                     |
-| `.gitlab/workflows/build-mygo.yml`   | GitLab 触发器（mygo）              | 依赖基础镜像已推送                     |
-| `.gitlab/workflows/build-gio.yml`    | GitLab 触发器（gio）               | 依赖基础镜像已推送                     |
-| `.gitlab/workflows/build-nsgo.yml`   | GitLab 触发器（nsgo）              | 依赖基础镜像已推送                     |
-| `.gitlab/workflows/build-viva.yml`   | GitLab 触发器（viva）              | 独立定时，排在 nsgo 之后 1 小时        |
-| `.gitlab/workflows/build-asuka.yml`  | GitLab 触发器（asuka）             | 独立定时，排在 viva 之后 1 小时        |
-| `.cnb.yml`、`.cnb/web_trigger.yml`   | CNB 定时任务、十个构建按钮         | 事件名必须与 workflow 一致             |
-| `.gitlab-ci.yml`                     | GitLab 全局配置、变量、schedules   | 定时任务建在 UI / API 里               |
+| 文件                                 | 职责                                 | 注意事项                               |
+|--------------------------------------|--------------------------------------|----------------------------------------|
+| `.cnb/docker/Dockerfile.golang`      | CNB 侧：基座、工具链、镜像源开关     | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.fnpack`      | CNB 侧：在 golang 镜像上加 fnpack    | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.wails3`      | CNB 侧：在 golang 镜像上加 wails3    | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.wails2`      | CNB 侧：在 golang 镜像上加 wails2    | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.fyne`        | CNB 侧：在 golang 镜像上加 fyne      | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.mygo`        | CNB 侧：在 golang 镜像上加 mygo      | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.gio`         | CNB 侧：在 golang 镜像上加 gio       | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.nsgo`        | CNB 侧：在 golang 镜像上加 nsgo      | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.viva`        | CNB 侧：在 golang 镜像上加 viva      | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.cnb/docker/Dockerfile.asuka`       | CNB 侧：在 golang 镜像上加 asuka     | 与 `.github/`、`.gitlab/` 同名文件同步 |
+| `.github/docker/Dockerfile.golang`   | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.fnpack`   | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.wails3`   | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.wails2`   | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.fyne`     | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.mygo`     | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.gio`      | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.nsgo`     | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.viva`     | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.github/docker/Dockerfile.asuka`    | GitHub 侧：同上                      | 与 `.cnb/`、`.gitlab/` 同步            |
+| `.gitlab/docker/Dockerfile.golang`   | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.fnpack`   | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.wails3`   | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.wails2`   | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.fyne`     | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.mygo`     | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.gio`      | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.nsgo`     | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.viva`     | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.gitlab/docker/Dockerfile.asuka`    | GitLab 侧：同上                      | 与 `.cnb/`、`.github/` 同步            |
+| `.cnb/scripts/build-golang.sh`       | CNB 侧：构建并发布 golang 基础镜像   | POSIX `sh`；失败要显式退出             |
+| `.cnb/scripts/build-fnpack.sh`       | CNB 侧：基于基础镜像发布 fnpack      | 与另外两侧标签/冒烟同步                |
+| `.cnb/scripts/build-wails3.sh`       | CNB 侧：基于基础镜像发布 wails3      | 与另外两侧标签/冒烟同步                |
+| `.cnb/scripts/build-wails2.sh`       | CNB 侧：基于基础镜像发布 wails2      | 与另外两侧标签/冒烟同步                |
+| `.cnb/scripts/build-fyne.sh`         | CNB 侧：基于基础镜像发布 fyne        | 与另外两侧标签/冒烟同步                |
+| `.cnb/scripts/build-mygo.sh`         | CNB 侧：基于基础镜像发布 mygo        | 与另外两侧标签/冒烟同步                |
+| `.cnb/scripts/build-gio.sh`          | CNB 侧：基于基础镜像发布 gio         | 与另外两侧标签/冒烟同步                |
+| `.cnb/scripts/build-nsgo.sh`         | CNB 侧：基于基础镜像发布 nsgo        | 与另外两侧标签/冒烟同步                |
+| `.cnb/scripts/build-viva.sh`         | CNB 侧：基于基础镜像发布 viva        | 与另外两侧标签/冒烟同步                |
+| `.cnb/scripts/build-asuka.sh`        | CNB 侧：基于基础镜像发布 asuka       | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-golang.sh`    | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-fnpack.sh`    | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-wails3.sh`    | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-wails2.sh`    | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-fyne.sh`      | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-mygo.sh`      | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-gio.sh`       | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-nsgo.sh`      | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-viva.sh`      | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.github/scripts/build-asuka.sh`     | GitHub 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-golang.sh`    | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-fnpack.sh`    | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-wails3.sh`    | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-wails2.sh`    | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-fyne.sh`      | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-mygo.sh`      | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-gio.sh`       | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-nsgo.sh`      | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-viva.sh`      | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.gitlab/scripts/build-asuka.sh`     | GitLab 侧：同上                      | 与另外两侧标签/冒烟同步                |
+| `.cnb/workflows/build-golang.yml`    | CNB 触发器（golang）                 | 按钮事件                               |
+| `.cnb/workflows/build-fnpack.yml`    | CNB 触发器（fnpack）                 | 依赖基础镜像已推送                     |
+| `.cnb/workflows/build-wails3.yml`    | CNB 触发器（wails3）                 | 依赖基础镜像已推送                     |
+| `.cnb/workflows/build-wails2.yml`    | CNB 触发器（wails2）                 | 依赖基础镜像已推送                     |
+| `.cnb/workflows/build-fyne.yml`      | CNB 触发器（fyne）                   | 依赖基础镜像已推送                     |
+| `.cnb/workflows/build-mygo.yml`      | CNB 触发器（mygo）                   | 依赖基础镜像已推送                     |
+| `.cnb/workflows/build-gio.yml`       | CNB 触发器（gio）                    | 依赖基础镜像已推送                     |
+| `.cnb/workflows/build-nsgo.yml`      | CNB 触发器（nsgo）                   | 依赖基础镜像已推送                     |
+| `.cnb/workflows/build-viva.yml`      | CNB 触发器（viva）                   | 独立定时，排在 nsgo 之后 1 小时        |
+| `.cnb/workflows/build-asuka.yml`     | CNB 触发器（asuka）                  | 独立定时，排在 viva 之后 1 小时        |
+| `.github/workflows/build-golang.yml` | GitHub 触发器（golang）              | QEMU、Step Summary                     |
+| `.github/workflows/build-fnpack.yml` | GitHub 触发器（fnpack）              | 独立定时                               |
+| `.github/workflows/build-wails3.yml` | GitHub 触发器（wails3）              | 独立定时                               |
+| `.github/workflows/build-wails2.yml` | GitHub 触发器（wails2）              | 定时任务暂时停用                       |
+| `.github/workflows/build-fyne.yml`   | GitHub 触发器（fyne）                | 独立定时                               |
+| `.github/workflows/build-mygo.yml`   | GitHub 触发器（mygo）                | 独立定时                               |
+| `.github/workflows/build-gio.yml`    | GitHub 触发器（gio）                 | 独立定时                               |
+| `.github/workflows/build-nsgo.yml`   | GitHub 触发器（nsgo）                | 独立定时                               |
+| `.github/workflows/build-viva.yml`   | GitHub 触发器（viva）                | 独立定时，排在 nsgo 之后 1 小时        |
+| `.github/workflows/build-asuka.yml`  | GitHub 触发器（asuka）               | 独立定时，排在 viva 之后 1 小时        |
+| `.gitlab/workflows/build-golang.yml` | GitLab 触发器（golang）              | dind、QEMU、buildx                     |
+| `.gitlab/workflows/build-fnpack.yml` | GitLab 触发器（fnpack）              | 依赖基础镜像已推送                     |
+| `.gitlab/workflows/build-wails3.yml` | GitLab 触发器（wails3）              | 依赖基础镜像已推送                     |
+| `.gitlab/workflows/build-wails2.yml` | GitLab 触发器（wails2）              | 依赖基础镜像已推送                     |
+| `.gitlab/workflows/build-fyne.yml`   | GitLab 触发器（fyne）                | 依赖基础镜像已推送                     |
+| `.gitlab/workflows/build-mygo.yml`   | GitLab 触发器（mygo）                | 依赖基础镜像已推送                     |
+| `.gitlab/workflows/build-gio.yml`    | GitLab 触发器（gio）                 | 依赖基础镜像已推送                     |
+| `.gitlab/workflows/build-nsgo.yml`   | GitLab 触发器（nsgo）                | 依赖基础镜像已推送                     |
+| `.gitlab/workflows/build-viva.yml`   | GitLab 触发器（viva）                | 独立定时，排在 nsgo 之后 1 小时        |
+| `.gitlab/workflows/build-asuka.yml`  | GitLab 触发器（asuka）               | 独立定时，排在 viva 之后 1 小时        |
+| `.cnb.yml`                           | CNB 流水线入口，仅 include           | 加镜像时在这里加一行                   |
+| `.cnb/workflows/build-*.yml`         | 各镜像的 cron + 手动按钮（共用锚点） | 事件名必须与 web_trigger 一致          |
+| `.gitlab-ci.yml`                     | GitLab 全局配置、变量、schedules     | 定时任务建在 UI / API 里               |
 
 ## 本地验证
 

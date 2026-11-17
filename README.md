@@ -223,6 +223,16 @@ GitHub 与 GitLab 的 Dockerfile 全部直连官方源（Go / APT / npm / 下载
 - 安全报告走 [SECURITY.md](SECURITY.md)，贡献流程与硬性规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 - 文档入口：[docs/README.md](docs/README.md)。
 
+## 仓库
+
+| 平台    | 地址                             |
+|---------|----------------------------------|
+| CNB     | https://cnb.cool/dtapp/golang    |
+| GitHub  | https://github.com/dtapps/golang |
+| GitLab  | https://gitlab.com/dtapps/golang |
+| Gitee   | https://gitee.com/dtapps/golang  |
+| GitCode | https://gitcode.com/dtapp/golang |
+
 ## 许可
 
 [MIT](LICENSE)

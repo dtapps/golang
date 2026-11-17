@@ -100,7 +100,7 @@ docker pull ghcr.io/dtapps/golang/fyne@sha256:<fyne_digest>
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-fyne.yml`，每天 06:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05、wails3 04:05 之后）；也可用「打包 Golang + fyne 镜像（多架构）」按钮手动触发，可填 `version` / `fyne_version`。
+- CNB：`.cnb/workflows/build-fyne.yml`，每天 06:05 由该文件内的 crontab 定时触发（基座 00:05、fnpack 03:05、wails3 04:05 之后）；也可用「打包 Golang + fyne 镜像（多架构）」按钮手动触发，可填 `version` / `fyne_version`。
 - GitHub：`.github/workflows/build-fyne.yml`，每天 22:05 UTC（北京 06:05）定时触发（基座 16:05 UTC、fnpack 19:05 UTC、wails3 20:05 UTC 之后）；手动触发同样可填 `version` / `fyne_version`。
 - GitLab：`.gitlab/workflows/build-fyne.yml`，在 UI / API 建 `TARGET=fyne` 的 schedule 定时触发（基座先构建）；手动 Run pipeline 时填 `TARGET=fyne`，可再填 `VERSION` / `FYNE_VERSION`，见 [../gitlab.md](../gitlab.md)。
 

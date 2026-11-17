@@ -136,7 +136,7 @@ GUI 需要显示环境：容器里没有显示器时用镜像自带的 `Xvfb`（
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-viva.yml`，每天 10:05 由 `.cnb.yml` 定时触发，排在 nsgo（09:05）之后 1 小时；距基座已过十小时，脚本按常规等基座 5 分钟。也可用「打包 Golang + viva 镜像（多架构）」按钮手动触发，可填 `version` / `viva_version`。
+- CNB：`.cnb/workflows/build-viva.yml`，每天 10:05 由该文件内的 crontab 定时触发，排在 nsgo（09:05）之后 1 小时；距基座已过十小时，脚本按常规等基座 5 分钟。也可用「打包 Golang + viva 镜像（多架构）」按钮手动触发，可填 `version` / `viva_version`。
 - GitHub：`.github/workflows/build-viva.yml`，每天 02:05 UTC（北京 10:05）定时触发，排在 build-nsgo（01:05 UTC）之后 1 小时；手动触发同样可填 `version` / `viva_version`。
 - GitLab：`.gitlab/workflows/build-viva.yml`，在 UI / API 建 `TARGET=viva` 的 schedule 定时触发（建议 cron `5 2 * * *` UTC / `5 10 * * *` 北京，排在 nsgo 之后 1 小时）；手动 Run pipeline 时填 `TARGET=viva`，可再填 `VERSION` / `VIVA_VERSION`，见 [../gitlab.md](../gitlab.md)。
 

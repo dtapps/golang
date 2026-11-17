@@ -76,7 +76,7 @@ docker pull ghcr.io/dtapps/golang/wails3@sha256:<wails3_digest>
 
 ## 怎么构建
 
-- CNB：`.cnb/workflows/build-wails3.yml`，每天 04:05 由 `.cnb.yml` 定时触发（基座 00:05、fnpack 03:05 之后）；也可用「打包 Golang + wails3 镜像（多架构）」按钮手动触发，可填 `version` / `wails3_version`。
+- CNB：`.cnb/workflows/build-wails3.yml`，每天 04:05 由该文件内的 crontab 定时触发（基座 00:05、fnpack 03:05 之后）；也可用「打包 Golang + wails3 镜像（多架构）」按钮手动触发，可填 `version` / `wails3_version`。
 - GitHub：`.github/workflows/build-wails3.yml`，每天 20:05 UTC（北京 04:05）定时触发（基座 16:05 UTC、fnpack 19:05 UTC 之后）；手动触发同样可填 `version` / `wails3_version`。
 - GitLab：`.gitlab/workflows/build-wails3.yml`，在 UI / API 建 `TARGET=wails3` 的 schedule 定时触发（基座先构建）；手动 Run pipeline 时填 `TARGET=wails3`，可再填 `VERSION` / `WAILS3_VERSION`，见 [../gitlab.md](../gitlab.md)。
 

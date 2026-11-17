@@ -11,6 +11,7 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（golang:1-trixie，自动跟随最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
@@ -25,11 +26,13 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           fnpack_version:
+            name: fnpack 版本
             description: 选填。fnpack 版本：留空 = 使用 Dockerfile 的 FNPACK_VERSION（当前 1.2.3，暂作为最新版本）；也可填 1.2.3
             required: false
             type: input
@@ -44,11 +47,13 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           wails3_version:
+            name: wails3 版本
             description: 选填。wails3 版本：留空 = 解析上游最新稳定 tag（如 v3.1.0）；也可填 v3.0.0 / 3.1.0 / v3.0.0-beta.34
             required: false
             type: input
@@ -63,11 +68,13 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           wails2_version:
+            name: wails2 版本
             description: 选填。wails2 版本：留空 = 解析上游最新稳定 tag（如 v2.17.1）；也可填 v2.17.1 / 2.17.1
             required: false
             type: input
@@ -82,11 +89,13 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           fyne_version:
+            name: fyne CLI 版本
             description: 选填。fyne CLI 版本：留空 = 解析上游最新稳定 tag（如 v1.7.4）；也可填 v1.7.4 / 1.7.4
             required: false
             type: input
@@ -101,16 +110,19 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           mygo_version:
+            name: mygo CLI 版本
             description: 选填。mygo CLI 版本：留空 = 解析上游最新稳定 tag（如 v0.8.1）；也可填 v0.8.1 / 0.8.1
             required: false
             type: input
             default: ''
           bun_version:
+            name: bun 版本
             description: 选填。bun 版本（前端模板用）：留空 = 解析 npm 上的最新稳定版（如 1.4.4）；也可填 1.4.4
             required: false
             type: input
@@ -126,11 +138,13 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           gio_version:
+            name: gogio CLI 版本
             description: 选填。gogio CLI 版本（模块 gioui.org/cmd，注意不是 gio）：留空 = 解析上游最新稳定 tag（如 v0.10.3）；也可填 v0.10.3 / 0.10.3
             required: false
             type: input
@@ -146,11 +160,13 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           nsgo_version:
+            name: nsgo CLI 版本
             description: 选填。nsgo CLI 版本（模块 github.com/nsgo-dev/nsgo）：上游暂无 tag，留空 = 把 @latest 解析成具体伪版本； 也可填 v0.0.0-20260101000000-abcdef123456
               伪版本或 vX.Y.Z
             required: false
@@ -167,11 +183,13 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           viva_version:
+            name: viva CLI 版本
             description: 选填。viva CLI 版本（模块 github.com/vivaui/viva）：留空 = 解析上游最新稳定 tag（如 v0.6.4）；也可填 v0.6.4 / 0.6.4
             required: false
             type: input
@@ -186,11 +204,13 @@ branch:
             - developer
         inputs:
           version:
+            name: Go 版本
             description: 选填。对应基础镜像的 Go 版本：留空 = 跟随 Dockerfile 的 GO_VERSION（最新稳定 Go）；也可填 1.27 或 1.27.3
             required: false
             type: input
             default: ''
           asuka_version:
+            name: asuka CLI 版本
             description: 选填。asuka CLI 版本（模块 github.com/egoist/asuka）：留空 = 解析上游最新稳定 tag（如 v0.1.1）；也可填 v0.1.1 / 0.1.1
             required: false
             type: input

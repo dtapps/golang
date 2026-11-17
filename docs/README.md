@@ -71,7 +71,7 @@
   - GitHub：`.github/scripts/build-golang.sh`、`.github/scripts/build-fnpack.sh`、`.github/scripts/build-wails3.sh`、`.github/scripts/build-wails2.sh`、`.github/scripts/build-fyne.sh`、`.github/scripts/build-mygo.sh`、`.github/scripts/build-gio.sh`、`.github/scripts/build-nsgo.sh`、`.github/scripts/build-viva.sh`、`.github/scripts/build-asuka.sh`
   - GitLab：`.gitlab/scripts/build-golang.sh`、`.gitlab/scripts/build-fnpack.sh`、`.gitlab/scripts/build-wails3.sh`、`.gitlab/scripts/build-wails2.sh`、`.gitlab/scripts/build-fyne.sh`、`.gitlab/scripts/build-mygo.sh`、`.gitlab/scripts/build-gio.sh`、`.gitlab/scripts/build-nsgo.sh`、`.gitlab/scripts/build-viva.sh`、`.gitlab/scripts/build-asuka.sh`
 - 触发器：每个平台按镜像拆成十个 workflow。
-  - CNB：`.cnb.yml`（cron）、`.cnb/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`、`.cnb/web_trigger.yml`
+  - CNB：`.cnb.yml`（仅 include；cron 在各 workflow 内）、`.cnb/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`、`.cnb/web_trigger.yml`
   - GitHub：`.github/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`（各自定时触发）
   - GitLab：`.gitlab-ci.yml`（全局配置、schedules）+ `.gitlab/workflows/build-{golang,fnpack,wails3,wails2,fyne,mygo,gio,nsgo,viva,asuka}.yml`
 - 文档与脚本冲突时，以脚本和 Dockerfile 为准，并回头修文档。
