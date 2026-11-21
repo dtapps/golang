@@ -268,9 +268,9 @@ viva 镜像（`.cnb/scripts/build-viva.sh` / `.github/scripts/build-viva.sh` / `
 golang 镜像：
 
 - `go version` 与解析出的版本一致
-- 以下命令都存在：`go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm wixl sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task`
+- 以下命令都存在：`go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm goreleaser sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task gh cnb wixl`
 - `date +%z` 为 `+0800`（`TZ=Asia/Shanghai` 生效、`tzdata` 到位）
-- 以下工具的版本命令能实际执行（`--version` / `version` / `-v` 任一成功，防 latest 升级装进坏二进制）：`node npm pnpm upx nfpm sqlc golangci-lint gojq shfmt gotestsum task`
+- 以下工具的版本命令能实际执行（`--version` / `version` / `-v` 任一成功，防 latest 升级装进坏二进制）：`node npm pnpm upx nfpm goreleaser sqlc golangci-lint gojq shfmt gotestsum task gh cnb wixl`
 - `fnpack` **不存在**
 
 fnpack 镜像：

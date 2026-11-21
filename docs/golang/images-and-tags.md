@@ -208,7 +208,7 @@ docker pull ghcr.io/dtapps/golang/viva@sha256:<viva_digest>
 | `source_date`        | 最后一次提交时间                              |
 | `revision`           | 提交 SHA                                      |
 
-golang 基座还会**逐个工具**写一份版本号：key 是 Dockerfile 里 `ARG` 名的小写形式（`GOLANGCI_LINT_VERSION` → `golangci_lint_version`），覆盖全部 14 个 `go install` 版本变量加 `node_version` / `pnpm_version` / `upx_version`，共 17 个；apt 装的 `wixl` 没有 `ARG`，版本由冒烟容器里的 `dpkg-query -W` 带出，写成 `wixl_version`（取不到时为 `unknown`）。原来的单行汇总 `tools`（`upx=4.2.4 node=26.0.0 …`）保留不变，两种读法都能用：
+golang 基座还会**逐个工具**写一份版本号：key 是 Dockerfile 里 `ARG` 名的小写形式（`GOLANGCI_LINT_VERSION` → `golangci_lint_version`），覆盖全部 17 个 `go install` 版本变量加 `upx_version` / `node_version` / `pnpm_version` / `cnb_cli_version`，共 21 个；apt 装的 `wixl` 没有 `ARG`，版本由冒烟容器里的 `dpkg-query -W` 带出，写成 `wixl_version`（取不到时为 `unknown`）。原来的单行汇总 `tools`（`upx=4.2.4 node=26.0.0 …`）保留不变，两种读法都能用：
 
 ```bash
 jq -r '.golangci_lint_version' .github/annotation.json  # 单个工具

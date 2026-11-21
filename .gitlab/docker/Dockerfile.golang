@@ -11,6 +11,7 @@
 #   + gojq / sql-formatter / gotestsum / markdownfmt
 #   + gocover-cobertura / gcov2lcov（覆盖率报告转换）
 #   + task（go-task：Taskfile 任务运行器）
+#   + GitHub CLI（gh）/ CNB CLI（cnb）
 #   + wixl（编译 Windows MSI 用）
 #
 # 工具版本默认 latest，构建时自动解析最新版（详见下方版本变量注释块）。
@@ -58,6 +59,8 @@ ARG IMAGE_SOURCE
 #   GoReleaser go install @latest（v2 模块路径含 /v2；钉版本格式 v2.X.Y）
 #   Go 工具链  go install @latest（模块路径含 /v2、/v3，不会自动跳 major）
 #   pnpm       npm registry 的 pnpm@latest
+#   gh         go list -m github.com/cli/cli/v2@latest（Go 模块；官方二进制优先）
+#   cnb        cnb.cool Releases 页面第一个 x.y.z（资产名 cnb-linux-{x64,arm64}，版本号不带 v）
 #
 # https://github.com/upx/upx/releases
 # https://github.com/goreleaser/nfpm/releases
@@ -77,6 +80,8 @@ ARG IMAGE_SOURCE
 # https://github.com/Kunde21/markdownfmt/releases
 # https://github.com/boumenot/gocover-cobertura/releases
 # https://github.com/jandelgado/gcov2lcov/releases
+# https://github.com/cli/cli/releases
+# https://cnb.cool/cnb/skills/cnb-skill/-/releases
 # ==========================================
 ARG UPX_VERSION=latest
 ARG NFPM_VERSION=latest
@@ -97,6 +102,8 @@ ARG MARKDOWNFMT_VERSION=latest
 ARG GOCOVER_COBERTURA_VERSION=latest
 ARG GCOV2LCOV_VERSION=latest
 ARG TASK_VERSION=latest
+ARG GH_VERSION=latest
+ARG CNB_CLI_VERSION=latest
 
 # 1. 设置 Go 环境变量
 ENV GOPATH=/go \
@@ -107,6 +114,9 @@ ENV GOPATH=/go \
 ENV TZ=Asia/Shanghai \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
+
+# cnb CLI 默认 API 端点（公有云端点）；私有化部署在运行时覆盖，镜像里不放任何凭证
+ENV CNB_API_ENDPOINT=https://api.cnb.cool
 
 # 2. 安装基础构建工具（含 tzdata，配合上面的 TZ）
 # xz-utils / zstd：.tar.xz（UPX、Node）与 .tar.zst 的打包解压；zstd 当前无调用，先预留
@@ -304,6 +314,39 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     || go install -v github.com/go-task/task/v3/cmd/task@${TASK_VERSION}; \
     echo "[${TARGETPLATFORM:-unknown}] ==> task 安装完成 (${TASK_VERSION})"
 
+# 5.6 GitHub CLI（gh）
+# 官方 Release 有 linux/amd64、linux/arm64 二进制，install-tool 下载即用；
+# 失败再 go install（模块带 /v2，latest 不会跳到 v3）。
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    install-tool gh "${GH_VERSION}" \
+    || go install -v github.com/cli/cli/v2/cmd/gh@${GH_VERSION}; \
+    echo "[${TARGETPLATFORM:-unknown}] ==> gh 安装完成 (${GH_VERSION})"
+
+# 5.7 CNB CLI（cnb）
+# 官方二进制只在 cnb.cool Releases（不在 GitHub），因此不走 install-tool：
+#   latest   → /releases/latest/download/cnb-linux-<arch>
+#   指定版本 → /releases/download/<x.y.z>/cnb-linux-<arch>
+# 资产名用 x64 / arm64，版本号不带 v。
+RUN set -eux; \
+    ARCH="$(uname -m)"; \
+    case "$ARCH" in \
+    x86_64) CNB_ARCH=x64 ;; \
+    aarch64) CNB_ARCH=arm64 ;; \
+    *) echo "[${TARGETPLATFORM:-unknown}] 不支持的架构: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    CNB_VER="${CNB_CLI_VERSION#v}"; \
+    CNB_BASE="https://cnb.cool/cnb/skills/cnb-skill/-/releases"; \
+    if [ "${CNB_VER}" = "latest" ]; then \
+    CNB_URL="${CNB_BASE}/latest/download/cnb-linux-${CNB_ARCH}"; \
+    else CNB_URL="${CNB_BASE}/download/${CNB_VER}/cnb-linux-${CNB_ARCH}"; fi; \
+    wget -q -O /tmp/cnb "${CNB_URL}"; \
+    install -m 0755 /tmp/cnb /usr/local/bin/cnb; \
+    rm -f /tmp/cnb; \
+    echo "[${TARGETPLATFORM:-unknown}] --- CNB CLI 安装的 ---"; \
+    cnb --version
+
 # 6. 清空所有 apt 缓存（保留 wget / xz-utils，不卸载）
 RUN apt-get autoremove -y \
     && apt-get clean \
@@ -319,7 +362,7 @@ LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.version="${IMAGE_VERSION}" \
-    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + GoReleaser + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、task、wixl、gocover-cobertura、gcov2lcov" \
+    org.opencontainers.image.description="Golang 构建环境：Go 工具链 + UPX + nfpm + GoReleaser + Node.js/pnpm + sqlc、ent、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、task、gh、cnb、wixl、gocover-cobertura、gcov2lcov" \
     org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.base.name="golang:${GO_VERSION}-${DEBIAN_VERSION}" \
     org.opencontainers.image.base.digest="${BASE_DIGEST}"

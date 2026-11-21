@@ -16,3 +16,6 @@ markdownfmt,Markdown 格式化,格式化 Markdown；只能 go install；ARG MARK
 gotestsum,测试运行器,跑 go test 并产出 JUnit；ARG GOTESTSUM_VERSION,全部镜像（基座安装，变体继承）
 gocover-cobertura,覆盖率转换,把 Go coverprofile 转成 Cobertura XML；只能 go install；ARG GOCOVER_COBERTURA_VERSION,全部镜像（基座安装，变体继承）
 gcov2lcov,覆盖率转换,把 Go coverprofile 转成 lcov；ARG GCOV2LCOV_VERSION,全部镜像（基座安装，变体继承）
+平台 CLI,,,
+gh,GitHub CLI,在容器内调用 GitHub API / 操作 Release 等；官方二进制优先，失败回退 go install；ARG GH_VERSION,全部镜像（基座安装，变体继承）
+cnb,CNB CLI,在容器内调用 CNB API；官方二进制只发布在 cnb.cool Releases，运行时需 CNB_TOKEN；默认 CNB_API_ENDPOINT=https://api.cnb.cool；ARG CNB_CLI_VERSION,全部镜像（基座安装，变体继承）

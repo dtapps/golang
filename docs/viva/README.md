@@ -11,7 +11,7 @@
 ## 镜像里有什么
 
 - 基座：本仓库构建的 Golang 构建环境镜像（CI 按 `<go 版本>` 钉住当天刚推好的那份；Dockerfile 默认基座是官方 `golang:1-trixie`，只用于不依赖私有仓库的本地构建）
-- 继承基座全部内容：Go 工具链、UPX、nfpm、Node.js + npm + pnpm、sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt / gojq / sql-formatter / gotestsum / markdownfmt / gocover-cobertura / gcov2lcov / task、wixl、git / curl / make / jq / zip / unzip / pkg-config、`TZ=Asia/Shanghai` 与 `C.UTF-8`
+- 继承基座全部内容：Go 工具链、UPX、nfpm、Node.js + npm + pnpm、sqlc / ent / golangci-lint / govulncheck / shfmt / dockerfmt / yamlfmt / gojq / sql-formatter / gotestsum / markdownfmt / gocover-cobertura / gcov2lcov / task、gh / cnb、wixl、git / curl / make / jq / zip / unzip / pkg-config、`TZ=Asia/Shanghai` 与 `C.UTF-8`
 - 新增系统包：`pkg-config`、`gcc`、`libx11-dev`、`libx11-xcb-dev`、`libxcb1-dev`、`libxcb-randr0-dev`、`libxcb-sync-dev`、`libxcb-cursor-dev`、`libxkbcommon-dev`、`libxkbcommon-x11-dev`、`libvulkan-dev`、`libfontconfig1-dev`、`libglib2.0-dev`、`libpango1.0-dev`、`libcairo2-dev`、`libgdk-pixbuf-2.0-dev`、`libgtk-3-dev`、`libwebkit2gtk-4.1-dev`，以及无头运行环境 `xvfb`、`xauth`、`dbus-x11`、`libgl1-mesa-dri`、`libglx-mesa0`、`libegl-mesa0`、`mesa-vulkan-drivers`、`shared-mime-info`、`adwaita-icon-theme`、`fonts-dejavu-core`
 - 新增 CLI：`/go/bin/viva`（`GOPATH=/go`，已在 `PATH` 里；`go install github.com/vivaui/viva/cmd/viva@<VIVA_VERSION>`）
 

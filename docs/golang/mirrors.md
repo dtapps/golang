@@ -5,6 +5,8 @@
 | 依赖                               | GitHub Actions / GitLab CI      | CNB                                                    |
 |------------------------------------|---------------------------------|--------------------------------------------------------|
 | GitHub Release（UPX）              | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`           |
+| GitHub Release（gh 二进制）        | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`           |
+| CNB CLI（cnb.cool Releases）       | 直连 `cnb.cool`                 | 直连 `cnb.cool`                                        |
 | GitHub Release Atom（UPX 版本号）  | 直连 `github.com`               | `https://files.m.daocloud.io/github.com/...`（同域名） |
 | Node.js 官方 tar.xz 与版本索引     | 直连 `nodejs.org`               | `https://files.m.daocloud.io/nodejs.org/...`           |
 | nfpm 与各 Go 工具（`go install`）  | Go module（`proxy.golang.org`） | 腾讯 → goproxy.cn → goproxy.io → direct（见下文）      |

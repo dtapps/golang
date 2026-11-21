@@ -172,6 +172,7 @@ MARKDOWNFMT_VERSION=github.com/Kunde21/markdownfmt/v3
 GOCOVER_COBERTURA_VERSION=github.com/boumenot/gocover-cobertura
 GCOV2LCOV_VERSION=github.com/jandelgado/gcov2lcov
 TASK_VERSION=github.com/go-task/task/v3
+GH_VERSION=github.com/cli/cli/v2
 "
 
 # 版本变量 → 二进制名：元数据里的版本以镜像里实际装上的为准（读二进制而不是靠解析）
@@ -192,6 +193,8 @@ MARKDOWNFMT_VERSION=markdownfmt
 GOCOVER_COBERTURA_VERSION=gocover-cobertura
 GCOV2LCOV_VERSION=gcov2lcov
 TASK_VERSION=task
+GH_VERSION=gh
+CNB_CLI_VERSION=cnb
 UPX_VERSION=upx
 NODE_VERSION=node
 PNPM_VERSION=pnpm
@@ -262,6 +265,15 @@ pnpm_ver="$(curl -fsSL "${NPM_REGISTRY%/}/pnpm/latest" 2>/dev/null \
 case "${pnpm_ver}" in
 [0-9]*) printf 'PNPM_VERSION=%s\n' "${pnpm_ver}" ;;
 *) echo "无法解析 pnpm 版本（得到：${pnpm_ver:-空}），本次用 latest" >&2 ;;
+esac
+
+# CNB CLI：cnb.cool 的 Releases 页面第一个 x.y.z（版本号不带 v）
+cnb_ver="$(curl -fsSL "https://cnb.cool/cnb/skills/cnb-skill/-/releases" 2>/dev/null \
+  | grep -oE '/releases/download/[0-9]+\.[0-9]+\.[0-9]+/' | head -n 1 \
+  | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+case "${cnb_ver}" in
+[0-9]*) printf 'CNB_CLI_VERSION=%s\n' "${cnb_ver}" ;;
+*) echo "无法解析 CNB CLI 版本（得到：${cnb_ver:-空}），本次用 latest" >&2 ;;
 esac
 RESOLVE_EOF
   resolve_b64="$(base64 <"${resolve_tmp}" | tr -d '\n')"
@@ -344,7 +356,7 @@ MINOR="$(printf '%s' "${GO_REAL}" | cut -d. -f1,2)"
 # 解析失败不阻断构建：回退 latest，由 Dockerfile 在构建时自行解析（缓存不生效）。
 DOCKERFILE_GOPROXY="$(read_env GOPROXY "$DOCKERFILE_GOLANG")"
 NPM_REGISTRY="$(read_npm_registry "$DOCKERFILE_GOLANG")"
-TOOL_VARS="$(dockerfile_tool_vars "$DOCKERFILE_GOLANG") UPX_VERSION NODE_VERSION PNPM_VERSION"
+TOOL_VARS="$(dockerfile_tool_vars "$DOCKERFILE_GOLANG") UPX_VERSION NODE_VERSION PNPM_VERSION CNB_CLI_VERSION"
 
 # 自检：Dockerfile 里出现的 go install 版本变量都要在 GO_TOOL_MODULES 里登记
 missing_modules=""
@@ -548,7 +560,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     [ "$got" = "$EXPECT_GO" ] || fail="$fail go-version($got)"
     for b in go node npm pnpm git curl make jq zip unzip pkg-config upx nfpm \
       goreleaser sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
-      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task wixl; do
+      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task gh cnb wixl; do
       command -v "$b" >/dev/null 2>&1 || fail="$fail bin:$b"
     done
     # 时区生效：TZ=Asia/Shanghai 下偏移必须是 +0800（tzdata 已装且 zoneinfo 可用）
@@ -556,7 +568,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     # 版本命令实际跑一遍：工具默认 @latest 自动追新后，只查 presence
     # 挡不住装坏的二进制。--version / version / -v 逐个兜底，
     # 输出丢弃，仅以退出码计 fail。
-    for b in node npm pnpm upx nfpm goreleaser sqlc golangci-lint gojq shfmt gotestsum task wixl; do
+    for b in node npm pnpm upx nfpm goreleaser sqlc golangci-lint gojq shfmt gotestsum task gh cnb wixl; do
       command -v "$b" >/dev/null 2>&1 || continue
       "$b" --version >/dev/null 2>&1 \
         || "$b" version >/dev/null 2>&1 \
@@ -568,7 +580,7 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     # 真实版本：从二进制里的模块信息读（go version -m），比解析 --version 输出可靠。
     # 供元数据使用：CI 解析失败回退 latest 时，这里仍能给出实际装上的版本号。
     for b in nfpm goreleaser sqlc ent entc golangci-lint govulncheck shfmt dockerfmt yamlfmt gojq \
-      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task; do
+      sql-formatter gotestsum markdownfmt gocover-cobertura gcov2lcov task gh; do
       v="$(go version -m "$(command -v "$b")" 2>/dev/null \
         | sed -n "s/^[[:space:]]*mod[[:space:]][^[:space:]]*[[:space:]]\([^[:space:]]*\).*/\1/p" \
         | head -n 1 || true)"
@@ -578,6 +590,8 @@ if ! smoke_output="$(docker run --rm --platform linux/amd64 \
     printf "TOOLVER pnpm=%s\n" "$(pnpm -v 2>/dev/null || true)"
     printf "TOOLVER upx=%s\n" "$(upx --version 2>/dev/null \
       | sed -n "s/^upx \([0-9][0-9.]*\).*/\1/p" | head -n 1 || true)"
+    # cnb 不是 Go 编译的二进制，go version -m 读不到，直接取 --version 输出
+    printf "TOOLVER cnb=%s\n" "$(cnb --version 2>/dev/null | head -n 1 || true)"
     # wixl 是 apt 装的、没有 ARG 版本变量，版本只能从包信息里取，随冒烟一起带出来
     printf "SMOKE_OK wixl=%s" "$(dpkg-query -W -f="\${Version}" wixl 2>/dev/null || echo unknown)"
   ' 2>&1)"; then

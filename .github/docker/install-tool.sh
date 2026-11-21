@@ -93,6 +93,10 @@ case "${tool}" in
     repo=go-task/task
     file="task_linux_${arch}.tar.gz"
     ;;
+  gh)
+    repo=cli/cli
+    file="gh_${v}_linux_${arch}.tar.gz"
+    ;;
   *)
     echo "没有官方二进制，回退 go install：${tool}" >&2
     exit 1

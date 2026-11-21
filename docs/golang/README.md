@@ -22,6 +22,7 @@
 - 下载与打包工具：UPX、nfpm；另有 `wixl` / `wixl-data`（msitools），在 Linux 上直接编译 Windows MSI
 - Node.js 26 + npm + pnpm 12
 - Go 工具：sqlc、ent/entc、golangci-lint、govulncheck、shfmt、dockerfmt、yamlfmt、gojq、sql-formatter、gotestsum、markdownfmt、gocover-cobertura、gcov2lcov、task（go-task）
+- 平台 CLI：GitHub CLI（`gh`）与 CNB CLI（`cnb`），均装官方二进制；`CNB_API_ENDPOINT` 默认公有云端点
 - 基础命令：git、curl、make、jq、zip/unzip、pkg-config
 - 时区与语言：`TZ=Asia/Shanghai`、`LANG=C.UTF-8`、`LC_ALL=C.UTF-8`，并装了 `tzdata`（容器内 `date` 显示 CST，构建日志与产物时间戳统一北京时间）
 

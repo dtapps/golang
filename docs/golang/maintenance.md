@@ -54,6 +54,8 @@
 | gocover-cobertura | `GOCOVER_COBERTURA_VERSION` |
 | gcov2lcov         | `GCOV2LCOV_VERSION`         |
 | task（go-task）   | `TASK_VERSION`              |
+| GitHub CLI（gh）  | `GH_VERSION`                |
+| CNB CLI（cnb）    | `CNB_CLI_VERSION`           |
 
 升级后本地构建一次，确认对应二进制仍可执行；CI 冒烟只检查「命令存在」，不检查版本号。
 
