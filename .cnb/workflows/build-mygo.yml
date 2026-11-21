@@ -23,6 +23,13 @@
       settings:
         type: ADD
         fromJsonFile: .cnb/annotation-mygo.json
+    # 构建完成后在该变体的固定 Issue 上更新当前版本，版本号变化时追加评论。
+    # 每个变体一条 Issue；脚本统一在 .cnb/scripts/announce-build.sh。
+    - name: 发布构建评论
+      image: cnbcool/cnb-cli
+      allowFailure: true
+      script: |
+        sh .cnb/scripts/announce-build.sh mygo
 
 '**':
   # 自定义按钮可触发的事件：web_trigger_build_mygo

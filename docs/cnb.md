@@ -9,7 +9,7 @@
 | `.cnb.yml`                    | 仅 `include` 列表；各镜像的 cron（00:05 golang、03:05 fnpack、04:05 wails3、06:05 fyne、07:05 mygo、08:05 gio、09:05 nsgo、10:05 viva、11:05 asuka）与手动按钮都在对应 `build-*.yml` 内 |
 | `.cnb/workflows/`             | 构建、扫描、评审、文档生成、知识库                                                                                                                                                      |
 | `.cnb/docker/`                | CNB 侧的 Dockerfile（golang / fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka）                                                                                      |
-| `.cnb/scripts/`               | CNB 侧的构建脚本（golang / fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 各一份）                                                                                  |
+| `.cnb/scripts/`               | CNB 侧的构建脚本（golang / fnpack / wails3 / wails2 / fyne / mygo / gio / nsgo / viva / asuka 各一份）与构建记录脚本 `announce-build.sh`                                                |
 | `.cnb/web_trigger.yml`        | 手动按钮、权限、输入项                                                                                                                                                                  |
 | `.cnb/annotation.json`        | golang 构建元数据（`.gitignore` 已排除），由 annotation 插件读取                                                                                                                        |
 | `.cnb/annotation-fnpack.json` | fnpack 构建元数据（`.gitignore` 已排除）                                                                                                                                                |
@@ -139,6 +139,31 @@ https://cnb.cool/dtapp/golang/-/badge/annotation/commit/latest/{key}
 常用 key：`image_version`、`golang_digest`、`fnpack_digest`、`fnpack_version`、`wails3_digest`、`wails3_version`、`wails2_digest`、`wails2_version`、`fyne_digest`、`fyne_version`、`mygo_digest`、`mygo_version`、`bun_version`、`gio_digest`、`gio_version`、`nsgo_digest`、`nsgo_version`、`viva_digest`、`viva_version`、`tools`、`built_at`。
 
 `cnbcool/annotations` 目前只发 `:latest`，构建网络内也取不到 digest，所以插件引用暂时无法固定版本。发现插件行为变化时先看流水线日志。
+
+## 构建记录 Issue
+
+每个变体在 CNB 上有一条常驻 Issue（标题 `[镜像] <变体> 构建记录`），由 `.cnb/scripts/announce-build.sh` 维护。所有 `build-*.yml` 在「写入镜像元数据」之后调用同一个脚本，改行为只改脚本：
+
+```yaml
+- name: 发布构建评论
+  image: cnbcool/cnb-cli
+  allowFailure: true
+  script: |
+    sh .cnb/scripts/announce-build.sh wails3
+```
+
+- 第一次构建自动创建 Issue（标签 `构建记录`），之后复用同一条，不按天新建。
+- 每次构建刷新正文里的「当前版本」（镜像、Go / 工具版本、digest、体积、构建时间）。
+- 评论与正文里的构建时间按北京时间（`+08:00`）显示；annotation JSON 里的 `built_at` 保持 UTC（OCI 元数据惯例），只有面向人看的文字做转换。
+- 只有版本号变化才追加评论，没有变化不评论。`golang` 记录 `golang_version` 与内置工具表，`mygo` 额外记录 `bun_version`，其余变体记录 `golang_version` 与自己的 `<变体>_version`。
+- 每条评论开头 `@CodeBuddy`，让仓库里的 NPC 根据版本变化和 annotation 整理一份面向使用者的更新说明（NPC 配置见 `.cnb/settings.yml`）。
+- 评论末尾附上本次构建的完整 annotation JSON（可折叠），方便对照工具版本、digest、系统包等细节。
+- 上一次版本写在评论开头的隐藏标记里（`<!-- build-announce-state:... -->`），脚本读最近一条带标记的评论做 diff。评论发出后删不掉，所以同一次构建重跑也不会重复评论。
+- 周一额外发一条「周总结」（总结上一周），每月 1 号额外发一条「月总结」（总结上一个月），日期按 Asia/Shanghai 判断，都发在同一条变体 Issue 里。基线是上一次同名总结评论顶部的快照标记（`<!-- build-summary-state:weekly|monthly:<日期>:<版本快照> -->`）；首次没有基线时只记录当前版本、建立基线。周一与 1 号重合时合并成一条评论，当天重跑不会重复发。
+- stage 用 `cnbcool/cnb-cli`（`cnb issues ...`）并 `allowFailure: true`：公告失败不影响镜像发布。
+- 该功能只在 CNB 侧实现；GitHub / GitLab 侧不维护对应的 Issue。
+
+> 依赖构建阶段写出的 `.cnb/annotation[-<变体>].json`，stage 之间共享工作区。
 
 ## 镜像源
 
